@@ -146,7 +146,7 @@ export default function HomePage() {
   }, [activeThread, agentId, loadHistory]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    bottomRef.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
   }, [visibleMessages.length, messages, isStreaming]);
 
   const newTask = () => {
