@@ -1,0 +1,271 @@
+/* ===================================================================
+   Octop Crayon Theme — 手绘蜡笔风全局皮肤
+   Loaded after theme-vars.css & manus-theme.css (wins over both).
+   1. Remap --fn-* surface tokens (light mode) to cream paper + ink.
+   2. Structural layer: crayon borders, subtle wobble radii, hard
+      offset shadows, handwriting font on headings/controls.
+   Brand palette tokens are untouched. Dark mode keeps its surfaces.
+   Font: ZCOOL KuaiLe is bundled via @fontsource (see App.tsx).
+   =================================================================== */
+
+:root {
+  --crayon-ink: #3b3a36;
+  --crayon-ink-soft: #6b675c;
+  --crayon-line: #cfc2a2;
+  --crayon-line-strong: #a89a76;
+  --crayon-paper: #faf3e4;
+  --crayon-card: #fffdf6;
+  --crayon-yellow: #ffe066;
+  --crayon-font-hand: "ZCOOL KuaiLe", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", sans-serif;
+}
+
+/* ---------- crayon palette (light surfaces) ---------- */
+:root,
+html[data-theme="light"] {
+  --fn-bg-primary: var(--crayon-card);
+  --fn-bg-secondary: #f8f1de;
+  --fn-bg-tertiary: #f2e9d2;
+  --fn-bg-elevated: var(--crayon-card);
+  --fn-bg-layout: var(--crayon-paper);
+  --fn-bg-container: var(--crayon-card);
+  --fn-bg-code: #f6efdc;
+  --fn-bg-toolbar: #fbf5e6;
+  --fn-bg-toolbar-hover: #f2e9d2;
+  --fn-bg-input-label: #f8f1de;
+  --fn-bg-glass: rgba(255, 253, 246, 0.9);
+  --fn-bg-sidebar: var(--crayon-paper);
+  --fn-bg-base: var(--crayon-card);
+  --fn-bg-page: var(--crayon-paper);
+  --fn-surface: var(--crayon-card);
+  --fn-surface-sunken: #f8f1de;
+
+  --fn-text-primary: var(--crayon-ink);
+  --fn-text-secondary: var(--crayon-ink-soft);
+  --fn-text-tertiary: #9b958a;
+  --fn-text-placeholder: #b3ac9c;
+
+  --fn-border-primary: var(--crayon-line);
+  --fn-border-secondary: #e9dfc6;
+  --fn-border-tertiary: #f0e8d2;
+  --fn-border-input: #d8ccaf;
+  --fn-border-input-alt: #e4dabb;
+  --fn-border: var(--crayon-line);
+  --fn-border-color: var(--crayon-line);
+  --fn-border-strong: var(--crayon-line-strong);
+
+  --fn-sidebar-bg: var(--crayon-paper);
+  --fn-sidebar-border: #e4dabb;
+  --fn-header-bg: var(--crayon-paper);
+
+  --fn-card-border-normal: var(--crayon-line);
+  --fn-card-radius: 14px;
+}
+
+/* ---------- paper grain under everything (light only) ---------- */
+html[data-theme="light"] body {
+  background-color: var(--crayon-paper);
+  background-image: radial-gradient(
+    rgba(59, 58, 54, 0.045) 1px,
+    transparent 1.4px
+  );
+  background-size: 24px 24px;
+}
+
+/* ===================================================================
+   Surfaces — crayon borders, wobble radii, offset shadows
+   =================================================================== */
+
+.octop-card,
+.octop-modal-content,
+.octop-drawer-content,
+.octop-popover-inner,
+.octop-dropdown .octop-dropdown-menu,
+.octop-notification-notice,
+.octop-message-notice,
+.octop-alert {
+  border: 2px solid var(--crayon-line-strong) !important;
+  border-radius: 14px 18px 12px 20px / 18px 12px 20px 14px !important;
+  box-shadow: 3px 4px 0 rgba(59, 58, 54, 0.1) !important;
+}
+.octop-modal-content,
+.octop-drawer-content {
+  box-shadow: 5px 7px 0 rgba(59, 58, 54, 0.18) !important;
+}
+.octop-modal-header,
+.octop-drawer-header {
+  border-bottom: 2px dashed var(--crayon-line) !important;
+}
+
+/* ---------- controls ---------- */
+.octop-input,
+.octop-input-affix-wrapper,
+.octop-input-number,
+.octop-select-selector,
+.octop-picker {
+  border-radius: 10px 14px 9px 15px / 14px 9px 15px 10px !important;
+  border: 2px solid var(--fn-border-input) !important;
+  background: var(--crayon-card) !important;
+  box-shadow: none !important;
+  color: var(--crayon-ink) !important;
+}
+.octop-input:hover,
+.octop-input-affix-wrapper:hover,
+.octop-select-selector:hover,
+.octop-picker:hover {
+  border-color: var(--crayon-line-strong) !important;
+}
+.octop-input:focus,
+.octop-input-focused,
+.octop-input-affix-wrapper-focused,
+.octop-select-focused .octop-select-selector,
+.octop-picker-focused {
+  border-color: var(--crayon-ink) !important;
+  box-shadow: 0 0 0 3px rgba(255, 224, 102, 0.5) !important;
+}
+
+/* ---------- buttons ---------- */
+.octop-btn {
+  border-radius: 10px 60px 12px 55px / 55px 12px 65px 10px !important;
+  font-family: var(--crayon-font-hand) !important;
+  font-weight: 400 !important;
+  letter-spacing: 0.5px;
+  transition:
+    background-color 0.14s ease,
+    border-color 0.14s ease,
+    transform 0.14s ease !important;
+}
+.octop-btn-default {
+  border-color: var(--fn-border-input) !important;
+  background: var(--crayon-card) !important;
+}
+.octop-btn-default:not(:disabled):hover {
+  border-color: var(--crayon-line-strong) !important;
+  background: var(--fn-bg-secondary) !important;
+  transform: translateY(-1px) rotate(-0.4deg);
+}
+.octop-btn-primary:not(.octop-btn-dangerous) {
+  background: var(--fn-primary) !important;
+  border-color: var(--crayon-ink) !important;
+  box-shadow: 2px 3px 0 rgba(59, 58, 54, 0.24) !important;
+}
+.octop-btn-primary:not(.octop-btn-dangerous):not(:disabled):hover {
+  transform: translateY(-1px) rotate(-0.5deg);
+  filter: brightness(1.05);
+}
+.octop-btn-round {
+  border-radius: 999px !important;
+}
+.octop-btn-circle {
+  border-radius: 50% !important;
+}
+
+/* ---------- handwriting accents ---------- */
+.octop-modal-title,
+.octop-drawer-title,
+.octop-tabs-tab,
+.octop-tag,
+.octop-menu-item,
+.octop-menu-submenu-title,
+.octop-segmented-item,
+.octop-pagination-item,
+.octop-table-thead > tr > th {
+  font-family: var(--crayon-font-hand) !important;
+}
+
+/* segmented / tabs */
+.octop-segmented {
+  background: var(--fn-bg-secondary) !important;
+  border: 2px solid var(--fn-border-input);
+  border-radius: 12px !important;
+  padding: 2px !important;
+}
+.octop-segmented-item,
+.octop-segmented-thumb {
+  border-radius: 9px !important;
+}
+.octop-segmented-item-selected {
+  background: var(--crayon-yellow) !important;
+  box-shadow: 1px 2px 0 rgba(59, 58, 54, 0.16) !important;
+}
+.octop-tabs-tab {
+  border-radius: 8px !important;
+}
+.octop-tabs-tab-active .octop-tabs-tab-btn {
+  font-weight: 400;
+  color: var(--crayon-ink) !important;
+}
+.octop-tabs-ink-bar {
+  background: var(--crayon-ink) !important;
+}
+
+/* ---------- tables ---------- */
+.octop-table {
+  border: 2px solid var(--crayon-line-strong) !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+}
+.octop-table-thead > tr > th {
+  background: var(--fn-bg-toolbar) !important;
+  border-bottom: 2px solid var(--crayon-line) !important;
+  font-weight: 400 !important;
+  letter-spacing: 1px;
+}
+.octop-table-tbody > tr > td {
+  border-bottom: 1.5px dashed var(--crayon-line) !important;
+}
+.octop-table-tbody > tr:hover > td {
+  background: rgba(255, 224, 102, 0.28) !important;
+}
+
+/* ---------- tags & pills ---------- */
+.octop-tag {
+  border-radius: 6px 40px 8px 36px / 36px 8px 44px 6px !important;
+  border: 1.5px solid var(--crayon-line-strong) !important;
+  padding-inline: 10px !important;
+}
+
+/* ---------- tooltip / popover ---------- */
+.octop-tooltip-inner {
+  border-radius: 10px !important;
+  border: 2px solid var(--crayon-line-strong) !important;
+  font-size: 12px !important;
+}
+
+/* ---------- list rows ---------- */
+.octop-list-item {
+  border-block-end: 1.5px dashed var(--crayon-line) !important;
+}
+
+/* ---------- focus ring & selection ---------- */
+:where(button, a, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--crayon-ink) !important;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+::selection {
+  background: var(--crayon-yellow);
+}
+
+/* ---------- scrollbars (warm) ---------- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 122, 84, 0.35);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 122, 84, 0.55);
+  background-clip: content-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+html[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  background-clip: content-box;
+}

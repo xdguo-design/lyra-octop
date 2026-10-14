@@ -1,0 +1,570 @@
+/* ============================================================
+   手绘蜡笔风 AI 工作台 · /home
+   布局 = Manus 任务式双栏：左栏（新建任务/导航/任务历史/用户）
+   + 中央（居中 hero / 入口卡 / 底部大输入框）。
+   风格基因：奶油纸张底 + 深棕蜡笔描边 + 荧光笔高亮 + 贴纸卡片。
+   本页固定暖色纸张风，不随全站明暗主题切换。
+   ============================================================ */
+
+.wb-root {
+  /* palette */
+  --wb-paper: #faf3e4;
+  --wb-paper-deep: #f5ecd7;
+  --wb-ink: #3b3a36;
+  --wb-ink-soft: rgba(59, 58, 54, 0.62);
+  --wb-yellow: #ffd43b;
+  --wb-yellow-soft: #ffe066;
+  --wb-blue: #4dabf7;
+  --wb-blue-soft: #a5d8ff;
+  --wb-green: #69db7c;
+  --wb-green-soft: #b2f2bb;
+  --wb-orange: #ffa94d;
+  --wb-pink: #f783ac;
+  --wb-card: #fffdf6;
+  --wb-wood: #e7b96a;
+  --wb-wood-deep: #c98f3f;
+
+  --wb-hand: "ZCOOL KuaiLe", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", sans-serif;
+  --wb-brush: "Ma Shan Zheng", "ZCOOL KuaiLe", "KaiTi", serif;
+
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr);
+  gap: 14px;
+  padding: 14px;
+  overflow: hidden;
+  color: var(--wb-ink);
+  background-color: var(--wb-paper);
+  background-image: radial-gradient(
+    rgba(59, 58, 54, 0.05) 1px,
+    transparent 1.4px
+  );
+  background-size: 24px 24px;
+  font-family: var(--wb-hand);
+}
+
+.wb-root ::selection {
+  background: var(--wb-yellow-soft);
+}
+
+/* 手绘 wobble 圆角（不规则半径轮换，模拟手画框） */
+.wb-wobble {
+  border: 2.5px solid var(--wb-ink);
+  border-radius: 14px 255px 15px 225px / 225px 15px 255px 15px;
+  background: var(--wb-card);
+  box-shadow: 3px 4px 0 rgba(59, 58, 54, 0.16);
+}
+.wb-wobble-sm {
+  border: 2px solid var(--wb-ink);
+  border-radius: 10px 155px 12px 145px / 145px 12px 165px 12px;
+  background: var(--wb-card);
+}
+
+/* ============ 左栏 ============ */
+.wb-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 8px 6px 4px;
+}
+
+.wb-logo {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px 10px;
+  font-family: var(--wb-hand);
+  color: var(--wb-ink);
+  text-align: left;
+  cursor: pointer;
+  background: none;
+  border: none;
+  border-bottom: 2.5px dashed rgba(59, 58, 54, 0.35);
+}
+.wb-logo-img {
+  width: 78px;
+  height: 78px;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+  transform: rotate(-4deg);
+}
+.wb-logo-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.wb-logo-title {
+  font-family: var(--wb-brush);
+  font-size: 26px;
+  line-height: 1;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+.wb-logo-tape {
+  padding: 3px 10px;
+  font-size: 12.5px;
+  color: var(--wb-ink);
+  background: var(--wb-yellow);
+  border: 2px solid var(--wb-ink);
+  border-radius: 3px 18px 4px 16px / 16px 4px 18px 3px;
+  transform: rotate(-2deg);
+  box-shadow: 2px 2px 0 rgba(59, 58, 54, 0.18);
+}
+
+.wb-newtask {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 12px;
+  font-family: var(--wb-hand);
+  font-size: 16.5px;
+  letter-spacing: 1px;
+  color: var(--wb-ink);
+  cursor: pointer;
+  background: var(--wb-yellow);
+  border: 2.5px solid var(--wb-ink);
+  border-radius: 12px 130px 14px 120px / 120px 14px 140px 12px;
+  box-shadow: 2.5px 3.5px 0 rgba(59, 58, 54, 0.22);
+  transition: transform 0.13s ease, box-shadow 0.13s ease;
+}
+.wb-newtask:hover {
+  transform: translate(-1px, -2px) rotate(-0.6deg);
+  box-shadow: 4px 6px 0 rgba(59, 58, 54, 0.24);
+}
+.wb-newtask:active {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 2px 0 rgba(59, 58, 54, 0.2);
+}
+
+.wb-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.wb-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  font-family: var(--wb-hand);
+  font-size: 15.5px;
+  color: var(--wb-ink);
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 2.5px solid transparent;
+  border-radius: 12px 120px 12px 110px / 110px 12px 130px 12px;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.wb-nav-item:hover {
+  background: rgba(255, 224, 102, 0.45);
+  transform: translateX(2px) rotate(-0.4deg);
+}
+
+.wb-side-section {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding: 0 6px;
+  font-size: 13px;
+  letter-spacing: 2px;
+  color: var(--wb-ink-soft);
+}
+.wb-side-section button {
+  padding: 0;
+  font-family: var(--wb-hand);
+  font-size: 12.5px;
+  letter-spacing: 0;
+  color: var(--wb-ink-soft);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.wb-side-section button:hover {
+  color: var(--wb-ink);
+}
+
+.wb-task-list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  padding: 2px;
+  scrollbar-width: thin;
+}
+.wb-task-empty {
+  padding: 14px 8px;
+  font-size: 13.5px;
+  color: var(--wb-ink-soft);
+  text-align: center;
+}
+.wb-task-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7.5px 10px;
+  font-family: var(--wb-hand);
+  font-size: 14px;
+  color: var(--wb-ink);
+  text-align: left;
+  cursor: pointer;
+  background: none;
+  border: 2px solid transparent;
+  border-radius: 10px 90px 10px 80px / 80px 10px 100px 10px;
+  transition: background 0.12s ease;
+}
+.wb-task-item:hover {
+  background: rgba(255, 224, 102, 0.4);
+}
+.wb-task-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.wb-task-item time {
+  margin-left: auto;
+  flex: none;
+  font-size: 12px;
+  color: var(--wb-ink-soft);
+}
+
+.wb-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 8px 4px;
+  border-top: 2.5px dashed rgba(59, 58, 54, 0.3);
+}
+.wb-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  font-size: 18px;
+  color: var(--wb-ink);
+  background: var(--wb-green-soft);
+  border: 2.5px solid var(--wb-ink);
+  border-radius: 50% 46% 52% 48% / 48% 52% 46% 54%;
+}
+.wb-user-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.wb-user-meta strong {
+  font-size: 15px;
+  letter-spacing: 1px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.wb-user-meta em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--wb-ink-soft);
+}
+
+/* ============ 中央 ============ */
+.wb-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  padding-bottom: 2px;
+}
+.wb-scroll {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-y: auto;
+  padding: 12px 6px 6px;
+  scrollbar-width: thin;
+}
+
+/* —— 居中 hero（Manus 式 logo + 标题） —— */
+.wb-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 4vh 20px 0;
+  text-align: center;
+}
+.wb-hero-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.wb-hero-dino {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+  transform: rotate(-5deg);
+}
+.wb-hero h1 {
+  margin: 0;
+  font-family: var(--wb-brush);
+  font-weight: 400;
+  font-size: 58px;
+  line-height: 1.1;
+  letter-spacing: 4px;
+  white-space: nowrap;
+}
+.wb-hero-sub {
+  margin: 0;
+  font-size: 20px;
+  color: var(--wb-ink);
+}
+.wb-hl {
+  padding: 0 0.14em;
+  background: linear-gradient(
+    101deg,
+    transparent 1%,
+    var(--wb-yellow-soft) 3%,
+    var(--wb-yellow-soft) 97%,
+    transparent 99%
+  );
+  border-radius: 6px 20px 8px 18px / 18px 8px 20px 6px;
+  box-decoration-break: clone;
+}
+.wb-hl-blue {
+  background: linear-gradient(
+    99deg,
+    transparent 1%,
+    var(--wb-blue-soft) 3%,
+    var(--wb-blue-soft) 97%,
+    transparent 99%
+  );
+}
+
+/* —— 入口卡（示例任务，Manus 三卡位） —— */
+.wb-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  padding: 6px 4px 0;
+}
+.wb-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 0 0 10px;
+  font-family: var(--wb-hand);
+  color: var(--wb-ink);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.wb-tilt-0 { transform: rotate(-0.8deg); }
+.wb-tilt-1 { transform: rotate(0.7deg); }
+.wb-tilt-2 { transform: rotate(-0.5deg); }
+.wb-tilt-3 { transform: rotate(0.9deg); }
+.wb-card:hover {
+  transform: translateY(-4px) rotate(0deg);
+  box-shadow: 4px 6px 0 rgba(59, 58, 54, 0.22);
+}
+.wb-card-img {
+  width: 100%;
+  aspect-ratio: 1 / 0.82;
+  object-fit: cover;
+  mix-blend-mode: multiply;
+  border-bottom: 2.5px solid var(--wb-ink);
+}
+.wb-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 14px 0;
+}
+.wb-card-body strong {
+  font-size: 19px;
+  letter-spacing: 1px;
+}
+.wb-card-body em {
+  font-style: normal;
+  font-size: 13px;
+  color: var(--wb-ink-soft);
+  line-height: 1.45;
+}
+
+/* —— 快速开始 —— */
+.wb-sec-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 8px;
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: 1px;
+}
+.wb-sec-title svg {
+  color: var(--wb-orange);
+}
+.wb-quick-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+.wb-quick-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 6px 10px;
+  font-family: var(--wb-hand);
+  font-size: 14px;
+  color: var(--wb-ink);
+  cursor: pointer;
+  transition: transform 0.14s ease, background 0.14s ease;
+}
+.wb-quick-item:nth-child(odd) { transform: rotate(-0.7deg); }
+.wb-quick-item:nth-child(even) { transform: rotate(0.6deg); }
+.wb-quick-item:hover {
+  background: var(--wb-yellow-soft);
+  transform: translateY(-3px) rotate(0deg);
+}
+
+/* —— 底部固定大输入框（Manus 式） —— */
+.wb-ask {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px 9px;
+}
+.wb-ask textarea {
+  width: 100%;
+  padding: 4px 4px;
+  font-family: var(--wb-hand);
+  font-size: 16.5px;
+  color: var(--wb-ink);
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+}
+.wb-ask textarea::placeholder {
+  color: var(--wb-ink-soft);
+}
+.wb-ask-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 2px dashed rgba(59, 58, 54, 0.3);
+  padding-top: 7px;
+}
+.wb-ask-hint {
+  font-size: 13px;
+  color: var(--wb-ink-soft);
+}
+.wb-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 36px;
+  color: #fff;
+  cursor: pointer;
+  background: var(--wb-blue);
+  border: 2.5px solid var(--wb-ink);
+  border-radius: 10px 60px 12px 55px / 55px 12px 65px 10px;
+  box-shadow: 2px 3px 0 rgba(59, 58, 54, 0.22);
+  transition: transform 0.12s ease;
+}
+.wb-send:hover {
+  transform: rotate(-3deg) scale(1.05);
+}
+.wb-send:active {
+  transform: scale(0.96);
+}
+
+/* ============ 星球乐园弹层 ============ */
+.wb-planet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4vh 4vw;
+  background: rgba(59, 58, 54, 0.45);
+}
+.wb-planet-window {
+  display: flex;
+  flex-direction: column;
+  width: min(1100px, 100%);
+  height: 100%;
+  overflow: hidden;
+  background: var(--wb-paper);
+}
+.wb-planet-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  font-size: 15px;
+  background: var(--wb-yellow-soft);
+  border-bottom: 2.5px solid var(--wb-ink);
+}
+.wb-planet-bar button {
+  padding: 4px 14px;
+  font-family: var(--wb-hand);
+  font-size: 14px;
+  color: var(--wb-ink);
+  cursor: pointer;
+  background: var(--wb-card);
+  border: 2px solid var(--wb-ink);
+  border-radius: 8px 40px 10px 36px / 36px 10px 44px 8px;
+}
+.wb-planet-window iframe {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: var(--wb-paper);
+}
+
+/* ============ 响应式 ============ */
+@media (max-width: 1240px) {
+  .wb-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .wb-quick-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 920px) {
+  .wb-root {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .wb-side {
+    display: none;
+  }
+  .wb-hero h1 {
+    font-size: 38px;
+  }
+  .wb-hero-dino {
+    width: 68px;
+    height: 68px;
+  }
+  .wb-cards {
+    grid-template-columns: 1fr;
+  }
+}

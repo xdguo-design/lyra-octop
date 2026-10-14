@@ -1,0 +1,7 @@
+id: lyra-planet
+version: 0.1.3
+name: 星球乐园
+description: 打开星球乐园儿童学习工作台（趣味数学）。检查本地服务、按需拉起、并在 Octop 页面内嵌打开，不弹新窗口。
+icon: "⭐"
+kind: tool
+entry: main.py

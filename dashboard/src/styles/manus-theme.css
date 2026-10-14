@@ -1,0 +1,338 @@
+/* ===================================================================
+   Octop Manus Theme — clean / minimal surface layer
+   Style reference: https://manus.im/app
+   Loaded after theme-vars.css. Two jobs:
+   1. Remap the --fn-* surface tokens to a neutral light palette
+      (white surfaces on a very light gray canvas, soft ink text).
+   2. Give antd surfaces the Manus treatment: 1px hairline borders,
+      12px radii, barely-there shadows, pill/rounded controls.
+   Brand tokens are intentionally untouched — palettes still win.
+   =================================================================== */
+
+/* ---------- Manus palette: light ---------- */
+:root,
+html[data-theme="light"] {
+  /* surfaces */
+  --fn-bg-primary: #ffffff;
+  --fn-bg-secondary: #f7f7f7;
+  --fn-bg-tertiary: #f0f0f0;
+  --fn-bg-elevated: #ffffff;
+  --fn-bg-layout: #f7f7f7;
+  --fn-bg-container: #ffffff;
+  --fn-bg-code: #f7f7f7;
+  --fn-bg-toolbar: #fafafa;
+  --fn-bg-toolbar-hover: #f0f0f0;
+  --fn-bg-input-label: #f7f7f7;
+  --fn-bg-glass: rgba(255, 255, 255, 0.86);
+  --fn-bg-sidebar: #fafafa;
+  --fn-bg-base: #ffffff;
+  --fn-bg-page: #f7f7f7;
+  --fn-bg-quaternary: rgba(0, 0, 0, 0.025);
+  --fn-bg-subtle: #f7f7f7;
+  --fn-bg-secondary-hover: #f0f0f0;
+  --fn-bg-secondary-active: #ebebeb;
+  --fn-surface: #ffffff;
+  --fn-surface-sunken: #f7f7f7;
+  --fn-fill-hover: rgba(0, 0, 0, 0.035);
+  --fn-fill-tertiary: #f2f2f2;
+
+  /* ink */
+  --fn-text-primary: #1a1a1a;
+  --fn-text-secondary: #6b6b6b;
+  --fn-text-tertiary: #9b9b9b;
+  --fn-text-quaternary: #c4c4c4;
+  --fn-text-placeholder: #b3b3b3;
+  --fn-text-disabled: #c4c4c4;
+
+  /* hairlines */
+  --fn-border-primary: #ebebeb;
+  --fn-border-secondary: #f0f0f0;
+  --fn-border-tertiary: #f5f5f5;
+  --fn-border-input: #e5e5e5;
+  --fn-border-input-alt: #ebebeb;
+  --fn-border: #ebebeb;
+  --fn-border-color: #ebebeb;
+  --fn-border-strong: #dcdcdc;
+  --fn-border-subtle: rgba(0, 0, 0, 0.06);
+
+  /* sidebar */
+  --fn-sidebar-bg: #fafafa;
+  --fn-sidebar-border: #ebebeb;
+  --fn-sidebar-item-hover: rgba(0, 0, 0, 0.045);
+  --fn-sidebar-item-active-bg: rgba(0, 0, 0, 0.06);
+  --fn-sidebar-item-active: rgba(0, 0, 0, 0.06);
+  --fn-sidebar-item-active-text: #1a1a1a;
+  --fn-sidebar-group-text: #a3a3a3;
+
+  /* header */
+  --fn-header-bg: #ffffff;
+
+  /* cards */
+  --fn-card-border-normal: #ebebeb;
+  --fn-card-shadow-normal: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --fn-card-radius: 12px;
+
+  /* theme hooks used by app surfaces */
+  --manus-radius-card: 14px;
+  --manus-radius-control: 10px;
+  --manus-radius-pill: 999px;
+  --manus-shadow-hairline: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --manus-shadow-raise: 0 4px 14px rgba(0, 0, 0, 0.07);
+  --manus-shadow-float: 0 8px 28px rgba(0, 0, 0, 0.1);
+}
+
+/* ---------- Manus palette: dark ---------- */
+html[data-theme="dark"] {
+  --fn-bg-primary: #1a1a1a;
+  --fn-bg-secondary: #202020;
+  --fn-bg-tertiary: #262626;
+  --fn-bg-elevated: #222222;
+  --fn-bg-layout: #0f0f0f;
+  --fn-bg-container: #1a1a1a;
+  --fn-bg-code: #202020;
+  --fn-bg-toolbar: #1c1c1c;
+  --fn-bg-toolbar-hover: #262626;
+  --fn-bg-input-label: #202020;
+  --fn-bg-glass: rgba(26, 26, 26, 0.88);
+  --fn-bg-sidebar: #141414;
+  --fn-bg-base: #1a1a1a;
+  --fn-bg-page: #0f0f0f;
+  --fn-bg-quaternary: rgba(255, 255, 255, 0.035);
+  --fn-bg-subtle: #202020;
+  --fn-bg-secondary-hover: #262626;
+  --fn-bg-secondary-active: #2e2e2e;
+  --fn-surface: #1a1a1a;
+  --fn-surface-sunken: #141414;
+  --fn-fill-hover: rgba(255, 255, 255, 0.06);
+  --fn-fill-tertiary: #262626;
+
+  --fn-text-primary: #ededed;
+  --fn-text-secondary: #a3a3a3;
+  --fn-text-tertiary: #7a7a7a;
+  --fn-text-quaternary: #575757;
+  --fn-text-placeholder: #6b6b6b;
+  --fn-text-disabled: #575757;
+
+  --fn-border-primary: #262626;
+  --fn-border-secondary: #202020;
+  --fn-border-tertiary: #1c1c1c;
+  --fn-border-input: #303030;
+  --fn-border-input-alt: #262626;
+  --fn-border: #262626;
+  --fn-border-color: #262626;
+  --fn-border-strong: #3a3a3a;
+  --fn-border-subtle: rgba(255, 255, 255, 0.07);
+
+  --fn-sidebar-bg: #141414;
+  --fn-sidebar-border: #262626;
+  --fn-sidebar-item-hover: rgba(255, 255, 255, 0.06);
+  --fn-sidebar-item-active-bg: rgba(255, 255, 255, 0.09);
+  --fn-sidebar-item-active: rgba(255, 255, 255, 0.09);
+  --fn-sidebar-item-active-text: #ffffff;
+  --fn-sidebar-group-text: #6b6b6b;
+
+  --fn-header-bg: #1a1a1a;
+
+  --fn-card-border-normal: #262626;
+  --fn-card-shadow-normal: none;
+  --fn-card-radius: 12px;
+
+  --manus-shadow-hairline: none;
+  --manus-shadow-raise: 0 4px 14px rgba(0, 0, 0, 0.4);
+  --manus-shadow-float: 0 8px 28px rgba(0, 0, 0, 0.5);
+}
+
+/* ===================================================================
+   Surfaces — hairline borders, soft radii, restrained shadows
+   =================================================================== */
+
+/* cards, panels, overlays */
+.octop-card,
+.octop-modal-content,
+.octop-drawer-content,
+.octop-popover-inner,
+.octop-dropdown .octop-dropdown-menu,
+.octop-notification-notice,
+.octop-message-notice,
+.octop-alert {
+  border: 1px solid var(--fn-border-primary) !important;
+  border-radius: var(--manus-radius-card) !important;
+  box-shadow: var(--manus-shadow-hairline) !important;
+}
+.octop-modal-content,
+.octop-drawer-content {
+  box-shadow: var(--manus-shadow-float) !important;
+}
+.octop-modal-header,
+.octop-drawer-header {
+  border-bottom: 1px solid var(--fn-border-secondary) !important;
+}
+
+/* controls: inputs, selects, pickers — rounded, hairline, subtle focus */
+.octop-input,
+.octop-input-affix-wrapper,
+.octop-input-number,
+.octop-select-selector,
+.octop-picker {
+  border-radius: var(--manus-radius-control) !important;
+  border: 1px solid var(--fn-border-input) !important;
+  background: var(--fn-bg-primary) !important;
+  box-shadow: none !important;
+}
+.octop-input:hover,
+.octop-input-affix-wrapper:hover,
+.octop-select-selector:hover,
+.octop-picker:hover {
+  border-color: var(--fn-border-strong) !important;
+}
+.octop-input:focus,
+.octop-input-focused,
+.octop-input-affix-wrapper-focused,
+.octop-select-focused .octop-select-selector,
+.octop-picker-focused {
+  border-color: var(--fn-text-primary) !important;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06) !important;
+}
+html[data-theme="dark"] .octop-input:focus,
+html[data-theme="dark"] .octop-input-focused,
+html[data-theme="dark"] .octop-input-affix-wrapper-focused,
+html[data-theme="dark"] .octop-select-focused .octop-select-selector,
+html[data-theme="dark"] .octop-picker-focused {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08) !important;
+}
+
+/* buttons — quiet by default, solid black primary like Manus */
+.octop-btn {
+  border-radius: var(--manus-radius-control) !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease !important;
+}
+.octop-btn-default {
+  border-color: var(--fn-border-input) !important;
+  background: var(--fn-bg-primary) !important;
+}
+.octop-btn-default:not(:disabled):hover {
+  border-color: var(--fn-border-strong) !important;
+  background: var(--fn-bg-secondary) !important;
+  color: var(--fn-text-primary) !important;
+}
+.octop-btn-primary:not(.octop-btn-dangerous) {
+  background: var(--fn-text-primary) !important;
+  border-color: var(--fn-text-primary) !important;
+  color: var(--fn-bg-primary) !important;
+}
+.octop-btn-primary:not(.octop-btn-dangerous):not(:disabled):hover {
+  opacity: 0.88;
+}
+.octop-btn-round {
+  border-radius: var(--manus-radius-pill) !important;
+}
+.octop-btn-circle {
+  border-radius: 50% !important;
+}
+
+/* segmented / tabs */
+.octop-segmented {
+  background: var(--fn-bg-secondary) !important;
+  border-radius: var(--manus-radius-control) !important;
+  padding: 2px !important;
+}
+.octop-segmented-item,
+.octop-segmented-thumb {
+  border-radius: 8px !important;
+}
+.octop-segmented-item-selected {
+  background: var(--fn-bg-primary) !important;
+  box-shadow: var(--manus-shadow-hairline) !important;
+}
+.octop-tabs-tab {
+  border-radius: 8px !important;
+}
+.octop-tabs-tab-active .octop-tabs-tab-btn {
+  font-weight: 500;
+}
+
+/* tables — clean hairlines */
+.octop-table {
+  border: 1px solid var(--fn-border-primary) !important;
+  border-radius: var(--manus-radius-card) !important;
+  overflow: hidden;
+}
+.octop-table-thead > tr > th {
+  background: var(--fn-bg-secondary) !important;
+  border-bottom: 1px solid var(--fn-border-primary) !important;
+  font-weight: 500 !important;
+}
+.octop-table-tbody > tr > td {
+  border-bottom: 1px solid var(--fn-border-secondary) !important;
+}
+.octop-table-tbody > tr:hover > td {
+  background: var(--fn-bg-secondary) !important;
+}
+
+/* tags & pills */
+.octop-tag {
+  border-radius: var(--manus-radius-pill) !important;
+  border-color: var(--fn-border-primary) !important;
+  padding-inline: 10px !important;
+}
+
+/* popover/tooltip */
+.octop-tooltip-inner {
+  border-radius: 8px !important;
+  border: 1px solid var(--fn-border-primary) !important;
+  font-size: 12px !important;
+}
+
+/* list rows */
+.octop-list-item {
+  border-block-end: 1px solid var(--fn-border-secondary) !important;
+}
+
+/* focus ring — quiet, no dashes */
+:where(button, a, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--fn-text-primary) !important;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+html[data-theme="dark"] :where(button, a, input, textarea, select, [tabindex]):focus-visible {
+  outline-color: #ffffff !important;
+}
+
+/* selection */
+::selection {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+/* thin neutral scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.16);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.28);
+  background-clip: content-box;
+}
+html[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  background-clip: content-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* links */
+a:not(.octop-btn):hover {
+  color: var(--fn-text-primary);
+  text-decoration-color: var(--fn-border-strong);
+}
