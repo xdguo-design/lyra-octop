@@ -105,4 +105,35 @@ describe("LYRA workbench page integration", () => {
     fireEvent.click(screen.getByRole("button", { name: /返回工作台/ }));
     expect(screen.getByRole("textbox", { name: "给主 Agent 发消息" })).toBeTruthy();
   });
+  it("opens settings as a modal rather than a sidebar subtree", () => {
+    renderHome();
+    fireEvent.click(screen.getByRole("button", { name: "打开设置" }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: /模型与算力/ })).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: /个性与记忆/ })).toBeTruthy();
+  });
+
+  it("opens and closes a single mobile navigation", () => {
+    renderHome();
+    fireEvent.click(screen.getByRole("button", { name: "打开导航" }));
+    expect(screen.getByRole("button", { name: "关闭导航" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "关闭导航" }));
+    expect(screen.queryByRole("button", { name: "关闭导航" })).toBeNull();
+  });
+
+  it("ignores a stale thread creation after new task is clicked", async () => {
+    let finish: ((value: { thread_id: string; session_key: string }) => void) | undefined;
+    mocks.create.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    renderHome();
+    await waitFor(() => expect(screen.getByText("1/1 已启动")).toBeTruthy());
+    const field = screen.getByRole("textbox", { name: "给主 Agent 发消息" });
+    fireEvent.change(field, { target: { value: "旧的任务" } });
+    fireEvent.click(screen.getByRole("button", { name: "发送消息" }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "新建任务" }));
+    finish?.({ thread_id: "stale-thread", session_key: "stale-session" });
+    await waitFor(() => expect((field as HTMLTextAreaElement).value).toBe(""));
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
+    expect(screen.queryByRole("region", { name: "主 Agent 对话" })).toBeNull();
+  });
 });

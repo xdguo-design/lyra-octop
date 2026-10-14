@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Popover } from "antd";
+import { Modal, Popover } from "antd";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import dayjs from "dayjs";
@@ -8,7 +8,7 @@ import {
   ArrowLeft, ArrowRight, Bot, Boxes, ChevronRight, CircleHelp,
   Database, ExternalLink, GraduationCap, Layers3, Monitor, SquarePen,
   Maximize2, MessageCircle, MessageSquareText, Plus,
-  Send, Settings2, ShieldCheck, Sparkles, Square, Timer, Users,
+  Send, Settings2, ShieldCheck, Sparkles, Square, Timer, Users, Menu, LockKeyhole,
   Workflow, Wrench, X,
 } from "lucide-react";
 import { request } from "../../api/request";
@@ -38,10 +38,16 @@ const NAV_ITEMS = [
 ];
 const MORE_ITEMS = [
   { path: "/token-usage", label: "Token 统计" },
-  { path: "/admin/models", label: "模型与算力" },
-  { path: "/personalization/skills", label: "个性化" },
   { path: "/connectors", label: "连接器" },
 ];
+
+const SETTINGS_ITEMS = [
+  { path: "/admin/models", label: "模型与算力", detail: "配置模型供应商、额度与路由", Icon: Bot },
+  { path: "/experts", label: "Agent 团队", detail: "管理主控、成员和团队运行状态", Icon: Users },
+  { path: "/personalization/mbti", label: "个性与记忆", detail: "调整人格、记忆及个人偏好", Icon: Sparkles },
+  { path: "/admin/security", label: "安全与权限", detail: "查看私有部署的安全设置", Icon: LockKeyhole },
+  { path: "/connectors", label: "连接器", detail: "管理服务与外部工具连接", Icon: Boxes },
+] as const;
 
 const PROMPTS = [
   { title: "帮我分析资料", text: "请作为主 Agent，规划并协调合适的 Agent 分析这份资料：" },
@@ -68,7 +74,8 @@ function initialPlatformUrl() {
 export default function HomePage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [profileOpen, setProfileOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [user, setUser] = useState<MeUser | null>(null);
   const [agents, setAgents] = useState<OctopAgent[]>([]);
@@ -87,6 +94,7 @@ export default function HomePage() {
   const [platformSettingsOpen, setPlatformSettingsOpen] = useState(false);
   const [platformUrl, setPlatformUrl] = useState(initialPlatformUrl);
   const [platformDraft, setPlatformDraft] = useState(initialPlatformUrl);
+  const taskEpoch = useRef(0);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -164,7 +172,10 @@ export default function HomePage() {
   }, [visibleMessages.length, messages, isStreaming]);
 
   const newTask = () => {
+    // Starting another task wins over an in-flight create-thread request.
+    taskEpoch.current += 1;
     setPlatformOpen(false);
+    setMobileNavOpen(false);
     setActiveThread(null);
     setInput("");
     setError("");
@@ -172,14 +183,24 @@ export default function HomePage() {
   };
 
   const selectThread = (threadId: string) => {
+    taskEpoch.current += 1;
     setPlatformOpen(false);
+    setMobileNavOpen(false);
     setError("");
     setActiveThread(threadId);
+  };
+
+  const navigateFromWorkbench = (path: string) => {
+    setMobileNavOpen(false);
+    setSettingsOpen(false);
+    setMoreOpen(false);
+    navigate(path);
   };
 
   const send = async (provided?: string) => {
     const text = (provided ?? input).trim();
     if (!text || !agentId || sending || isStreaming || hasPendingApproval) return;
+    const epoch = taskEpoch.current;
     setSending(true);
     setError("");
     try {
@@ -187,6 +208,7 @@ export default function HomePage() {
       let sessionKey = threadId || "";
       if (!threadId) {
         const created = await octopThreadsApi.create(agentId);
+        if (epoch !== taskEpoch.current) return;
         threadId = created.thread_id;
         sessionKey = created.session_key;
         const now = Math.floor(Date.now() / 1000);
@@ -200,7 +222,7 @@ export default function HomePage() {
         }, ...prev]);
         setActiveThread(threadId);
       }
-      if (!threadId) throw new Error("无法创建会话");
+      if (!threadId || epoch !== taskEpoch.current) return;
       // The existing Octop WebSocket store handles streaming and reconnection.
       // Do not dispatch worker messages directly from this surface.
       sendMessage(text, sessionKey, agentId, undefined, threadId);
@@ -237,6 +259,7 @@ export default function HomePage() {
     setPlatformSettingsOpen(false);
   };
   const chooseHost = (id: string) => {
+    taskEpoch.current += 1;
     setPreferredHostId(id);
     try { window.localStorage.setItem("octop:workbench:primary-agent", id); }
     catch { /* browser storage may be disabled */ }
@@ -249,20 +272,24 @@ export default function HomePage() {
   const hasChat = activeThread !== null;
 
   return (
-    <div className={"wb-root" + (platformOpen ? " wb-root-platform" : "")}>
+    <div className={"wb-root" + (platformOpen ? " wb-root-platform" : "") + (mobileNavOpen ? " is-mobile-nav-open" : "")}>
+      {!platformOpen && mobileNavOpen && (
+        <button type="button" className="wb-mobile-scrim" aria-label="关闭导航"
+          onClick={() => setMobileNavOpen(false)} />
+      )}
       {!platformOpen && (
-        <aside className="wb-side">
+        <aside className={"wb-side" + (mobileNavOpen ? " is-open" : "")}>
           <button className="wb-brand" type="button" onClick={newTask} aria-label="返回工作台">
             <span className="wb-brand-mark"><img src="/lyra-dino.svg" alt="" width="36" height="36" /></span>
             <span className="wb-brand-copy"><strong>LYRA</strong><small>私有云工作台</small></span>
           </button>
           <button className="wb-newtask" type="button" onClick={newTask}>
-            <Plus size={18} /> 新建任务 <span className="wb-newtask-shortcut">+</span>
+            <Plus size={18} /> 新建任务
           </button>
           <nav className="wb-nav" aria-label="主导航">
             {NAV_ITEMS.map(({ path, label, Icon }) => (
               <button type="button" key={path} className="wb-nav-item"
-                onClick={() => navigate(path)}>
+                onClick={() => navigateFromWorkbench(path)}>
                 {label === "Agent" ? <img src="/lyra-dino.svg" width="19" height="19" alt="" /> : <Icon size={17} />}
                 <span>{label}</span>
                 {label === "Agent" && <span className="wb-cue">Cue!</span>}
@@ -272,7 +299,7 @@ export default function HomePage() {
               placement="rightTop" arrow={false}
               content={<div className="wb-menu-popup">
                 {MORE_ITEMS.map((item) => <button type="button" key={item.path}
-                  onClick={() => { setMoreOpen(false); navigate(item.path); }}>{item.label}</button>)}
+                  onClick={() => navigateFromWorkbench(item.path)}>{item.label}</button>)}
               </div>}>
               <button className="wb-nav-item" type="button" aria-expanded={moreOpen}>
                 <span className="wb-more-dots">•••</span><span>更多</span><ChevronRight size={15} className="wb-nav-chevron" />
@@ -297,23 +324,15 @@ export default function HomePage() {
               </button>
             ))}
           </div>
-          <Popover trigger="click" open={profileOpen} onOpenChange={setProfileOpen}
-            placement="topLeft" arrow={false}
-            content={<div className="wb-menu-popup" role="menu">
-              <button type="button" onClick={() => { setProfileOpen(false); navigate("/personalization/skills"); }}>
-                <Settings2 size={16}/> 设置
-              </button>
-              <button type="button" onClick={() => { setProfileOpen(false); navigate("/experts"); }}>
-                <Users size={16}/> Agent 管理
-              </button>
-            </div>}>
-            <button type="button" className="wb-sidebar-footer" aria-expanded={profileOpen}>
-              <span className="wb-user-avatar">{displayName.slice(0, 1)}</span>
-              <span>{displayName}</span>
-              <span className="wb-footer-space" />
-              <ChevronRight size={16}/>
-            </button>
-          </Popover>
+          <button type="button" className="wb-sidebar-footer" onClick={() => {
+            setMobileNavOpen(false);
+            setSettingsOpen(true);
+          }} aria-label="打开设置">
+            <span className="wb-user-avatar">{displayName.slice(0, 1)}</span>
+            <span>{displayName}</span>
+            <span className="wb-footer-space" />
+            <Settings2 size={16} />
+          </button>
         </aside>
       )}
 
@@ -368,6 +387,10 @@ export default function HomePage() {
       ) : (
         <main className="wb-main">
           <header className="wb-topbar">
+            <button type="button" className="wb-mobile-toggle" aria-label="打开导航"
+              aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(true)}>
+              <Menu size={21} />
+            </button>
             <div className="wb-breadcrumb"><span>LYRA SPACE</span><ChevronRight size={13}/><strong>工作台</strong>
               <div className="wb-mode-tabs" role="group" aria-label="工作区模式">
                 <button type="button" className="is-selected" aria-current="page" onClick={() => setPlatformOpen(false)}>
@@ -563,6 +586,20 @@ export default function HomePage() {
           </div>
         </main>
       )}
+      <Modal title="工作台设置" className="wb-settings-modal" open={settingsOpen}
+        footer={null} onCancel={() => setSettingsOpen(false)} width={620}>
+        <p className="wb-settings-intro">统一从这里进入私有云配置，不在侧边栏展开第二套设置菜单。</p>
+        <div className="wb-settings-grid">
+          {SETTINGS_ITEMS.map(({ path, label, detail, Icon }) => (
+            <button key={path} type="button" className="wb-settings-link"
+              onClick={() => navigateFromWorkbench(path)}>
+              <span className="wb-settings-icon"><Icon size={19} /></span>
+              <span className="wb-settings-link-text"><strong>{label}</strong><small>{detail}</small></span>
+              <ArrowRight size={16} />
+            </button>
+          ))}
+        </div>
+      </Modal>
     </div>
   );
 }

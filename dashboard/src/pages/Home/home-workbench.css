@@ -597,3 +597,43 @@
 .wb-sidebar-footer:hover { background: #e9ece9; border-radius: 8px; }
 .wb-newtask { background: #357cf4; color: white !important; border-color: #286cdb; box-shadow: none; }
 .wb-newtask:hover { background: #2367e1; transform: none; box-shadow: 0 3px 10px rgba(49,108,224,.22); }
+
+
+/* New interaction: one settings modal and a proper off-canvas small-screen nav. */
+.wb-settings-intro { margin:0 0 16px; color:#657485; font-size:13px; line-height:1.7; }
+.wb-settings-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.wb-settings-link { display:flex; width:100%; min-width:0; align-items:center; gap:11px; padding:14px; border:1px solid #e3eaf1; border-radius:12px; background:#f8fafc; cursor:pointer; text-align:left; }
+.wb-settings-link:hover,.wb-settings-link:focus-visible { background:#eaf3ff; border-color:#b4ccea; }
+.wb-settings-link > svg { flex:none; color:#6087ab; }
+.wb-settings-icon { display:grid; flex:none; place-items:center; width:38px; height:38px; color:#3a6e9d; background:#dcecff; border-radius:10px; }
+.wb-settings-link-text { display:flex; flex:1; min-width:0; flex-direction:column; gap:5px; }
+.wb-settings-link-text strong { font-size:13px; color:#273847; }
+.wb-settings-link-text small { color:#798a97; font-size:11px; line-height:1.4; }
+.wb-mobile-scrim,.wb-mobile-toggle { display:none; }
+.wb-member-index { background:#e6eff9; color:#4979a1; border-radius:50%; font-size:11px; font-weight:700; }
+@media(max-width:740px) {
+ .wb-root { grid-template-columns:minmax(0,1fr); }
+ .wb-side { position:fixed; z-index:31; left:0; top:0; bottom:0; width:min(290px,86vw); transform:translateX(-105%); transition:transform .2s ease; box-shadow:8px 0 26px rgba(22,33,50,.12); }
+ .wb-side.is-open { transform:translateX(0); }
+ .wb-mobile-scrim { display:block; position:fixed; z-index:30; inset:0; border:0; background:rgba(25,36,47,.43); }
+ .wb-mobile-toggle { display:grid; flex:none; place-items:center; width:36px; height:36px; border:1px solid #e2e8f1; border-radius:9px; background:white; }
+ .wb-topbar { min-height:60px; gap:8px; }
+ .wb-welcome-brand { gap:12px; margin-bottom:21px; }
+ .wb-welcome-brand h1 { font-size:clamp(24px,7vw,36px); }
+ .wb-hero-bot { width:59px; height:59px; }
+ .wb-hero-bot img { max-width:42px; max-height:42px; }
+ .wb-entry-grid { grid-template-columns:minmax(0,1fr); gap:10px; }
+ .wb-entry-card { min-height:155px; padding:15px 16px; }
+ .wb-entry-card h2 { margin:9px 0 4px; font-size:22px; }
+ .wb-entry-card p { line-height:1.4; margin-bottom:7px; }
+ .wb-card-icon { width:39px; height:39px; }
+ .wb-card-icon svg { width:21px; height:21px; }
+ .wb-starters { grid-template-columns:minmax(0,1fr); gap:6px; }
+ .wb-starters button { min-height:39px; padding:8px 11px; }
+ .wb-panel-caption { margin:12px 0 7px; }
+ .wb-agent-footnote { flex-wrap:wrap; margin-top:12px; }
+ .wb-composer-caption { display:none; }
+ .wb-composer-wrap { margin-bottom:12px; }
+ .wb-composer-tip,.wb-composer-privacy { display:none; }
+ .wb-settings-grid { grid-template-columns:1fr; }
+}
