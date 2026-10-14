@@ -542,3 +542,58 @@
 
 /* Keep the platform loading indication visible until the real iframe has loaded. */
 .wb-platform-loading { z-index: 2; pointer-events: none; }
+
+
+/* Manus-style navigation structure, LYRA dinosaur and profile settings popover. */
+.wb-brand-mark {
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  box-shadow: none;
+}
+.wb-brand-mark img, .wb-agent-bubble img, .wb-chat-avatar img, .wb-hero-bot img,
+.wb-insight-bot img { object-fit: contain; display: block; }
+.wb-cue {
+  margin-left: -6px;
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: #dce9ff;
+  color: #315cbd;
+  font: 700 10px system-ui,sans-serif;
+}
+.wb-more-dots { width: 18px; flex: none; font-size: 13px; letter-spacing: -2px; }
+.wb-project-new { margin: 0; }
+.wb-sidebar-section { margin-top: 16px; margin-bottom: 5px; }
+.wb-menu-popup {
+  min-width: 155px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px;
+}
+.wb-menu-popup button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  text-align: left;
+  color: #42554e;
+  cursor: pointer;
+  font: 13px "PingFang SC","Microsoft YaHei",sans-serif;
+}
+.wb-menu-popup button:hover { background: #eef3f0; }
+.wb-sidebar-footer {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-top: 1px dashed #cfcfc8;
+  cursor: pointer;
+  text-align: left;
+}
+.wb-sidebar-footer:hover { background: #e9ece9; border-radius: 8px; }
+.wb-newtask { background: #357cf4; color: white !important; border-color: #286cdb; box-shadow: none; }
+.wb-newtask:hover { background: #2367e1; transform: none; box-shadow: 0 3px 10px rgba(49,108,224,.22); }
