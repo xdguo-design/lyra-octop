@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Popover } from "antd";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import dayjs from "dayjs";
 import {
   ArrowLeft, ArrowRight, Bot, Boxes, ChevronRight, CircleHelp,
-  Cpu, Database, ExternalLink, GraduationCap, Home, Layers3,
-  LayoutGrid, Maximize2, MessageCircle, MessageSquareText, Plus,
-  Send, Settings2, ShieldCheck, Sparkles, Square, Timer, Users,
+  Database, ExternalLink, GraduationCap, Layers3, Monitor, SquarePen,
+  Maximize2, MessageCircle, MessageSquareText, Plus,
+  Send, Settings2, ShieldCheck, Sparkles, Timer, Users,
   Workflow, Wrench, X,
 } from "lucide-react";
 import { request } from "../../api/request";
@@ -28,13 +29,18 @@ interface MeUser {
 }
 
 const NAV_ITEMS = [
-  { path: "/home", label: "工作台", Icon: Home },
-  { path: "/experts", label: "Agent 团队", Icon: Users },
-  { path: "/knowledge-bases", label: "知识与文件", Icon: Database },
-  { path: "/tasks", label: "自动化任务", Icon: Timer },
-  { path: "/admin/plugins", label: "插件与工具", Icon: Boxes },
-  { path: "/admin/models", label: "模型与算力", Icon: Cpu },
-  { path: "/personalization/skills", label: "设置", Icon: Settings2 },
+  { path: "/remote-desktop", label: "电脑", Icon: Monitor },
+  { path: "/experts", label: "Agent", Icon: Users },
+  { path: "/knowledge-bases", label: "资料库", Icon: Database },
+  { path: "/workbench", label: "创作", Icon: SquarePen },
+  { path: "/tasks", label: "自动化", Icon: Timer },
+  { path: "/admin/plugins", label: "插件", Icon: Boxes },
+];
+const MORE_ITEMS = [
+  { path: "/token-usage", label: "Token 统计" },
+  { path: "/admin/models", label: "模型与算力" },
+  { path: "/personalization/skills", label: "个性化" },
+  { path: "/connectors", label: "连接器" },
 ];
 
 const PROMPTS = [
@@ -61,6 +67,9 @@ function initialPlatformUrl() {
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [user, setUser] = useState<MeUser | null>(null);
   const [agents, setAgents] = useState<OctopAgent[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(true);
@@ -80,6 +89,11 @@ export default function HomePage() {
   const [platformDraft, setPlatformDraft] = useState(initialPlatformUrl);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if ((location.state as { newProject?: boolean } | null)?.newProject) {
+      setInput("请帮我规划一个新项目，先明确目标、交付物和任务分工：");
+    }
+  }, [location.state]);
 
   const primary = useMemo(() => selectPrimaryAgent(agents, preferredHostId), [agents, preferredHostId]);
   const hostOptions = useMemo(() => {
@@ -239,26 +253,38 @@ export default function HomePage() {
       {!platformOpen && (
         <aside className="wb-side">
           <button className="wb-brand" type="button" onClick={newTask} aria-label="返回工作台">
-            <span className="wb-brand-mark"><Bot size={26} strokeWidth={2.25} /></span>
-            <span className="wb-brand-copy"><strong>LYRA <i>cloud</i></strong><small>PRIVATE AGENT SPACE</small></span>
+            <span className="wb-brand-mark"><img src="/lyra-dino.svg" alt="" width="36" height="36" /></span>
+            <span className="wb-brand-copy"><strong>LYRA</strong><small>私有云工作台</small></span>
           </button>
           <button className="wb-newtask" type="button" onClick={newTask}>
-            <Plus size={18} /> 新建对话 <span className="wb-newtask-shortcut">+</span>
+            <Plus size={18} /> 新建任务 <span className="wb-newtask-shortcut">+</span>
           </button>
           <nav className="wb-nav" aria-label="主导航">
             {NAV_ITEMS.map(({ path, label, Icon }) => (
-              <button type="button" key={path}
-                className={"wb-nav-item" + (path === "/home" ? " is-active" : "")}
-                onClick={() => path === "/home" ? newTask() : navigate(path)}>
-                <Icon size={17} /> <span>{label}</span>
-                {path === "/home" && <span className="wb-active-dot" />}
+              <button type="button" key={path} className="wb-nav-item"
+                onClick={() => navigate(path)}>
+                {label === "Agent" ? <img src="/lyra-dino.svg" width="19" height="19" alt="" /> : <Icon size={17} />}
+                <span>{label}</span>
+                {label === "Agent" && <span className="wb-cue">Cue!</span>}
               </button>
             ))}
-            <button className="wb-nav-item" type="button" onClick={openPlatform}>
-              <LayoutGrid size={17} /><span>内置平台</span><ChevronRight size={15} className="wb-nav-chevron" />
-            </button>
+            <Popover trigger="click" open={moreOpen} onOpenChange={setMoreOpen}
+              placement="rightTop" arrow={false}
+              content={<div className="wb-menu-popup">
+                {MORE_ITEMS.map((item) => <button type="button" key={item.path}
+                  onClick={() => { setMoreOpen(false); navigate(item.path); }}>{item.label}</button>)}
+              </div>}>
+              <button className="wb-nav-item" type="button" aria-expanded={moreOpen}>
+                <span className="wb-more-dots">•••</span><span>更多</span><ChevronRight size={15} className="wb-nav-chevron" />
+              </button>
+            </Popover>
           </nav>
-          <div className="wb-sidebar-section"><strong>最近对话</strong><span>{threads.length}</span></div>
+          <div className="wb-sidebar-section"><strong>项目</strong></div>
+          <button type="button" className="wb-nav-item wb-project-new" onClick={() => {
+            newTask();
+            setInput("请帮我规划一个新项目，先明确目标、交付物和任务分工：");
+          }}><Plus size={17}/><span>新项目</span></button>
+          <div className="wb-sidebar-section"><strong>任务</strong><span>{threads.length}</span></div>
           <div className="wb-task-list" aria-label="会话历史">
             {threads.length === 0 && <p className="wb-task-empty">还没有对话，开始和主 Agent 交流吧。</p>}
             {threads.map((thread) => (
@@ -271,11 +297,23 @@ export default function HomePage() {
               </button>
             ))}
           </div>
-          <div className="wb-sidebar-footer">
-            <span className="wb-private-dot" />
-            <span>私有部署</span><ShieldCheck size={15} /><span className="wb-footer-space" />
-            <span className="wb-user-avatar">{displayName.slice(0, 1)}</span>
-          </div>
+          <Popover trigger="click" open={profileOpen} onOpenChange={setProfileOpen}
+            placement="topLeft" arrow={false}
+            content={<div className="wb-menu-popup" role="menu">
+              <button type="button" onClick={() => { setProfileOpen(false); navigate("/personalization/skills"); }}>
+                <Settings2 size={16}/> 设置
+              </button>
+              <button type="button" onClick={() => { setProfileOpen(false); navigate("/experts"); }}>
+                <Users size={16}/> Agent 管理
+              </button>
+            </div>}>
+            <button type="button" className="wb-sidebar-footer" aria-expanded={profileOpen}>
+              <span className="wb-user-avatar">{displayName.slice(0, 1)}</span>
+              <span>{displayName}</span>
+              <span className="wb-footer-space" />
+              <ChevronRight size={16}/>
+            </button>
+          </Popover>
         </aside>
       )}
 
@@ -352,7 +390,7 @@ export default function HomePage() {
           {hasChat ? (
             <section className="wb-conversation" aria-label="主 Agent 对话">
               <div className="wb-conversation-head">
-                <div className="wb-agent-bubble"><Bot size={25}/></div>
+                <div className="wb-agent-bubble"><img src="/lyra-dino.svg" alt="" width="36" height="36" /></div>
                 <div><h1>{primary?.name || "主 Agent"}</h1>
                   <p>{teamReady ? "正在由主 Agent 统一规划与协调团队" : "单 Agent 模式 · 配置团队后即可自动分发任务"}</p>
                 </div>
@@ -366,7 +404,7 @@ export default function HomePage() {
                 {historyError && <div className="wb-alert" role="alert">会话加载失败。可以从高级对话中重试。</div>}
                 {visibleMessages.map((message) => (
                   <article key={message.id} className={"wb-chat-message " + (message.role === "user" ? "is-user" : "is-agent")}>
-                    <div className="wb-chat-avatar">{message.role === "user" ? displayName.slice(0, 1) : <Bot size={18}/>}</div>
+                    <div className="wb-chat-avatar">{message.role === "user" ? displayName.slice(0, 1) : <img src="/lyra-dino.svg" width="27" height="27" alt="" />}</div>
                     <div className="wb-chat-message-body">
                       <div className="wb-chat-author">{message.role === "user" ? "你" : (primary?.name || "主 Agent")}
                         <time>{formatTime(message.timestamp)}</time></div>
@@ -385,7 +423,7 @@ export default function HomePage() {
           ) : (
             <section className="wb-welcome">
               <div className="wb-eyebrow"><span className="wb-eyebrow-mark">✳</span> YOUR PRIVATE AI WORKSPACE <span className="wb-eyebrow-mark">✳</span></div>
-              <div className="wb-welcome-brand"><span className="wb-hero-bot"><Bot size={42} strokeWidth={1.8}/></span>
+              <div className="wb-welcome-brand"><span className="wb-hero-bot"><img src="/lyra-dino.svg" width="58" height="58" alt="" /></span>
                 <div><h1>你的想法，<em>交给我们。</em></h1>
                   <p>一个入口 · 一个主 Agent · 一整支协作团队</p>
                 </div></div>
@@ -454,7 +492,7 @@ export default function HomePage() {
             <aside className="wb-insight-panel" aria-label="主 Agent 和内置平台">
               <section className="wb-insight-card wb-insight-host">
                 <div className="wb-insight-head">
-                  <span className="wb-insight-bot"><Bot size={22}/></span>
+                  <span className="wb-insight-bot"><img src="/lyra-dino.svg" width="33" height="33" alt="" /></span>
                   <div><strong>{primary?.name || "主 Agent"}</strong>
                     <small>{primary ? "已连接" : "等待启用"}</small>
                   </div>
