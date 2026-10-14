@@ -16,6 +16,11 @@ vi.mock("../../api/request", () => ({ request: mocks.request }));
 vi.mock("../../api/modules/octopThreads", () => ({
   octopThreadsApi: { list: mocks.list, create: mocks.create },
 }));
+vi.mock("../../layouts/MainLayout", () => ({
+  default: ({ embedded }: { embedded?: boolean }) => (
+    <div role="region" aria-label="功能模块">{embedded ? "统一内容区" : "旧后台内容区"}</div>
+  ),
+}));
 vi.mock("../Chat/hooks/useChat", () => ({
   useChat: () => ({
     messages: [],
@@ -119,6 +124,37 @@ describe("LYRA workbench page integration", () => {
     expect(screen.getByRole("button", { name: "关闭导航" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "关闭导航" }));
     expect(screen.queryByRole("button", { name: "关闭导航" })).toBeNull();
+  });
+
+  it.each([
+    ["电脑", "电脑"],
+    ["Agent", "Agent"],
+    ["资料库", "资料库"],
+    ["创作", "创作"],
+    ["自动化", "自动化"],
+    ["插件", "插件"],
+  ])("keeps the exact same LYRA shell for %s navigation", (button, title) => {
+    renderHome();
+    const nav = screen.getByRole("navigation", { name: "主导航" });
+    fireEvent.click(within(nav).getByRole("button", { name: button }));
+    expect(screen.getByRole("navigation", { name: "主导航" })).toBe(nav);
+    expect(screen.getByRole("region", { name: "功能模块" }).textContent).toBe("统一内容区");
+    expect(screen.getByRole("main", { name: title + "页面" })).toBeTruthy();
+    expect(within(nav).getByRole("button", { name: button }).getAttribute("aria-current")).toBe("page");
+    fireEvent.click(screen.getByRole("button", { name: "返回工作台" }));
+    expect(screen.getByRole("textbox", { name: "给主 Agent 发消息" })).toBeTruthy();
+    expect(screen.getByRole("navigation", { name: "主导航" })).toBe(nav);
+  });
+
+  it("keeps LYRA shell after entering a settings page and returns through new task", () => {
+    renderHome();
+    fireEvent.click(screen.getByRole("button", { name: "打开设置" }));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: /模型与算力/ }));
+    expect(screen.getByRole("region", { name: "功能模块" })).toBeTruthy();
+    expect(screen.getByRole("navigation", { name: "主导航" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "新建任务" }));
+    expect(screen.getByRole("textbox", { name: "给主 Agent 发消息" })).toBeTruthy();
   });
 
   it("ignores a stale thread creation after new task is clicked", async () => {

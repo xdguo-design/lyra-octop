@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import MainLayout from "../../layouts/MainLayout";
 import { Modal, Popover } from "antd";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -49,6 +50,28 @@ const SETTINGS_ITEMS = [
   { path: "/connectors", label: "连接器", detail: "管理服务与外部工具连接", Icon: Boxes },
 ] as const;
 
+const FEATURE_TITLES: Record<string, string> = {
+  "/remote-desktop": "电脑",
+  "/experts": "Agent",
+  "/knowledge-bases": "资料库",
+  "/workbench": "创作",
+  "/tasks": "自动化",
+  "/admin/plugins": "插件",
+  "/token-usage": "Token 统计",
+  "/connectors": "连接器",
+  "/admin/models": "模型与算力",
+  "/personalization": "个性化",
+  "/admin/security": "安全与权限",
+  "/chat": "高级对话",
+};
+
+function featureTitle(path: string) {
+  const segment = Object.keys(FEATURE_TITLES)
+    .sort((a, b) => b.length - a.length)
+    .find((prefix) => path === prefix || path.startsWith(prefix + "/"));
+  return segment ? FEATURE_TITLES[segment] : "工作台功能";
+}
+
 const PROMPTS = [
   { title: "帮我分析资料", text: "请作为主 Agent，规划并协调合适的 Agent 分析这份资料：" },
   { title: "创建一个项目", text: "请帮我规划一个新项目，拆分任务并分配给合适的 Agent：" },
@@ -74,6 +97,7 @@ function initialPlatformUrl() {
 export default function HomePage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const isHomeRoute = location.pathname === "/home" || location.pathname === "/";
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -179,6 +203,7 @@ export default function HomePage() {
     setActiveThread(null);
     setInput("");
     setError("");
+    if (!isHomeRoute) navigate("/home");
     window.setTimeout(() => inputRef.current?.focus(), 0);
   };
 
@@ -188,12 +213,15 @@ export default function HomePage() {
     setMobileNavOpen(false);
     setError("");
     setActiveThread(threadId);
+    if (!isHomeRoute) navigate("/home");
   };
 
   const navigateFromWorkbench = (path: string) => {
     setMobileNavOpen(false);
     setSettingsOpen(false);
     setMoreOpen(false);
+    // Star Planet is an independent surface, never carry its iframe to a feature route.
+    setPlatformOpen(false);
     navigate(path);
   };
 
@@ -270,14 +298,16 @@ export default function HomePage() {
     ? "/chat/" + encodeURIComponent(agentId) + (activeThread ? "/" + encodeURIComponent(activeThread) : "")
     : "/chat";
   const hasChat = activeThread !== null;
+  const platformVisible = isHomeRoute && platformOpen;
+  const currentSection = featureTitle(location.pathname);
 
   return (
-    <div className={"wb-root" + (platformOpen ? " wb-root-platform" : "") + (mobileNavOpen ? " is-mobile-nav-open" : "")}>
-      {!platformOpen && mobileNavOpen && (
+    <div className={"wb-root" + (platformVisible ? " wb-root-platform" : "") + (mobileNavOpen ? " is-mobile-nav-open" : "")}>
+      {!platformVisible && mobileNavOpen && (
         <button type="button" className="wb-mobile-scrim" aria-label="关闭导航"
           onClick={() => setMobileNavOpen(false)} />
       )}
-      {!platformOpen && (
+      {!platformVisible && (
         <aside className={"wb-side" + (mobileNavOpen ? " is-open" : "")}>
           <button className="wb-brand" type="button" onClick={newTask} aria-label="返回工作台">
             <span className="wb-brand-mark"><img src="/lyra-dino.svg" alt="" width="36" height="36" /></span>
@@ -288,7 +318,9 @@ export default function HomePage() {
           </button>
           <nav className="wb-nav" aria-label="主导航">
             {NAV_ITEMS.map(({ path, label, Icon }) => (
-              <button type="button" key={path} className="wb-nav-item"
+              <button type="button" key={path}
+                className={"wb-nav-item" + (location.pathname === path || location.pathname.startsWith(path + "/") ? " is-active" : "")}
+                aria-current={location.pathname === path || location.pathname.startsWith(path + "/") ? "page" : undefined}
                 onClick={() => navigateFromWorkbench(path)}>
                 {label === "Agent" ? <img src="/lyra-dino.svg" width="19" height="19" alt="" /> : <Icon size={17} />}
                 <span>{label}</span>
@@ -336,7 +368,7 @@ export default function HomePage() {
         </aside>
       )}
 
-      {platformOpen ? (
+      {platformVisible ? (
         <main className="wb-platform-shell">
           <div className="wb-platform-bar">
             <button type="button" className="wb-platform-back" onClick={() => setPlatformOpen(false)}>
@@ -383,6 +415,30 @@ export default function HomePage() {
               <button type="button" onClick={() => setPlatformSettingsOpen(true)}>配置地址</button>
             </div>
           )}
+        </main>
+      ) : !isHomeRoute ? (
+        <main className="wb-main wb-feature-main" aria-label={currentSection + "页面"}>
+          <header className="wb-topbar">
+            <button type="button" className="wb-mobile-toggle" aria-label="打开导航"
+              aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(true)}>
+              <Menu size={21} />
+            </button>
+            <div className="wb-breadcrumb">
+              <button className="wb-home-link" type="button" onClick={newTask}>LYRA SPACE</button>
+              <ChevronRight size={13} />
+              <strong>{currentSection}</strong>
+            </div>
+            <div className="wb-topbar-right">
+              <span className="wb-status"><span className={primary ? "wb-status-dot" : "wb-status-dot is-off"} />
+                {agentsLoading ? "正在连接…" : primary ? "主 Agent 已连接" : "未发现运行中的 Agent"}
+              </span>
+              <span className="wb-topbar-divider" />
+              <span className="wb-private-label"><ShieldCheck size={14} /> 私有云</span>
+            </div>
+          </header>
+          <section className="wb-feature-content" aria-label={currentSection + "内容"}>
+            <MainLayout embedded />
+          </section>
         </main>
       ) : (
         <main className="wb-main">

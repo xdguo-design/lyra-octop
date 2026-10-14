@@ -637,3 +637,16 @@
  .wb-composer-tip,.wb-composer-privacy { display:none; }
  .wb-settings-grid { grid-template-columns:1fr; }
 }
+
+/* The LYRA shell never remounts when navigating to a feature route. */
+.wb-feature-main { min-width:0; height:100%; }
+.wb-feature-content { flex:1; min-width:0; min-height:0; overflow:hidden; background:#f7f8fa; }
+.wb-feature-content .page-container { min-height:0; background:#f7f8fa !important; }
+.wb-feature-content .page-content { min-height:0; }
+.wb-home-link { border:0; padding:0; background:transparent; color:inherit; cursor:pointer; font:inherit; letter-spacing:inherit; }
+.wb-home-link:hover { color:#3177d6; }
+.wb-side { flex-shrink:0; }
+@media(max-width:740px) {
+ .wb-feature-main { width:100%; }
+ .wb-feature-content .page-content { overflow-y:auto; }
+}

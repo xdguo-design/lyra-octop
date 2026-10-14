@@ -12,9 +12,8 @@ import {
 } from "./hooks/useDesktopChrome";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import MainLayout from "./layouts/MainLayout";
 import LoginPage from "./pages/Login";
-// 手绘蜡笔风工作台首页（独立全屏布局，不套 MainLayout）
+// Unified LYRA shell: all authenticated routes retain the same workbench navigation.
 const HomePage = lazy(() => import("./pages/Home"));
 import RegisterPage from "./pages/Register";
 import OidcComplete from "./pages/Login/OidcComplete";
@@ -157,16 +156,6 @@ function ThemedApp() {
             <Route path="/" element={<Navigate to="/home" replace />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
-            <Route
-              path="/home"
-              element={
-                <AuthGuard>
-                  <Suspense fallback={null}>
-                    <HomePage />
-                  </Suspense>
-                </AuthGuard>
-              }
-            />
             <Route path="/login/oidc/complete" element={<OidcComplete />} />
             <Route path="/setup" element={<SetupPage />} />
             <Route path="/invite" element={<InvitePage />} />
@@ -177,7 +166,9 @@ function ThemedApp() {
                   <AgentProvider>
                     <LayoutModeProvider>
                       <VoiceOutputProvider>
-                        <MainLayout />
+                        <Suspense fallback={<OctopSpinner />}>
+                          <HomePage />
+                        </Suspense>
                       </VoiceOutputProvider>
                     </LayoutModeProvider>
                   </AgentProvider>
