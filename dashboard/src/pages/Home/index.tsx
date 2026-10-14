@@ -70,6 +70,7 @@ export default function HomePage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [platformOpen, setPlatformOpen] = useState(false);
+  const [platformFrameReady, setPlatformFrameReady] = useState(false);
   const [platformSettingsOpen, setPlatformSettingsOpen] = useState(false);
   const [platformUrl, setPlatformUrl] = useState(initialPlatformUrl);
   const [platformDraft, setPlatformDraft] = useState(initialPlatformUrl);
@@ -91,9 +92,17 @@ export default function HomePage() {
     (m) => m.hitlData?.status === "pending",
   );
   const platformSrc = useMemo(
-    () => resolvePrivatePlatformUrl(platformUrl, window.location.hostname),
+    () => resolvePrivatePlatformUrl(platformUrl, window.location.hostname, window.location.protocol),
     [platformUrl],
   );
+  const members = useMemo(
+    () => (primary?.member_ids ?? []).map((id) =>
+      agents.find((agent) => agent.agent_id === id) ?? null
+    ).filter((member): member is OctopAgent => member !== null),
+    [primary?.member_ids, agents],
+  );
+  const activeMembers = members.filter((member) => member.state === "running").length;
+  const configuredMembers = primary?.member_ids?.length ?? 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -186,12 +195,13 @@ export default function HomePage() {
   };
 
   const savePlatformUrl = () => {
-    const next = resolvePrivatePlatformUrl(platformDraft, window.location.hostname);
+    const next = resolvePrivatePlatformUrl(platformDraft, window.location.hostname, window.location.protocol);
     if (!next) {
-      setError("平台地址只能使用当前私有云主机的 HTTP/HTTPS 地址，且不能包含账号密码。");
+      setError("平台地址必须是当前私有云主机的安全地址；HTTPS 工作台不能加载 HTTP 平台。");
       return;
     }
     setPlatformUrl(next);
+    setPlatformFrameReady(false);
     try { window.localStorage.setItem("octop:workbench:planet-url", next); } catch { /* storage optional */ }
     setError("");
     setPlatformSettingsOpen(false);
@@ -261,9 +271,12 @@ export default function HomePage() {
               <ArrowLeft size={18} /> 返回工作台
             </button>
             <div className="wb-platform-title"><span className="wb-platform-icon"><Layers3 size={18} /></span>
-              <strong>星球乐园</strong><small>内置平台 · 独立 Agent / LLM</small>
+              <strong>星球乐园</strong><small>已开发的独立工作台 · 使用平台自身功能</small>
             </div>
             <div className="wb-platform-actions">
+              {platformSrc && <a className="wb-platform-external" href={platformSrc} target="_blank" rel="noopener noreferrer">
+                <ExternalLink size={15}/> 新窗口打开
+              </a>}
               <button type="button" onClick={() => setPlatformSettingsOpen((v) => !v)} aria-label="平台地址设置">
                 <Settings2 size={17} />
               </button>
@@ -280,13 +293,17 @@ export default function HomePage() {
               <div><input id="wb-platform-url" value={platformDraft}
                 onChange={(e) => setPlatformDraft(e.target.value)} type="url" autoComplete="url" />
                 <button type="submit">保存并打开</button></div>
-              <p>内置平台使用其自身的 Agent 与 LLM 配置；此处不会向 iframe 传递 Octop 登录令牌。</p>
+              <p>这里接入现有的星球乐园工作台，不重建它的页面。平台的 Agent、模型及登录由平台自身管理；LYRA 不会将登录令牌传入平台。</p>
             </form>
           )}
           {error && <div className="wb-alert" role="alert">{error}</div>}
           {platformSrc ? (
-            <iframe key={platformSrc} title="星球乐园内置平台" className="wb-platform-frame" src={platformSrc}
-              referrerPolicy="no-referrer" allow="fullscreen; clipboard-read; clipboard-write" />
+            <div className="wb-platform-viewport">
+              {!platformFrameReady && <div className="wb-platform-loading" role="status">正在打开星球乐园的已有工作台…</div>}
+              <iframe key={platformSrc} title="星球乐园 · 独立工作台" className="wb-platform-frame" src={platformSrc}
+                onLoad={() => setPlatformFrameReady(true)}
+                referrerPolicy="no-referrer" allow="fullscreen; clipboard-read; clipboard-write" allowFullScreen />
+            </div>
           ) : (
             <div className="wb-platform-placeholder"><CircleHelp size={32} />
               <h2>请配置内置平台地址</h2>
@@ -298,7 +315,14 @@ export default function HomePage() {
       ) : (
         <main className="wb-main">
           <header className="wb-topbar">
-            <div className="wb-breadcrumb"><span>LYRA SPACE</span><ChevronRight size={13}/><strong>{hasChat ? "对话工作台" : "工作台"}</strong></div>
+            <div className="wb-breadcrumb"><span>LYRA SPACE</span><ChevronRight size={13}/><strong>工作台</strong>
+              <div className="wb-mode-tabs" role="group" aria-label="工作区模式">
+                <button type="button" className="is-selected" aria-current="page" onClick={() => setPlatformOpen(false)}>
+                  <MessageCircle size={14}/> 主 Agent 对话
+                </button>
+                <button type="button" onClick={openPlatform}><Layers3 size={14}/> 内置平台</button>
+              </div>
+            </div>
             <div className="wb-topbar-right">
               <span className="wb-status"><span className={primary ? "wb-status-dot" : "wb-status-dot is-off"} />
                 {agentsLoading ? "正在连接…" : primary ? "主 Agent 已连接" : "未发现运行中的 Agent"}
@@ -308,6 +332,8 @@ export default function HomePage() {
             </div>
           </header>
 
+          <div className="wb-workspace-body">
+            <div className="wb-center-column">
           {hasChat ? (
             <section className="wb-conversation" aria-label="主 Agent 对话">
               <div className="wb-conversation-head">
@@ -390,7 +416,7 @@ export default function HomePage() {
                 aria-label="给主 Agent 发消息"
                 placeholder={primary ? "给主 Agent 一个任务，或者聊聊你的想法…" : "请先在 Agent 团队中启动主 Agent"}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); }
+                  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); }
                 }} />
               <div className="wb-composer-bottom">
                 <span className="wb-composer-model"><Bot size={15}/>{primary?.name || "等待主 Agent"}</span>
@@ -408,6 +434,68 @@ export default function HomePage() {
               <span><ShieldCheck size={13}/> 会话由私有部署管理，模型调用依照已配置的提供商</span>
               <span>此工作台只呈现聊天记录，内部执行明细在高级对话中查看。</span>
             </div>
+          </div>
+            </div>
+            <aside className="wb-insight-panel" aria-label="主 Agent 和内置平台">
+              <section className="wb-insight-card wb-insight-host">
+                <div className="wb-insight-head">
+                  <span className="wb-insight-bot"><Bot size={22}/></span>
+                  <div><strong>{primary?.name || "主 Agent"}</strong>
+                    <small>{primary ? "已连接" : "等待启用"}</small>
+                  </div>
+                  <span className={"wb-insight-status" + (primary ? " is-online" : "")}>{primary ? "在线" : "离线"}</span>
+                </div>
+                <p>{teamReady
+                  ? "向主 Agent 描述任务目标，它会通过已有 Agent Team 调用专业成员并汇总结果。"
+                  : "当前尚未配置完整的协作团队，可以先与已启动的 Agent 聊天。"}
+                </p>
+                <button type="button" className="wb-insight-link" onClick={() => navigate("/experts")}>
+                  管理主 Agent 与团队 <ChevronRight size={14}/>
+                </button>
+              </section>
+              <section className="wb-insight-card wb-insight-team">
+                <div className="wb-insight-section-title">
+                  <div><strong>Agent 团队</strong><small>任务调度由主 Agent 负责</small></div>
+                  <span className="wb-team-count">{activeMembers}/{configuredMembers} 已启动</span>
+                </div>
+                {configuredMembers === 0 ? (
+                  <div className="wb-insight-empty">
+                    <Workflow size={23}/>
+                    <span>尚未配置协作成员</span>
+                    <button type="button" onClick={() => navigate("/experts")}>创建 Agent Team <ArrowRight size={14}/></button>
+                  </div>
+                ) : (
+                  <div className="wb-member-list">
+                    {(primary?.member_ids ?? []).map((id, i) => {
+                      const member = agents.find((agent) => agent.agent_id === id);
+                      return <div className="wb-member" key={id}>
+                        <span className="wb-member-index">{String(i + 1).padStart(2, "0")}</span>
+                        <span className="wb-member-name">{member?.name || id}</span>
+                        <span className={"wb-member-state" + (member?.state === "running" ? " is-running" : "")}>
+                          {member?.state === "running" ? "已启动" : "未启动"}
+                        </span>
+                      </div>;
+                    })}
+                  </div>
+                )}
+                <div className="wb-team-foot">
+                  <span className={"wb-team-dot" + (isStreaming ? " is-streaming" : "")} />
+                  {isStreaming ? "当前会话有任务正在处理" : "这里展示成员可用性，不代表任务执行进度"}
+                </div>
+              </section>
+              <section className="wb-insight-card wb-insight-platform">
+                <div className="wb-insight-section-title">
+                  <div><strong>内置平台</strong><small>已开发、可独立使用的工作台</small></div>
+                  <Layers3 size={19}/>
+                </div>
+                <button type="button" className="wb-platform-tile" onClick={openPlatform}>
+                  <span className="wb-platform-planet"><Layers3 size={24}/></span>
+                  <span><strong>星球乐园</strong><small>打开现有工作台，使用完整平台功能</small></span>
+                  <ArrowRight size={17}/>
+                </button>
+                <p className="wb-platform-note">进入后平台会尽可能占满窗口；LYRA 不复制或替换平台的原有业务界面。</p>
+              </section>
+            </aside>
           </div>
         </main>
       )}
