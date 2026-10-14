@@ -64,6 +64,10 @@ export default function HomePage() {
   const [user, setUser] = useState<MeUser | null>(null);
   const [agents, setAgents] = useState<OctopAgent[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(true);
+  const [preferredHostId, setPreferredHostId] = useState(() => {
+    try { return window.localStorage.getItem("octop:workbench:primary-agent") || ""; }
+    catch { return ""; }
+  });
   const [threads, setThreads] = useState<OctopThread[]>([]);
   const [activeThread, setActiveThread] = useState<string | null>(null);
   const [input, setInput] = useState("");
@@ -77,7 +81,12 @@ export default function HomePage() {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  const primary = useMemo(() => selectPrimaryAgent(agents), [agents]);
+  const primary = useMemo(() => selectPrimaryAgent(agents, preferredHostId), [agents, preferredHostId]);
+  const hostOptions = useMemo(() => {
+    const available = agents.filter((a) => a.state === "running" && !a.bridge);
+    const teams = available.filter((a) => a.kind === "team");
+    return teams.length ? teams : available;
+  }, [agents]);
   const agentId = primary?.agent_id || null;
   const teamReady = canDelegate(primary);
   const {
@@ -211,6 +220,11 @@ export default function HomePage() {
     setError("");
     setPlatformOpen(true);
     setPlatformSettingsOpen(false);
+  };
+  const chooseHost = (id: string) => {
+    setPreferredHostId(id);
+    try { window.localStorage.setItem("octop:workbench:primary-agent", id); }
+    catch { /* browser storage may be disabled */ }
   };
 
   const displayName = user?.display_name || user?.username || "用户";
@@ -445,6 +459,17 @@ export default function HomePage() {
                   </div>
                   <span className={"wb-insight-status" + (primary ? " is-online" : "")}>{primary ? "在线" : "离线"}</span>
                 </div>
+                {hostOptions.length > 1 && (
+                  <label className="wb-host-selector">
+                    <span>对话主控</span>
+                    <select aria-label="选择主 Agent" value={primary?.agent_id || ""}
+                      onChange={(e) => chooseHost(e.target.value)}>
+                      {hostOptions.map((agent) => (
+                        <option key={agent.agent_id} value={agent.agent_id}>{agent.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <p>{teamReady
                   ? "向主 Agent 描述任务目标，它会通过已有 Agent Team 调用专业成员并汇总结果。"
                   : "当前尚未配置完整的协作团队，可以先与已启动的 Agent 聊天。"}
