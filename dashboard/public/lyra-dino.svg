@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-labelledby="t">
+<title id="t">LYRA 小恐龙</title>
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#8fe0ff"/><stop offset="1" stop-color="#4f9af3"/></linearGradient></defs>
+<path d="M27 91C8 84 11 63 16 49c1 21 10 26 19 28" fill="#4f9af3" stroke="#285d8a" stroke-width="4" stroke-linejoin="round"/>
+<path d="M33 25 40 12l12 13 10-15 12 16 10-10 7 20" fill="#ffb14b" stroke="#d67e32" stroke-width="3.2" stroke-linejoin="round"/>
+<path d="M31 43c0-18 14-31 33-31 25 0 42 18 42 40 0 16-7 23-13 30 9 10 7 23-13 28H44C28 105 22 90 25 73c-8-9-7-24 6-30Z" fill="url(#g)" stroke="#285d8a" stroke-width="4" stroke-linejoin="round"/>
+<path d="M53 68c11-3 33-1 39 10 8 15-1 28-20 29H49C44 97 46 81 53 68Z" fill="#fdf3d8"/>
+<ellipse cx="88" cy="52" rx="5" ry="7" fill="#1a3c64"/><circle cx="90" cy="50" r="2" fill="white"/>
+<ellipse cx="48" cy="51" rx="5" ry="7" fill="#1a3c64"/><circle cx="50" cy="49" r="2" fill="white"/>
+<ellipse cx="100" cy="65" rx="3" ry="2" fill="#37658a"/>
+<path d="M69 70q10 7 21 0" fill="none" stroke="#2f648b" stroke-width="3.5" stroke-linecap="round"/>
+<ellipse cx="40" cy="66" rx="8" ry="4" fill="#ff9ea4" opacity=".5"/><ellipse cx="98" cy="73" rx="5" ry="4" fill="#ff9ea4" opacity=".5"/>
+<path d="M33 81q-9-3-8 7m59-6q13-7 14 1" fill="none" stroke="#285d8a" stroke-width="5" stroke-linecap="round"/>
+<path d="M51 106v5m27-5v5" stroke="#285d8a" stroke-width="6" stroke-linecap="round"/>
+</svg>
