@@ -497,7 +497,7 @@ export default function HomePage() {
                         <span className="wb-member-index">{String(i + 1).padStart(2, "0")}</span>
                         <span className="wb-member-name">{member?.name || id}</span>
                         <span className={"wb-member-state" + (member?.state === "running" ? " is-running" : "")}>
-                          {member?.state === "running" ? "已启动" : "未启动"}
+                          {!member ? "状态未知" : member.state === "running" ? "已启动" : "未启动"}
                         </span>
                       </div>;
                     })}
