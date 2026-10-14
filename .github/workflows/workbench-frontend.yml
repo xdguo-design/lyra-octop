@@ -38,5 +38,5 @@ jobs:
         run: npm run build
         working-directory: dashboard
       - name: Test workbench routing and security boundaries
-        run: npm run test -- src/pages/Home/workbench-model.test.ts
+        run: npm run test -- src/pages/Home
         working-directory: dashboard
