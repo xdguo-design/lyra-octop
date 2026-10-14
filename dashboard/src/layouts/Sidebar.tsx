@@ -3,10 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import AvatarDropdown from "../components/AvatarDropdown";
-import AppVersionBadge from "../components/AppVersionBadge";
-import CurrentVersionBadge from "../components/CurrentVersionBadge";
-import { ArrowRightLeft, ChevronDown, Plus, X } from "lucide-react";
-import { useTheme } from "../context/ThemeContext";
+import { ArrowRightLeft, ChevronDown, Plus, X, Monitor, Library, SquarePen, Workflow, Puzzle, Ellipsis, FolderPlus, Bot } from "lucide-react";
+import { Popover } from "antd";
 import { useLayoutMode } from "../context/LayoutModeContext";
 import { useUserRole } from "../hooks/useUserRole";
 import { useCurrentUser, useSetCurrentUser } from "../hooks/useCurrentUser";
@@ -388,7 +386,6 @@ export default function Sidebar({
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useTranslation();
-  const { isDark } = useTheme();
   const role = useUserRole();
   const user = useCurrentUser();
   const setUser = useSetCurrentUser();
@@ -403,6 +400,7 @@ export default function Sidebar({
   );
   const [savedLayout, setSavedLayout] = useState<SidebarNavLayout | null>(null);
   const [customizerOpen, setCustomizerOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const navSections = useMemo(
     () => stackNamedSections(sectionsFromLayout(catalog, savedLayout)),
     [catalog, savedLayout],
@@ -431,9 +429,8 @@ export default function Sidebar({
   const showChatRailExpand = !isMinimal && !chatSidebarOpen;
 
   const isRailCollapsed = collapsed && !isMobile;
-  const wordmarkSrc = isDark
-    ? "/logo_horizontal_white.png"
-    : "/logo_horizontal_dark.png";
+  // LYRA branding is intentionally independent of the Octop upstream logo.
+  const wordmarkSrc = "/lyra-dino.svg";
 
   const selectMinimalPane = useCallback(
     (pane: MinimalNavPane, opts?: { expand?: boolean }) => {
@@ -493,27 +490,15 @@ export default function Sidebar({
   ]);
 
   const brandInner = (
-    <>
-      <img
-        src={isRailCollapsed ? "/pwa-192.png" : wordmarkSrc}
-        alt="Octop"
-        style={{
-          height: isRailCollapsed ? 32 : isMobile ? 38 : 36,
-          width: isRailCollapsed ? 32 : "auto",
-          maxWidth: isRailCollapsed ? 32 : isMobile ? 190 : 160,
-          objectFit: "contain",
-          display: "block",
-          flexShrink: 0,
-          borderRadius: isRailCollapsed ? 8 : undefined,
-        }}
-      />
-      {!isRailCollapsed && !isMobile && (
-        <>
-          <CurrentVersionBadge isMobile={isMobile} />
-          <AppVersionBadge isMobile={isMobile} />
-        </>
-      )}
-    </>
+    <button
+      type="button"
+      className={styles.productBrand}
+      aria-label="返回 LYRA 工作台"
+      onClick={() => handleNavigate("/home")}
+    >
+      <img src={wordmarkSrc} alt="" width={isRailCollapsed ? 32 : 39} height={39} />
+      {!isRailCollapsed && <span className={styles.productBrandName}>LYRA<small>私有云工作台</small></span>}
+    </button>
   );
 
   const userFooter = (
@@ -672,7 +657,70 @@ export default function Sidebar({
     </div>
   );
 
-  const navScrollBody = isMinimal ? minimalNavBody : classicNavBody;
+  const allVisibleItems = catalog.flatMap((section) => section.items);
+  const byKey = new Map(allVisibleItems.map((item) => [item.key, item]));
+  const productItems = [
+    { key: "remote-desktop", label: "电脑", icon: <Monitor size={17} /> },
+    { key: "experts", label: "Agent", icon: <img src="/lyra-dino.svg" width="19" height="19" alt="" /> },
+    { key: "knowledge-bases", label: "资料库", icon: <Library size={17} /> },
+    { key: "workbench", label: "创作", icon: <SquarePen size={17} /> },
+    { key: "tasks", label: "自动化", icon: <Workflow size={17} /> },
+    { key: "admin-plugins", label: "插件", icon: <Puzzle size={17} /> },
+  ];
+  const moreKeys = new Set(productItems.map((item) => item.key));
+  const moreMenu = (
+    <div className={styles.productMorePopup} role="group" aria-label="更多功能">
+      {allVisibleItems.filter((item) => !moreKeys.has(item.key)).map((item) => (
+        <button type="button" key={item.key} onClick={() => {
+          setMoreOpen(false);
+          handleNavigate(item.path);
+        }}>
+          {item.icon}<span>{t(item.labelKey)}</span>
+        </button>
+      ))}
+    </div>
+  );
+  const productNavBody = (
+    <div className={styles.productNav} aria-label="LYRA 主导航">
+      {productItems.filter((entry) => byKey.has(entry.key)).map((entry) => {
+        const item = byKey.get(entry.key)!;
+        return (
+          <button type="button" key={entry.key}
+            className={selectedKey === item.key ? styles.productNavActive : styles.productNavButton}
+            onClick={() => handleNavigate(item.path)}>
+            {entry.icon}<span>{entry.label}</span>
+            {entry.key === "experts" && <span className={styles.cueBadge}>Cue!</span>}
+          </button>
+        );
+      })}
+      <Popover content={moreMenu} trigger="click" open={moreOpen}
+        onOpenChange={setMoreOpen} placement="rightTop" arrow={false}>
+        <button type="button" className={styles.productNavButton} aria-expanded={moreOpen}>
+          <Ellipsis size={17}/><span>更多</span>
+        </button>
+      </Popover>
+      <div className={styles.productGroupLabel}>项目</div>
+      <button type="button" className={styles.productNavButton}
+        onClick={() => {
+          navigate("/home", { state: { newProject: true } });
+          if (isMobile) onToggle();
+        }}>
+        <FolderPlus size={17}/><span>新项目</span>
+      </button>
+      <div className={styles.productGroupLabel}>任务</div>
+      <div className={styles.productHistory}>
+        {!onChatPath ? <MinimalRecordsHost /> :
+          <button type="button" className={styles.productNavButton} onClick={() => handleNavigate("/home")}>
+            <Bot size={17}/><span>查看对话工作台</span>
+          </button>}
+      </div>
+    </div>
+  );
+  // Keep the icon-only classic rail, but use a stable product menu when expanded.
+  // Secondary administration routes live in a popover, never an expanding settings tree.
+  const navScrollBody = isRailCollapsed
+    ? (isMinimal ? minimalNavBody : classicNavBody)
+    : productNavBody;
 
   // Crayon product mode: Manus-style primary action above the nav.
   const newTaskButton = (
@@ -684,7 +732,7 @@ export default function Sidebar({
           ? { margin: "4px auto 10px", width: 38, height: 38, padding: 0 }
           : undefined
       }
-      onClick={() => handleNavigate("/chat")}
+      onClick={() => handleNavigate("/home")}
       aria-label="新建任务"
     >
       <Plus size={isRailCollapsed ? 19 : 17} strokeWidth={2.6} />
