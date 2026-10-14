@@ -394,7 +394,7 @@ export default function HomePage() {
                 }} />
               <div className="wb-composer-bottom">
                 <span className="wb-composer-model"><Bot size={15}/>{primary?.name || "等待主 Agent"}</span>
-                <span className="wb-composer-privacy"><ShieldCheck size={14}/> 私有对话</span>
+                <span className="wb-composer-privacy"><ShieldCheck size={14}/> 私有部署</span>
                 <span className="wb-composer-spacer" />
                 <span className="wb-composer-tip">Enter 发送 · Shift+Enter 换行</span>
                 {isStreaming ?
@@ -405,7 +405,7 @@ export default function HomePage() {
               </div>
             </div>
             <div className="wb-composer-caption">
-              <span><ShieldCheck size={13}/> 数据保留在你的私有部署中</span>
+              <span><ShieldCheck size={13}/> 会话由私有部署管理，模型调用依照已配置的提供商</span>
               <span>此工作台只呈现聊天记录，内部执行明细在高级对话中查看。</span>
             </div>
           </div>
