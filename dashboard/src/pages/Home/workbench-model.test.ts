@@ -49,5 +49,9 @@ describe("private workbench", () => {
     expect(resolvePrivatePlatformUrl("https://external.example/", "nas.local")).toBeNull();
     expect(resolvePrivatePlatformUrl("http://nas.local:8130/app#x", "nas.local"))
       .toBe("http://nas.local:8130/app");
+    expect(resolvePrivatePlatformUrl("http://nas.local:8130/", "nas.local", "https:"))
+      .toBeNull();
+    expect(resolvePrivatePlatformUrl("https://nas.local:8130/", "nas.local", "https:"))
+      .toBe("https://nas.local:8130/");
   });
 });
