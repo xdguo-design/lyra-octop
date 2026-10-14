@@ -41,12 +41,15 @@ export function visibleConversationMessages(
 export function resolvePrivatePlatformUrl(
   rawUrl: string,
   dashboardHostname: string,
+  dashboardProtocol = "http:",
 ): string | null {
   try {
     const url = new URL(rawUrl);
     if (!["http:", "https:"].includes(url.protocol)) return null;
     if (url.username || url.password) return null;
     if (url.hostname !== dashboardHostname) return null;
+    // Browsers block a plain HTTP iframe under a private HTTPS dashboard.
+    if (dashboardProtocol === "https:" && url.protocol !== "https:") return null;
     url.hash = "";
     return url.toString();
   } catch {
