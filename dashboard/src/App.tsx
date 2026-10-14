@@ -154,6 +154,16 @@ function ThemedApp() {
             <DesktopWindowControls chrome={desktopChrome} />
           ) : null}
           <Routes>
+            {import.meta.env.VITE_LYRA_PREVIEW === "1" && (
+              <Route
+                path="/preview"
+                element={
+                  <Suspense fallback={null}>
+                    <HomePage previewMode />
+                  </Suspense>
+                }
+              />
+            )}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route
