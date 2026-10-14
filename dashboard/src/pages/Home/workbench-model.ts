@@ -2,8 +2,18 @@ import type { OctopAgent } from "../../context/AgentContext";
 import type { ChatMessage } from "../Chat/hooks/sseHelpers";
 
 /** A running team host is the only guaranteed delegation-capable entry point. */
-export function selectPrimaryAgent(agents: OctopAgent[]): OctopAgent | null {
+export function selectPrimaryAgent(
+  agents: OctopAgent[],
+  preferredAgentId?: string | null,
+): OctopAgent | null {
   const running = agents.filter((a) => a.state === "running" && !a.bridge);
+  const teams = running.filter((a) => a.kind === "team");
+  const preferred = running.find((a) => a.agent_id === preferredAgentId);
+  // When team hosts exist, never silently downgrade the designated coordinator
+  // to a worker: only a team may be selected as the primary entry point.
+  if (preferred && (preferred.kind === "team" || teams.length === 0)) {
+    return preferred;
+  }
   return (
     running.find((a) => a.kind === "team" && (a.member_ids?.length ?? 0) > 0) ??
     running.find((a) => a.kind === "team") ??
