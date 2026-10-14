@@ -24,13 +24,22 @@
   font-size: 14px;
 }
 .wb-root, .wb-root * { box-sizing: border-box; }
-.wb-root button, .wb-root input, .wb-root textarea { font: inherit; }
-.wb-root button { cursor: pointer; color: inherit; }
-.wb-root button:focus-visible, .wb-root textarea:focus-visible, .wb-root input:focus-visible {
+.wb-side button, .wb-main:not(.wb-feature-main) button, .wb-platform-shell button,
+.wb-feature-main > .wb-topbar button,
+.wb-side input, .wb-main:not(.wb-feature-main) input, .wb-platform-shell input,
+.wb-main:not(.wb-feature-main) textarea { font: inherit; }
+.wb-side button, .wb-main:not(.wb-feature-main) button,
+.wb-platform-shell button, .wb-feature-main > .wb-topbar button { cursor: pointer; color: inherit; }
+.wb-side button:focus-visible, .wb-side input:focus-visible,
+.wb-main:not(.wb-feature-main) button:focus-visible,
+.wb-main:not(.wb-feature-main) textarea:focus-visible,
+.wb-platform-shell button:focus-visible, .wb-platform-shell input:focus-visible,
+.wb-feature-main > .wb-topbar button:focus-visible {
   outline: 3px solid rgba(68, 117, 141, .42);
   outline-offset: 3px;
 }
-.wb-root button:disabled { opacity: .5; cursor: not-allowed; }
+.wb-side button:disabled, .wb-main:not(.wb-feature-main) button:disabled,
+.wb-platform-shell button:disabled { opacity: .5; cursor: not-allowed; }
 .wb-root ::selection { background: #f9d99f; }
 .wb-side {
   display: flex;
