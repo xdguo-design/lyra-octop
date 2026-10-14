@@ -218,6 +218,7 @@ export default function HomePage() {
 
   const openPlatform = () => {
     setError("");
+    setPlatformFrameReady(false);
     setPlatformOpen(true);
     setPlatformSettingsOpen(false);
   };
