@@ -25,6 +25,9 @@ describe("private workbench", () => {
     expect(selectPrimaryAgent([worker, stoppedTeam, team])?.agent_id).toBe("host");
     expect(canDelegate(team)).toBe(true);
     expect(canDelegate(worker)).toBe(false);
+    expect(selectPrimaryAgent([worker, stoppedTeam, team], "host")?.agent_id).toBe("host");
+    expect(selectPrimaryAgent([worker, stoppedTeam, team], "worker")?.agent_id).toBe("host");
+    expect(selectPrimaryAgent([worker], "worker")?.agent_id).toBe("worker");
   });
 
   it("does not falsely advertise delegation for an empty or missing team", () => {
