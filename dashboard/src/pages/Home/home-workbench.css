@@ -539,3 +539,6 @@
 .wb-entry-card,.wb-entry-card:hover { box-shadow: 0 3px 12px rgba(30,50,70,.035); }
 .wb-entry-primary { background: #fff; }
 .wb-entry-platform { background: #f0f6fb; border-color: #dce8f1; }
+
+/* Keep the platform loading indication visible until the real iframe has loaded. */
+.wb-platform-loading { z-index: 2; pointer-events: none; }
