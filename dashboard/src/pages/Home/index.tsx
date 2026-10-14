@@ -8,7 +8,7 @@ import {
   ArrowLeft, ArrowRight, Bot, Boxes, ChevronRight, CircleHelp,
   Database, ExternalLink, GraduationCap, Layers3, Monitor, SquarePen,
   Maximize2, MessageCircle, MessageSquareText, Plus,
-  Send, Settings2, ShieldCheck, Sparkles, Timer, Users,
+  Send, Settings2, ShieldCheck, Sparkles, Square, Timer, Users,
   Workflow, Wrench, X,
 } from "lucide-react";
 import { request } from "../../api/request";
