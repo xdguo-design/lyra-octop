@@ -324,7 +324,7 @@ export default function HomePage() {
                 onClick={() => navigateFromWorkbench(path)}>
                 {label === "Agent" ? <img src="/lyra-dino.svg" width="19" height="19" alt="" /> : <Icon size={17} />}
                 <span>{label}</span>
-                {label === "Agent" && <span className="wb-cue">Cue!</span>}
+                {label === "Agent" && <span className="wb-cue" aria-hidden="true">Cue!</span>}
               </button>
             ))}
             <Popover trigger="click" open={moreOpen} onOpenChange={setMoreOpen}
