@@ -14,6 +14,8 @@ import { request } from "../../api/request";
 import { octopThreadsApi, type OctopThread } from "../../api/modules/octopThreads";
 import { useChat } from "../Chat/hooks/useChat";
 import type { OctopAgent } from "../../context/AgentContext";
+import type { ChatMessage } from "../Chat/hooks/sseHelpers";
+import { previewAgents, previewTurn, previewUser } from "./preview-data";
 import {
   canDelegate, resolvePrivatePlatformUrl, selectPrimaryAgent,
   visibleConversationMessages,
@@ -59,7 +61,7 @@ function initialPlatformUrl() {
   }
 }
 
-export default function HomePage() {
+export default function HomePage({ previewMode = false }: { previewMode?: boolean }) {
   const navigate = useNavigate();
   const [user, setUser] = useState<MeUser | null>(null);
   const [agents, setAgents] = useState<OctopAgent[]>([]);
@@ -71,6 +73,7 @@ export default function HomePage() {
   const [threads, setThreads] = useState<OctopThread[]>([]);
   const [activeThread, setActiveThread] = useState<string | null>(null);
   const [input, setInput] = useState("");
+  const [demoMessages, setDemoMessages] = useState<ChatMessage[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [platformOpen, setPlatformOpen] = useState(false);
@@ -92,17 +95,18 @@ export default function HomePage() {
   const {
     messages, isStreaming, historyLoading, historyError,
     sendMessage, cancelStream, loadHistory,
-  } = useChat(activeThread, agentId, primary?.kind === "team");
+  } = useChat(previewMode ? null : activeThread, previewMode ? null : agentId, !previewMode && primary?.kind === "team");
+  const shownMessages = previewMode ? demoMessages : messages;
   const visibleMessages = useMemo(
-    () => visibleConversationMessages(messages, agentId),
-    [messages, agentId],
+    () => visibleConversationMessages(shownMessages, agentId),
+    [shownMessages, agentId],
   );
   const hasPendingApproval = messages.some(
     (m) => m.hitlData?.status === "pending",
   );
   const platformSrc = useMemo(
-    () => resolvePrivatePlatformUrl(platformUrl, window.location.hostname, window.location.protocol),
-    [platformUrl],
+    () => previewMode ? null : resolvePrivatePlatformUrl(platformUrl, window.location.hostname, window.location.protocol),
+    [platformUrl, previewMode],
   );
   const members = useMemo(
     () => (primary?.member_ids ?? []).map((id) =>
@@ -114,6 +118,12 @@ export default function HomePage() {
   const configuredMembers = primary?.member_ids?.length ?? 0;
 
   useEffect(() => {
+    if (previewMode) {
+      setUser(previewUser);
+      setAgents(previewAgents);
+      setAgentsLoading(false);
+      return;
+    }
     let cancelled = false;
     void request<MeUser>("/auth/me").then((value) => {
       if (!cancelled) setUser(value);
@@ -126,9 +136,10 @@ export default function HomePage() {
       if (!cancelled) setAgentsLoading(false);
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [previewMode]);
 
   useEffect(() => {
+    if (previewMode) return;
     setThreads([]);
     setActiveThread(null);
     if (!agentId) return;
@@ -139,11 +150,11 @@ export default function HomePage() {
       if (!cancelled) setError("暂时无法获取会话历史。");
     });
     return () => { cancelled = true; };
-  }, [agentId]);
+  }, [agentId, previewMode]);
 
   useEffect(() => {
-    if (activeThread && agentId) void loadHistory(activeThread);
-  }, [activeThread, agentId, loadHistory]);
+    if (!previewMode && activeThread && agentId) void loadHistory(activeThread);
+  }, [activeThread, agentId, loadHistory, previewMode]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
@@ -152,6 +163,7 @@ export default function HomePage() {
   const newTask = () => {
     setPlatformOpen(false);
     setActiveThread(null);
+    if (previewMode) setDemoMessages([]);
     setInput("");
     setError("");
     window.setTimeout(() => inputRef.current?.focus(), 0);
@@ -161,11 +173,27 @@ export default function HomePage() {
     setPlatformOpen(false);
     setError("");
     setActiveThread(threadId);
+    if (previewMode) setDemoMessages([]);
   };
 
   const send = async (provided?: string) => {
     const text = (provided ?? input).trim();
     if (!text || !agentId || sending || isStreaming || hasPendingApproval) return;
+    if (previewMode) {
+      const stamp = Date.now();
+      const id = activeThread || "demo-thread-" + stamp;
+      if (!activeThread) {
+        setActiveThread(id);
+        setThreads((old) => [{
+          thread_id: id, session_key: id, channel_type: "preview",
+          title: text.slice(0, 40), created_at: Math.floor(stamp / 1000),
+          last_active: Math.floor(stamp / 1000),
+        }, ...old]);
+      }
+      setDemoMessages((old) => [...old, ...previewTurn(text, stamp)]);
+      setInput("");
+      return;
+    }
     setSending(true);
     setError("");
     try {
@@ -204,6 +232,7 @@ export default function HomePage() {
   };
 
   const savePlatformUrl = () => {
+    if (previewMode) { setError("测试预览未连接实际星球乐园服务，请在私有云部署环境中验证平台。"); return; }
     const next = resolvePrivatePlatformUrl(platformDraft, window.location.hostname, window.location.protocol);
     if (!next) {
       setError("平台地址必须是当前私有云主机的安全地址；HTTPS 工作台不能加载 HTTP 平台。");
@@ -235,7 +264,8 @@ export default function HomePage() {
   const hasChat = activeThread !== null;
 
   return (
-    <div className={"wb-root" + (platformOpen ? " wb-root-platform" : "")}>
+    <div className={"wb-root" + (platformOpen ? " wb-root-platform" : "") + (previewMode ? " wb-demo" : "")}>
+      {previewMode && <div className="wb-demo-ribbon" role="status">云端布局演示 · 无真实 Agent、LLM 或星球乐园后端</div>}
       {!platformOpen && (
         <aside className="wb-side">
           <button className="wb-brand" type="button" onClick={newTask} aria-label="返回工作台">
@@ -249,7 +279,7 @@ export default function HomePage() {
             {NAV_ITEMS.map(({ path, label, Icon }) => (
               <button type="button" key={path}
                 className={"wb-nav-item" + (path === "/home" ? " is-active" : "")}
-                onClick={() => path === "/home" ? newTask() : navigate(path)}>
+                onClick={() => path === "/home" ? newTask() : previewMode ? setError("云端预览只提供工作台布局测试，其他功能需连接私有云。") : navigate(path)}>
                 <Icon size={17} /> <span>{label}</span>
                 {path === "/home" && <span className="wb-active-dot" />}
               </button>
@@ -322,7 +352,7 @@ export default function HomePage() {
           ) : (
             <div className="wb-platform-placeholder"><CircleHelp size={32} />
               <h2>请配置内置平台地址</h2>
-              <p>仅允许当前私有云主机，避免把你的工作台嵌入不可信站点。</p>
+              <p>{previewMode ? "本预览只展示平台最大化容器。请在真实私有云中配置星球乐园，系统不会伪造其已开发的业务界面。" : "仅允许当前私有云主机，避免把你的工作台嵌入不可信站点。"}</p>
               <button type="button" onClick={() => setPlatformSettingsOpen(true)}>配置地址</button>
             </div>
           )}
@@ -340,7 +370,7 @@ export default function HomePage() {
             </div>
             <div className="wb-topbar-right">
               <span className="wb-status"><span className={primary ? "wb-status-dot" : "wb-status-dot is-off"} />
-                {agentsLoading ? "正在连接…" : primary ? "主 Agent 已连接" : "未发现运行中的 Agent"}
+                {previewMode ? "演示 Agent · 非真实连接" : agentsLoading ? "正在连接…" : primary ? "主 Agent 已连接" : "未发现运行中的 Agent"}
               </span>
               <span className="wb-topbar-divider" />
               <span className="wb-private-label"><ShieldCheck size={14}/> 私有云</span>
@@ -446,7 +476,7 @@ export default function HomePage() {
               </div>
             </div>
             <div className="wb-composer-caption">
-              <span><ShieldCheck size={13}/> 会话由私有部署管理，模型调用依照已配置的提供商</span>
+              <span><ShieldCheck size={13}/>{previewMode ? "仅浏览器内演示，消息不会发送或存储到服务端" : "会话由私有部署管理，模型调用依照已配置的提供商"}</span>
               <span>此工作台只呈现聊天记录，内部执行明细在高级对话中查看。</span>
             </div>
           </div>
@@ -456,9 +486,9 @@ export default function HomePage() {
                 <div className="wb-insight-head">
                   <span className="wb-insight-bot"><Bot size={22}/></span>
                   <div><strong>{primary?.name || "主 Agent"}</strong>
-                    <small>{primary ? "已连接" : "等待启用"}</small>
+                    <small>{previewMode ? "样例团队（模拟）" : primary ? "已连接" : "等待启用"}</small>
                   </div>
-                  <span className={"wb-insight-status" + (primary ? " is-online" : "")}>{primary ? "在线" : "离线"}</span>
+                  <span className={"wb-insight-status" + (!previewMode && primary ? " is-online" : "")}>{previewMode ? "演示" : primary ? "在线" : "离线"}</span>
                 </div>
                 {hostOptions.length > 1 && (
                   <label className="wb-host-selector">
@@ -471,7 +501,7 @@ export default function HomePage() {
                     </select>
                   </label>
                 )}
-                <p>{teamReady
+                <p>{previewMode ? "这里展示真实工作台的界面结构，但输入只得到演示回复；部署到私有云后才能执行 Agent 任务。" : teamReady
                   ? "向主 Agent 描述任务目标，它会通过已有 Agent Team 调用专业成员并汇总结果。"
                   : "当前尚未配置完整的协作团队，可以先与已启动的 Agent 聊天。"}
                 </p>
@@ -506,7 +536,7 @@ export default function HomePage() {
                 )}
                 <div className="wb-team-foot">
                   <span className={"wb-team-dot" + (isStreaming ? " is-streaming" : "")} />
-                  {isStreaming ? "当前会话有任务正在处理" : "这里展示成员可用性，不代表任务执行进度"}
+                  {previewMode ? "样例成员数据，不表示真实运行状态" : isStreaming ? "当前会话有任务正在处理" : "这里展示成员可用性，不代表任务执行进度"}
                 </div>
               </section>
               <section className="wb-insight-card wb-insight-platform">
