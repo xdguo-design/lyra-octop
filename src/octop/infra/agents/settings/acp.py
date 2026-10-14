@@ -35,6 +35,12 @@ _OCTOP_BUILTIN_RUNNERS: dict[str, dict[str, Any]] = {
         "trusted": True,
         "tool_parse_mode": "update_detail",
     },
+    "kilo_code": {
+        "command": "kilo",
+        "args": ["acp"],
+        "trusted": False,
+        "tool_parse_mode": "update_detail",
+    },
 }
 
 
