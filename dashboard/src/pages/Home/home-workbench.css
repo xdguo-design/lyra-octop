@@ -500,3 +500,42 @@
 
 .wb-host-selector { display: flex; flex-direction: column; gap: 7px; margin-top: 15px; color: #85918a; font-size: 11px; }
 .wb-host-selector select { width: 100%; min-width: 0; padding: 9px 30px 9px 10px; border: 1px solid #dce6df; border-radius: 8px; color: #425f53; background: #f9fbf9; font: 12px "PingFang SC", "Microsoft YaHei", sans-serif; }
+
+
+/* Layout-first neutral baseline: graphic skin is a separate iteration. */
+.wb-root {
+  --wb-paper: #f7f8fa;
+  --wb-white: #ffffff;
+  --wb-ink: #202b37;
+  --wb-line: #e8ebf0;
+  --wb-accent: #7ca8e8;
+  --wb-green: #3b8a74;
+  background: #f7f8fa;
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+.wb-main {
+  background: #fff;
+  background-image: none;
+}
+.wb-side { background: #f8f9fb; border-color: #e9edf2; }
+.wb-brand-mark, .wb-hero-bot {
+  transform: none;
+  border-radius: 14px;
+  box-shadow: none;
+}
+.wb-welcome-brand h1 {
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-weight: 650;
+  letter-spacing: -.025em;
+}
+.wb-welcome-brand h1 em::after { height: 8px; border-radius: 3px; opacity: .45; }
+.wb-entry-card h2 {
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-weight: 650;
+  letter-spacing: -.02em;
+}
+.wb-newtask { box-shadow: none; border: 1px solid #cad5e0; }
+.wb-newtask:hover { box-shadow: 0 4px 16px rgba(20,45,75,.08); transform: none; }
+.wb-entry-card,.wb-entry-card:hover { box-shadow: 0 3px 12px rgba(30,50,70,.035); }
+.wb-entry-primary { background: #fff; }
+.wb-entry-platform { background: #f0f6fb; border-color: #dce8f1; }
