@@ -496,3 +496,7 @@
   .wb-platform-external { font-size: 0; gap: 0; padding: 7px; }
   .wb-platform-external svg { width: 17px; height: 17px; }
 }
+
+
+.wb-host-selector { display: flex; flex-direction: column; gap: 7px; margin-top: 15px; color: #85918a; font-size: 11px; }
+.wb-host-selector select { width: 100%; min-width: 0; padding: 9px 30px 9px 10px; border: 1px solid #dce6df; border-radius: 8px; color: #425f53; background: #f9fbf9; font: 12px "PingFang SC", "Microsoft YaHei", sans-serif; }
