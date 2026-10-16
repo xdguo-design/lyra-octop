@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -22,6 +23,8 @@ from octop.infra.agents.teams import HOST_TOOLS_ALLOWED, is_team_agent
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.server import OctopServer
 from octop.infra.utils.locale import resolve_request_locale
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 
@@ -371,6 +374,45 @@ def describe_connector_readiness(
     return output
 
 
+async def prepare_selected_connector_readiness(
+    *,
+    registry: Any,
+    agent_id: str,
+    user_id: int,
+    selected: list[str],
+    instances: list[dict[str, Any]],
+    mode: str,
+) -> None:
+    """Attempt registration before reporting a selected connector as missing.
+
+    The normal chat path loads gateway tools on demand via prepare_chat_mcp.
+    A read-only status lookup previously skipped that step, so a usable Agent
+    Mail / Gmail / GitHub connector could be incorrectly shown as not_loaded.
+    Only preflight explicitly effective, active, credentialed selections.
+    This does not send mail or assert that the upstream provider is reachable.
+    """
+    if mode != "craft":
+        return
+    active = {
+        str(item.get("mcp_server_name"))
+        for item in instances
+        if item.get("status") == "active" and item.get("has_credentials") is True
+    }
+    names = [name for name in dict.fromkeys(selected) if name in active]
+    if not names:
+        return
+    try:
+        await registry.prepare_chat_mcp(agent_id, names, connector_user_id=user_id)
+    except Exception:
+        # The final status will remain not_loaded if registration failed.
+        # Do not report a successful provider operation merely from a preflight.
+        logger.exception(
+            "tool readiness preflight failed for agent=%s servers=%s",
+            agent_id,
+            names,
+        )
+
+
 @router.get(
     "/{agent_id}/tool-readiness",
     summary="Explain effective connector availability for this agent and turn",
@@ -390,8 +432,26 @@ async def get_tool_readiness(
     if row is None:
         raise OctopError(ErrorCode.AGENT_NOT_FOUND, f"agent {agent_id!r} not found")
     _assert_agent_owner(row, user)
-    chosen = request.query_params.getlist("selected")
+    # Omitted selection means the new-turn defaults (incl. expert defaults).
+    # An explicit selection, including an empty one, must not force defaults.
+    if "selected" in request.query_params:
+        chosen = [name for name in request.query_params.getlist("selected") if name]
+    else:
+        chosen = registry.merge_turn_mcp_servers(
+            user.id,
+            None,
+            apply_defaults=True,
+            extra_defaults=registry.default_mcp_servers(agent_id),
+        ) or []
     visible = registry._connector_svc.list_instances_for_api(user.id)
+    await prepare_selected_connector_readiness(
+        registry=registry,
+        agent_id=agent_id,
+        user_id=user.id,
+        selected=chosen,
+        instances=visible,
+        mode=mode,
+    )
     agent = registry.get_agent(agent_id)
     loaded = set(getattr(agent, "_mcp_tool_name_set", frozenset()))
     return ConnectorReadinessResponse(
