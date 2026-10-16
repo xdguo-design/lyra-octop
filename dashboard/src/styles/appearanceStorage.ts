@@ -1,3 +1,4 @@
+import { DEFAULT_SKIN, isVisualSkin, type VisualSkin } from "./visualSkins";
 import {
   DEFAULT_CUSTOM_COLOR,
   DEFAULT_PALETTE,
@@ -13,6 +14,8 @@ export type ThemePreference = "system" | "light" | "dark";
 export type StoredAppearance = {
   preference: ThemePreference;
   palette: ThemePalette;
+  /** Independent visual skin, migrated from existing palettes. */
+  skin?: VisualSkin;
   /** Brand hex for the "custom" palette; ignored for curated palettes. */
   customColor?: string;
 };
@@ -48,6 +51,7 @@ export function readStoredAppearance(): StoredAppearance {
     return {
       preference: "system",
       palette: readLegacyPalette(),
+      skin: DEFAULT_SKIN,
       customColor: DEFAULT_CUSTOM_COLOR,
     };
   }
@@ -57,6 +61,7 @@ export function readStoredAppearance(): StoredAppearance {
     return {
       preference: raw,
       palette: readLegacyPalette(),
+      skin: DEFAULT_SKIN,
       customColor: DEFAULT_CUSTOM_COLOR,
     };
   }
@@ -73,7 +78,8 @@ export function readStoredAppearance(): StoredAppearance {
         : readLegacyPalette();
       const customColor =
         normalizeHexColor(obj.customColor as string) ?? DEFAULT_CUSTOM_COLOR;
-      return { preference, palette, customColor };
+      const skin = isVisualSkin(obj.skin) ? obj.skin : DEFAULT_SKIN;
+      return { preference, palette, skin, customColor };
     }
   } catch {
     // fall through
@@ -82,6 +88,7 @@ export function readStoredAppearance(): StoredAppearance {
   return {
     preference: "system",
     palette: readLegacyPalette(),
+    skin: DEFAULT_SKIN,
     customColor: DEFAULT_CUSTOM_COLOR,
   };
 }
@@ -93,6 +100,7 @@ export function writeStoredAppearance(appearance: StoredAppearance): void {
     JSON.stringify({
       preference: appearance.preference,
       palette: appearance.palette,
+      skin: isVisualSkin(appearance.skin) ? appearance.skin : DEFAULT_SKIN,
       customColor:
         normalizeHexColor(appearance.customColor ?? "") ?? DEFAULT_CUSTOM_COLOR,
     }),

@@ -31,6 +31,7 @@ import { useIsMobile } from "./hooks/useIsMobile";
 import { useUnauthorizedRedirect } from "./hooks/useUnauthorizedRedirect";
 import { installDesktopExternalLinks } from "./utils/desktopExternalLinks";
 import { brandTokensFor } from "./styles/themePalettes";
+import { skinAntdTokens } from "./styles/visualSkins";
 import "@fontsource/ma-shan-zheng";
 import "@fontsource/zcool-kuaile";
 import "./styles/theme-vars.css";
@@ -39,6 +40,7 @@ import "./styles/form-override.css";
 import "./styles/spin-override.css";
 import "./styles/manus-theme.css";
 import "./styles/crayon-theme.css";
+import "./styles/visual-skins.css";
 
 const GlobalStyle = createGlobalStyle`
 * {
@@ -48,11 +50,12 @@ const GlobalStyle = createGlobalStyle`
 `;
 
 function ThemedApp() {
-  const { isDark, palette, customColor } = useTheme();
+  const { isDark, palette, customColor, skin } = useTheme();
   const { t, i18n } = useTranslation();
   const isMobile = useIsMobile();
   const desktopChrome = useDesktopChrome();
   const brandTokens = brandTokensFor(palette, isDark, customColor);
+  const skinTokens = skinAntdTokens(skin, isDark);
   // Make antd built-ins (Popconfirm OK/Cancel, Modal default footer, Empty,
   // Pagination, DatePicker, Table… ) follow the current UI language.
   // DatePicker month/weekday labels come from dayjs — keep it in sync too.
@@ -125,17 +128,18 @@ function ThemedApp() {
             boxShadow: "0 1px 2px rgba(0, 0, 0, 0.04)",
             boxShadowSecondary: "0 8px 28px rgba(0, 0, 0, 0.1)",
           }),
+      ...skinTokens,
     },
     components: isDark
       ? {
-          Modal: { headerBg: "#1a1a1a", contentBg: "#1a1a1a" },
-          Input: { colorBgBase: "#1a1a1a" },
-          InputNumber: { colorBgBase: "#1a1a1a" },
-          Select: { colorBgBase: "#1a1a1a", selectorBg: "#1a1a1a" },
-          DatePicker: { colorBgBase: "#1a1a1a" },
-          Segmented: { itemSelectedBg: "#2a2a2a" },
-          Card: { colorBgContainer: "#1a1a1a" },
-          Tooltip: { colorBgSpotlight: "#2a2a2a" },
+          Modal: { headerBg: skinTokens.colorBgContainer, contentBg: skinTokens.colorBgContainer },
+          Input: { colorBgBase: skinTokens.colorBgContainer },
+          InputNumber: { colorBgBase: skinTokens.colorBgContainer },
+          Select: { colorBgBase: skinTokens.colorBgContainer, selectorBg: skinTokens.colorBgContainer },
+          DatePicker: { colorBgBase: skinTokens.colorBgContainer },
+          Segmented: { itemSelectedBg: skinTokens.colorBgElevated },
+          Card: { colorBgContainer: skinTokens.colorBgContainer },
+          Tooltip: { colorBgSpotlight: skinTokens.colorBgElevated },
         }
       : {},
   };

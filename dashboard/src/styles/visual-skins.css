@@ -1,0 +1,182 @@
+/* Skin palettes are deliberately independent of data-palette (brand accent).
+   Keep semantic colors stable; never override --fn-text-brand or alert colors. */
+
+html[data-skin="cloud"]:not([data-theme="dark"]) {
+  --fn-bg-primary: #ffffff; --fn-bg-secondary: #f1f6ff; --fn-bg-tertiary: #e9f2ff;
+  --fn-bg-elevated: #ffffff; --fn-bg-layout: #edf4ff; --fn-bg-container: #ffffff;
+  --fn-bg-sidebar: #e1edff; --fn-bg-page: #edf4ff; --fn-bg-glass: rgba(255,255,255,.88);
+  --fn-bg-toolbar: #f2f7ff; --fn-bg-code: #f0f6fd; --fn-surface: #ffffff;
+  --fn-text-primary: #243b5d; --fn-text-secondary: #637c9b; --fn-text-tertiary: #879bb6;
+  --fn-border-primary: #d4e1f3; --fn-border-input: #c5d8ee; --fn-border-secondary: #e1eaf7;
+  --fn-border: #d4e1f3; --fn-border-color: #d4e1f3; --fn-card-border-normal: #d4e1f3;
+  --fn-sidebar-bg: #e1edff; --fn-sidebar-border: #cfdef1; --fn-header-bg: #ffffff;
+  --fn-card-radius: 18px; --fn-radius-md: 12px; --fn-radius-lg: 18px;
+  --manus-radius-card: 18px; --manus-radius-control: 12px;
+}
+html[data-skin="cloud"][data-theme="dark"] {
+  --fn-bg-primary: #1c304a; --fn-bg-secondary: #223a56; --fn-bg-tertiary: #29435f;
+  --fn-bg-elevated: #1c304a; --fn-bg-layout: #111d33; --fn-bg-container: #1c304a;
+  --fn-bg-sidebar: #182944; --fn-bg-page: #111d33; --fn-bg-toolbar: #213753;
+  --fn-bg-code: #223a56; --fn-surface: #1c304a; --fn-text-primary: #edf5ff;
+  --fn-text-secondary: #adc2df; --fn-text-tertiary: #7f9dbf;
+  --fn-border-primary: #334c6b; --fn-border-input: #405c7b;
+  --fn-border-secondary: #2b4361; --fn-border: #334c6b; --fn-border-color: #334c6b;
+  --fn-card-border-normal: #334c6b; --fn-sidebar-bg: #182944;
+  --fn-sidebar-border: #334c6b; --fn-header-bg: #1c304a;
+  --fn-card-radius: 18px; --fn-radius-md: 12px; --fn-radius-lg: 18px;
+  --manus-radius-card: 18px; --manus-radius-control: 12px;
+}
+
+html[data-skin="forest"]:not([data-theme="dark"]) {
+  --fn-bg-primary: #fcfdf8; --fn-bg-secondary: #f2f8ee; --fn-bg-tertiary: #e5f0e6;
+  --fn-bg-elevated: #fcfdf8; --fn-bg-layout: #eff4ec; --fn-bg-container: #fcfdf8;
+  --fn-bg-sidebar: #dfece3; --fn-bg-page: #eff4ec; --fn-bg-toolbar: #f0f6ed;
+  --fn-bg-code: #eef4eb; --fn-surface: #fcfdf8; --fn-text-primary: #24483b;
+  --fn-text-secondary: #65796d; --fn-text-tertiary: #819888;
+  --fn-border-primary: #ceded2; --fn-border-input: #bbd0c2;
+  --fn-border-secondary: #e1eae0; --fn-border: #ceded2; --fn-border-color: #ceded2;
+  --fn-card-border-normal: #ceded2; --fn-sidebar-bg: #dfece3;
+  --fn-sidebar-border: #c7dacc; --fn-header-bg: #fcfdf8;
+  --fn-card-radius: 13px; --fn-radius-md: 9px;
+  --manus-radius-card: 13px; --manus-radius-control: 9px;
+}
+html[data-skin="forest"][data-theme="dark"] {
+  --fn-bg-primary: #1b352c; --fn-bg-secondary: #223c30; --fn-bg-tertiary: #294a3a;
+  --fn-bg-elevated: #1b352c; --fn-bg-layout: #0e1e19; --fn-bg-container: #1b352c;
+  --fn-bg-sidebar: #183329; --fn-bg-page: #0e1e19; --fn-bg-toolbar: #213b30;
+  --fn-bg-code: #213b30; --fn-surface: #1b352c;
+  --fn-text-primary: #eef7ee; --fn-text-secondary: #a8c5b3; --fn-text-tertiary: #85a995;
+  --fn-border-primary: #365748; --fn-border-input: #416553;
+  --fn-border-secondary: #2d4839; --fn-border: #365748; --fn-border-color: #365748;
+  --fn-card-border-normal: #365748; --fn-sidebar-bg: #183329;
+  --fn-sidebar-border: #365748; --fn-header-bg: #1b352c;
+  --fn-card-radius: 13px; --fn-radius-md: 9px;
+  --manus-radius-card: 13px; --manus-radius-control: 9px;
+}
+
+html[data-skin="orbit"]:not([data-theme="dark"]) {
+  --fn-bg-primary: #ffffff; --fn-bg-secondary: #f4f5fd; --fn-bg-tertiary: #eaf0fd;
+  --fn-bg-elevated: #ffffff; --fn-bg-layout: #f0f3fd; --fn-bg-container: #ffffff;
+  --fn-bg-sidebar: #e0e6f7; --fn-bg-page: #f0f3fd; --fn-bg-toolbar: #f3f5fc;
+  --fn-bg-code: #f1f2fb; --fn-surface: #ffffff; --fn-text-primary: #283758;
+  --fn-text-secondary: #667599; --fn-text-tertiary: #8c98ae;
+  --fn-border-primary: #d3ddf2; --fn-border-input: #cbd6ef;
+  --fn-border-secondary: #e1e8f5; --fn-border: #d3ddf2; --fn-border-color: #d3ddf2;
+  --fn-card-border-normal: #d3ddf2; --fn-sidebar-bg: #e0e6f7;
+  --fn-sidebar-border: #cedaf0; --fn-header-bg: #ffffff;
+  --fn-card-radius: 16px; --fn-radius-md: 11px;
+  --manus-radius-card: 16px; --manus-radius-control: 11px;
+}
+html[data-skin="orbit"][data-theme="dark"] {
+  --fn-bg-primary: #162744; --fn-bg-secondary: #1e3050; --fn-bg-tertiary: #273c5f;
+  --fn-bg-elevated: #162744; --fn-bg-layout: #0b1226; --fn-bg-container: #162744;
+  --fn-bg-sidebar: #101d38; --fn-bg-page: #0b1226; --fn-bg-toolbar: #1e3151;
+  --fn-bg-code: #1e3050; --fn-surface: #162744;
+  --fn-text-primary: #e9f1ff; --fn-text-secondary: #9caed1; --fn-text-tertiary: #8295b7;
+  --fn-border-primary: #2d4266; --fn-border-input: #3a5277;
+  --fn-border-secondary: #263b60; --fn-border: #2d4266; --fn-border-color: #2d4266;
+  --fn-card-border-normal: #2d4266; --fn-sidebar-bg: #101d38;
+  --fn-sidebar-border: #2d4266; --fn-header-bg: #162744;
+  --fn-card-radius: 16px; --fn-radius-md: 11px;
+  --manus-radius-card: 16px; --manus-radius-control: 11px;
+}
+
+html[data-skin="journal"]:not([data-theme="dark"]) {
+  --fn-bg-primary: #fffaf1; --fn-bg-secondary: #f5efe4; --fn-bg-tertiary: #ece2d0;
+  --fn-bg-elevated: #fffaf1; --fn-bg-layout: #f5efe4; --fn-bg-container: #fffaf1;
+  --fn-bg-sidebar: #ece2d0; --fn-bg-page: #f5efe4; --fn-bg-toolbar: #f7efdf;
+  --fn-bg-code: #f6eddd; --fn-surface: #fffaf1;
+  --fn-text-primary: #45382c; --fn-text-secondary: #7e6c59; --fn-text-tertiary: #a28e76;
+  --fn-border-primary: #dacbb7; --fn-border-input: #cbbcaa;
+  --fn-border-secondary: #e8ddcd; --fn-border: #dacbb7; --fn-border-color: #dacbb7;
+  --fn-card-border-normal: #dacbb7; --fn-sidebar-bg: #ece2d0;
+  --fn-sidebar-border: #d9cbb9; --fn-header-bg: #fffaf1;
+  --fn-card-radius: 8px; --fn-radius-md: 6px; --fn-radius-lg: 8px;
+  --manus-radius-card: 8px; --manus-radius-control: 6px;
+}
+html[data-skin="journal"][data-theme="dark"] {
+  --fn-bg-primary: #302920; --fn-bg-secondary: #3b3127; --fn-bg-tertiary: #463a2d;
+  --fn-bg-elevated: #302920; --fn-bg-layout: #211c19; --fn-bg-container: #302920;
+  --fn-bg-sidebar: #2b241e; --fn-bg-page: #211c19; --fn-bg-toolbar: #392f26;
+  --fn-bg-code: #392f26; --fn-surface: #302920;
+  --fn-text-primary: #f3e5ce; --fn-text-secondary: #c0a98b; --fn-text-tertiary: #a48d71;
+  --fn-border-primary: #594a39; --fn-border-input: #6c5944;
+  --fn-border-secondary: #4c3d2d; --fn-border: #594a39; --fn-border-color: #594a39;
+  --fn-card-border-normal: #594a39; --fn-sidebar-bg: #2b241e;
+  --fn-sidebar-border: #594a39; --fn-header-bg: #302920;
+  --fn-card-radius: 8px; --fn-radius-md: 6px; --fn-radius-lg: 8px;
+  --manus-radius-card: 8px; --manus-radius-control: 6px;
+}
+
+html[data-skin="terminal"]:not([data-theme="dark"]) {
+  --fn-bg-primary: #f8fffa; --fn-bg-secondary: #e9f2ed; --fn-bg-tertiary: #d8e8dd;
+  --fn-bg-elevated: #f8fffa; --fn-bg-layout: #e9f2ed; --fn-bg-container: #f8fffa;
+  --fn-bg-sidebar: #d8e8dd; --fn-bg-page: #e9f2ed; --fn-bg-toolbar: #e4f2e8;
+  --fn-bg-code: #e5f3e9; --fn-surface: #f8fffa;
+  --fn-text-primary: #143b2d; --fn-text-secondary: #527a67; --fn-text-tertiary: #719b84;
+  --fn-border-primary: #b9d4c5; --fn-border-input: #93bca5;
+  --fn-border-secondary: #d0e4d7; --fn-border: #b9d4c5; --fn-border-color: #b9d4c5;
+  --fn-card-border-normal: #b9d4c5; --fn-sidebar-bg: #d8e8dd;
+  --fn-sidebar-border: #b9d4c5; --fn-header-bg: #f8fffa;
+  --fn-card-radius: 4px; --fn-radius-sm: 2px; --fn-radius-md: 3px; --fn-radius-lg: 4px;
+  --manus-radius-card: 4px; --manus-radius-control: 3px;
+}
+html[data-skin="terminal"][data-theme="dark"] {
+  --fn-bg-primary: #142b22; --fn-bg-secondary: #1b382b; --fn-bg-tertiary: #244432;
+  --fn-bg-elevated: #142b22; --fn-bg-layout: #0b1613; --fn-bg-container: #142b22;
+  --fn-bg-sidebar: #10221b; --fn-bg-page: #0b1613; --fn-bg-toolbar: #1b382b;
+  --fn-bg-code: #1b382b; --fn-surface: #142b22;
+  --fn-text-primary: #d9fae1; --fn-text-secondary: #80b69a; --fn-text-tertiary: #6c9e80;
+  --fn-border-primary: #2a5843; --fn-border-input: #347253;
+  --fn-border-secondary: #214432; --fn-border: #2a5843; --fn-border-color: #2a5843;
+  --fn-card-border-normal: #2a5843; --fn-sidebar-bg: #10221b;
+  --fn-sidebar-border: #2a5843; --fn-header-bg: #142b22;
+  --fn-card-radius: 4px; --fn-radius-sm: 2px; --fn-radius-md: 3px; --fn-radius-lg: 4px;
+  --manus-radius-card: 4px; --manus-radius-control: 3px;
+}
+
+/* Decorative motifs affect only explicit skins; brand palette controls actions. */
+html[data-skin="cloud"] body {
+  background-image: radial-gradient(ellipse at 83% 8%, rgba(129,175,244,.17), transparent 58%);
+}
+html[data-skin="orbit"][data-theme="dark"] body {
+  background-image: radial-gradient(circle at 75% 20%, rgba(95,117,222,.16), transparent 53%);
+}
+html[data-skin="journal"] body {
+  background-image: repeating-linear-gradient(0deg, transparent, transparent 31px, rgba(135,103,69,.045) 32px);
+}
+html[data-skin="terminal"] .octop-card,
+html[data-skin="terminal"] .octop-modal-content,
+html[data-skin="terminal"] .octop-drawer-content,
+html[data-skin="terminal"] .octop-table {
+  border-radius: 4px !important;
+  box-shadow: none !important;
+}
+html[data-skin="journal"] .octop-modal-title,
+html[data-skin="journal"] .octop-drawer-title,
+html[data-skin="journal"] h1,
+html[data-skin="journal"] h2 {
+  font-family: Georgia, "Songti SC", "Noto Serif SC", serif;
+  letter-spacing: .02em;
+}
+html[data-skin="terminal"] .octop-modal-title,
+html[data-skin="terminal"] .octop-drawer-title,
+html[data-skin="terminal"] .octop-table-thead,
+html[data-skin="terminal"] h1,
+html[data-skin="terminal"] h2 {
+  font-family: var(--fn-font-mono, ui-monospace, monospace);
+  letter-spacing: -.015em;
+}
+html[data-skin="cloud"] .octop-card,
+html[data-skin="cloud"] .octop-modal-content,
+html[data-skin="cloud"] .octop-drawer-content {
+  box-shadow: 0 8px 26px rgba(66,108,160,.07) !important;
+}
+html[data-skin="forest"] .octop-card,
+html[data-skin="forest"] .octop-modal-content {
+  box-shadow: 0 3px 12px rgba(30,87,61,.05) !important;
+}
+html[data-skin="orbit"][data-theme="dark"] .octop-card,
+html[data-skin="orbit"][data-theme="dark"] .octop-modal-content {
+  box-shadow: 0 9px 32px rgba(3,9,26,.25) !important;
+}
