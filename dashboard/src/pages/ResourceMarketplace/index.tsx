@@ -60,6 +60,8 @@ export default function ResourceMarketplacePage() {
   const [previewBusy, setPreviewBusy] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
   const [packageId, setPackageId] = useState("");
+  const [probeBusy, setProbeBusy] = useState<string | null>(null);
+  const [probeResults, setProbeResults] = useState<Record<string, { ok: boolean; detail: string }>>({});
 
   const load = async () => {
     setLoading(true);
@@ -123,6 +125,23 @@ export default function ResourceMarketplacePage() {
       setPreviewBusy(false);
     }
   };
+  const probeInstance = async (instanceId: string) => {
+    if (probeBusy) return;
+    setProbeBusy(instanceId);
+    try {
+      const result = await connectorsApi.testInstance(instanceId);
+      const detail = result.ok
+        ? word(`连通性通过 · ${result.tool_count ?? result.tools?.length ?? 0} 个工具已发现（未执行写操作）`,
+          `Connection probe passed · ${result.tool_count ?? result.tools?.length ?? 0} tools discovered (no write action tested)`)
+        : result.error || word("连通性测试失败", "Connection probe failed");
+      setProbeResults(prev => ({ ...prev, [instanceId]: { ok: result.ok, detail } }));
+    } catch (error) {
+      setProbeResults(prev => ({ ...prev, [instanceId]: {
+        ok: false, detail: apiErrorMessage(error, word("连通性测试失败", "Connection probe failed"), t),
+      } }));
+    } finally { setProbeBusy(null); }
+  };
+  const customInstances = instances.filter(item => !connectors.some(entry => entry.kind === item.kind));
   const importSkill = async () => {
     if (!preview || !packageId || importBusy) return;
     setImportBusy(true);
@@ -204,7 +223,10 @@ export default function ResourceMarketplacePage() {
                   <div className={styles.cardTop}><span className={styles.glyph}><Link2 size={22}/></span><div className={styles.name}>{item.name}</div>
                     <Button type="text" icon={<Plus size={16}/>} onClick={() => navigate("/connectors")} aria-label={word("配置连接器", "Configure connector")}/></div>
                   <p className={styles.desc}>{item.description}</p>
-                  <div className={styles.cardFoot}><span>{item.category}</span><span>{installed ? word(`已连接 ${installed}`, `Connected ${installed}`) : word("需连接授权", "Authorization required")}</span></div>
+                  <div className={styles.cardFoot}><span>{item.category}</span><span>{installed ? word(`已连接 ${installed}`, `Connected ${installed}`) : word("需连接授权", "Authorization required")}</span>
+                    {instances.filter(entry => entry.kind === item.kind && entry.status === "active" && entry.has_credentials).slice(0, 1).map(instance =>
+                      <Button key={instance.instance_id} size="small" loading={probeBusy === instance.instance_id} onClick={() => void probeInstance(instance.instance_id)}>{word("验证", "Probe")}</Button>)}</div>
+                  {instances.filter(entry => entry.kind === item.kind).slice(0, 1).map(instance => probeResults[instance.instance_id] ? <div key={instance.instance_id} role="status" className={probeResults[instance.instance_id].ok ? styles.probeSuccess : styles.error}>{probeResults[instance.instance_id].detail}</div> : null)}
                 </article>;
               }) : (filtered as MarketPlugin[]).map(item => <article className={styles.card} key={item.id}>
                 <div className={styles.cardTop}><span className={styles.glyph}><Puzzle size={22}/></span><div className={styles.name}>{item.name || item.id}</div>
@@ -213,6 +235,16 @@ export default function ResourceMarketplacePage() {
                 <div className={styles.cardFoot}><span>{item.group || word("插件", "Plugin")}</span><span>{item.installed ? word("已安装", "Installed") : word("可安装", "Available")}</span></div>
               </article>)}
           </div>}
+        {tab === "connectors" && customInstances.length ? <section className={styles.customSection} aria-label={word("自定义连接器", "Custom connectors")}>
+          <div className={styles.sectionHeading}>{word("自定义 MCP（包括 GitHub 等）", "Custom MCP (including GitHub)")}</div>
+          <div className={styles.cards}>{customInstances.map(item => <article className={styles.card} key={item.mcp_server_name}>
+            <div className={styles.cardTop}><span className={styles.glyph}><Link2 size={22}/></span><div className={styles.name}>{item.display_name}</div></div>
+            <p className={styles.desc}>{item.description || item.kind}</p>
+            <div className={styles.cardFoot}><span>{item.status === "active" && item.has_credentials ? word("已配置 · 尚未验证", "Configured · not yet probed") : word("需授权", "Authorization required")}</span>
+              <Button size="small" disabled={item.status !== "active" || !item.has_credentials} loading={probeBusy === item.instance_id} onClick={() => void probeInstance(item.instance_id)}>{word("验证工具", "Probe tools")}</Button></div>
+            {probeResults[item.instance_id] ? <div role="status" className={probeResults[item.instance_id].ok ? styles.probeSuccess : styles.error}>{probeResults[item.instance_id].detail}</div> : null}
+          </article>)}</div>
+        </section> : null}
         <Modal title={word("预览并导入 FreeLLM Skill", "Preview and import FreeLLM Skill")} open={!!preview || previewBusy} onCancel={() => { if (!importBusy) { setPreview(null); setPreviewBusy(false); } }}
           footer={<div className={styles.modalActions}><Button onClick={() => setPreview(null)} disabled={importBusy}>{word("取消", "Cancel")}</Button>
             <Button type="primary" icon={<Download size={15}/>} disabled={!preview || !packageId || importBusy} loading={importBusy} onClick={() => void importSkill()}>{word("确认导入", "Confirm import")}</Button></div>}
