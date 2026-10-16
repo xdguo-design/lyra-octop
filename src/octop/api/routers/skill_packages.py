@@ -366,7 +366,6 @@ async def create_from_skillhub(
     return _package_payload_with_creator(server, store, result.row)
 
 
-
 # FreeLLM is a public *catalog*, not a trusted execution source. Only explicit,
 # authenticated imports are allowed; exports are previews, never auto-published.
 class FreeLLMImportBody(BaseModel):
@@ -451,7 +450,9 @@ async def freellm_export_preview(
     row = _package_or_404(store, package_id, locale=resolve_request_locale(request))
     store.assert_can_mutate(row, user)
     skill = _package_skill_or_404(store, package_id, slug)
-    manifest = (store.package_skills_dir(package_id) / slug / "SKILL.md").read_text(encoding="utf-8")
+    manifest = (store.package_skills_dir(package_id) / slug / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
     # No network write: the owner must inspect secrets, licenses, and sources
     # and explicitly approve publication through a protected GitHub PR.
     from octop.infra.skills.freellm_submission import submission_digest
@@ -466,7 +467,6 @@ async def freellm_export_preview(
         "markdown": manifest,
         "published": False,
     }
-
 
 
 class FreeLLMSubmitBody(BaseModel):
