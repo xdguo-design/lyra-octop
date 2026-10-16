@@ -3,6 +3,7 @@
 Never update FreeLLM's live catalog, main branch, or automatically merge a PR.
 GitHub access is server-side; no authorization token reaches an Agent or browser.
 """
+
 from __future__ import annotations
 
 import base64
@@ -56,10 +57,14 @@ async def submit_review_pull_request(
     }
     async with httpx.AsyncClient(timeout=20, trust_env=False, follow_redirects=False) as client:
         async def github(method: str, endpoint: str, **kwargs: Any) -> dict[str, Any]:
-            response = await client.request(method, _REPOSITORY_API + endpoint, headers=headers, **kwargs)
+            response = await client.request(
+                method, _REPOSITORY_API + endpoint, headers=headers, **kwargs
+            )
             if response.status_code < 200 or response.status_code >= 300:
                 # Never expose GitHub's raw response, which may contain private details.
-                raise FreeLLMSyncError(f"GitHub submission request failed: HTTP {response.status_code}")
+                raise FreeLLMSyncError(
+                    f"GitHub submission request failed: HTTP {response.status_code}"
+                )
             payload: Any = response.json()
             if not isinstance(payload, dict):
                 raise FreeLLMSyncError("GitHub returned an invalid response")
@@ -69,7 +74,9 @@ async def submit_review_pull_request(
         base_sha = dev.get("object", {}).get("sha")
         if not isinstance(base_sha, str) or not re.fullmatch(r"[a-f0-9]{40}", base_sha):
             raise FreeLLMSyncError("Cannot resolve the FreeLLM dev branch")
-        await github("POST", "/git/refs", json={"ref": f"refs/heads/{branch}", "sha": base_sha})
+        await github(
+            "POST", "/git/refs", json={"ref": f"refs/heads/{branch}", "sha": base_sha}
+        )
         await github(
             "PUT",
             "/contents/" + path,
