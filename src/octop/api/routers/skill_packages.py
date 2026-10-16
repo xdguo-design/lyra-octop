@@ -465,6 +465,45 @@ async def freellm_export_preview(
     }
 
 
+
+class FreeLLMSubmitBody(BaseModel):
+    reviewed_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    confirm_public: bool = False
+
+
+@router.post(
+    "/{package_id}/skills/{slug}/freellm/submit",
+    summary="Submit an explicitly approved public FreeLLM Skill for GitHub PR review",
+)
+async def freellm_submit_review(
+    package_id: str,
+    slug: str,
+    body: FreeLLMSubmitBody,
+    request: Request,
+    server: OctopServer = Depends(get_server),
+    user: User = Depends(require_permission("skill_packages")),
+) -> dict[str, Any]:
+    from octop.infra.skills.freellm_catalog import FreeLLMSyncError
+    from octop.infra.skills.freellm_submission import submit_review_pull_request
+
+    store = _store(server)
+    row = _package_or_404(store, package_id, locale=resolve_request_locale(request))
+    store.assert_can_mutate(row, user)
+    _package_skill_or_404(store, package_id, slug)
+    manifest = (store.package_skills_dir(package_id) / slug / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    try:
+        return await submit_review_pull_request(
+            slug=slug,
+            markdown=manifest,
+            approved_digest=body.reviewed_sha256,
+            approved_publication=body.confirm_public,
+        )
+    except (FreeLLMSyncError, OSError) as exc:
+        raise OctopError(ErrorCode.SKILL_IMPORT_FAILED, str(exc)) from exc
+
+
 @router.get("/{package_id}", summary="Get a global skill package and its skills")
 async def get_skill_package(
     package_id: str,
