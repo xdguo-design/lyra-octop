@@ -31,14 +31,14 @@ import { useIsMobile } from "./hooks/useIsMobile";
 import { useUnauthorizedRedirect } from "./hooks/useUnauthorizedRedirect";
 import { installDesktopExternalLinks } from "./utils/desktopExternalLinks";
 import { brandTokensFor } from "./styles/themePalettes";
-import "@fontsource/ma-shan-zheng";
-import "@fontsource/zcool-kuaile";
 import "./styles/theme-vars.css";
 import "./styles/layout.css";
 import "./styles/form-override.css";
 import "./styles/spin-override.css";
+// Single skin: manus-theme.css is the only global surface layer.
+// The crayon/handwriting skin was retired — feature pages, the LYRA shell
+// and the kid-facing planet app (8130) must not mix visual languages.
 import "./styles/manus-theme.css";
-import "./styles/crayon-theme.css";
 
 const GlobalStyle = createGlobalStyle`
 * {

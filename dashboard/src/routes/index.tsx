@@ -13,6 +13,7 @@ const PersonalizationPage = lazy(
 );
 const ACPPage = lazy(() => import("../pages/Agent/ACP"));
 const TokenUsagePage = lazy(() => import("../pages/Control/TokenUsage"));
+const CreationsPage = lazy(() => import("../pages/Creations"));
 
 // Lazy-loaded pages — Control
 const RemoteDesktopPage = lazy(() => import("../pages/Control/RemoteDesktop"));
@@ -155,6 +156,7 @@ export const routeConfigs: RouteConfig[] = [
   { path: "/connectors", element: <ConnectorsPage /> },
   { path: "/skill-packages", element: <SkillPackagesPage /> },
   { path: "/knowledge-bases", element: <KnowledgeBasesPage /> },
+  { path: "/creations", element: <CreationsPage /> },
   { path: "/bridge", element: <BridgePage /> },
   {
     path: "/personalization/acp",

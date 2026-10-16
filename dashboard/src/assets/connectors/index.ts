@@ -25,6 +25,8 @@ import wecomCli from "./wecom-cli.png";
 import weknora from "./weknora.svg";
 import youdaoNote from "./youdao-note.png";
 import yuandian from "./yuandian.png";
+import vercel from "./vercel.svg";
+import github from "./github.svg";
 
 export const CONNECTOR_LOGOS: Record<string, string> = {
   "tencent-ardot": tencentArdot,
@@ -54,6 +56,8 @@ export const CONNECTOR_LOGOS: Record<string, string> = {
   "youdao-note": youdaoNote,
   "tencent-weiyun": tencentWeiyun,
   weknora,
+  vercel,
+  github,
 };
 
 export function getConnectorLogo(kind: string): string | undefined {
@@ -69,6 +73,22 @@ export function getConnectorLogo(kind: string): string | undefined {
   if (normalized !== kind) {
     const fallback = CONNECTOR_LOGOS[normalized];
     if (fallback) return fallback;
+  }
+  return undefined;
+}
+
+/** 自定义 MCP 地址 → 品牌图标（按 URL 识别官方服务）。 */
+const BRAND_URL_LOGOS: Array<[RegExp, string]> = [
+  [/mcp\.vercel\.com/i, "vercel"],
+  [/githubcopilot\.com\/mcp|api\.github\.com|github\.com/i, "github"],
+];
+
+export function getConnectorLogoForUrl(
+  url: string | undefined | null,
+): string | undefined {
+  if (!url) return undefined;
+  for (const [pattern, key] of BRAND_URL_LOGOS) {
+    if (pattern.test(url)) return CONNECTOR_LOGOS[key];
   }
   return undefined;
 }

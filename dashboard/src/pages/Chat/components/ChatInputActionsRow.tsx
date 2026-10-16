@@ -23,6 +23,7 @@ import {
   Bot,
   Plus,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Route,
@@ -280,6 +281,8 @@ export default function ChatInputActionsRow({
   };
   /** Plus-button menu (model / skills / …). */
   const [overflowPopoverOpen, setOverflowPopoverOpen] = useState(false);
+  /** Dedicated always-visible model trigger (desktop composer). */
+  const [modelTriggerOpen, setModelTriggerOpen] = useState(false);
   /** Picker panel opened from a plus-menu item. */
   const [compactPicker, setCompactPicker] = useState<CompactPickerKey | null>(
     null,
@@ -376,9 +379,12 @@ export default function ChatInputActionsRow({
   );
   const activeSkillSlugs = parseSkillSlugsInText(text, skillTokenRefs);
   const showModePicker = Boolean(onConversationModeChange);
+  // Desktop uses the dedicated model trigger; the plus menu only lists the
+  // model entry in compact/mobile layouts.
+  const showPlusModelEntry = showModelPicker && useCompactControls;
   const showOverflowMenu =
     showModePicker ||
-    showModelPicker ||
+    showPlusModelEntry ||
     showConnectorPicker ||
     showKnowledgePicker ||
     showSkillPicker ||
@@ -400,6 +406,7 @@ export default function ChatInputActionsRow({
 
   const closePlusMenu = () => {
     setOverflowPopoverOpen(false);
+    setModelTriggerOpen(false);
     closeCompactPicker();
   };
 
@@ -749,7 +756,9 @@ export default function ChatInputActionsRow({
           </span>
         </button>
       )}
-      {showModelPicker && (
+      {/* Desktop has the dedicated always-visible model trigger; the plus
+          menu keeps the model entry only in compact/mobile layouts. */}
+      {showModelPicker && useCompactControls && (
         <button
           type="button"
           className={`${styles.mobileOverflowItem} ${
@@ -960,6 +969,39 @@ export default function ChatInputActionsRow({
 
     return (
       <>
+        {showModelPicker && !useCompactControls && (
+          <Popover
+            trigger="click"
+            placement="topLeft"
+            arrow={false}
+            open={modelTriggerOpen}
+            onOpenChange={setModelTriggerOpen}
+            overlayClassName={styles.modelPopover}
+            content={modelMenu}
+          >
+            <Tooltip
+              title={t("chat.selectModel", "模型")}
+              mouseEnterDelay={0.4}
+            >
+              <button
+                type="button"
+                aria-label={t("chat.selectModel", "模型")}
+                data-testid="composer-model-trigger"
+                className={`${styles.modelTriggerBtn} ${
+                  modelTriggerOpen || selectedModel
+                    ? styles.modelTriggerBtnActive
+                    : ""
+                }`}
+              >
+                <Cpu size={15} />
+                <span className={styles.modelTriggerLabel}>
+                  {selectedModelTriggerLabel}
+                </span>
+                <ChevronDown size={13} />
+              </button>
+            </Tooltip>
+          </Popover>
+        )}
         {showOverflowMenu && (
           <Popover
             trigger="click"

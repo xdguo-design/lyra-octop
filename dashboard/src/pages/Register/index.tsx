@@ -181,7 +181,10 @@ export default function RegisterPage() {
 
             <Input
               prefix={
-                <User size={16} style={{ color: "var(--fn-text-quaternary)" }} />
+                <User
+                  size={16}
+                  style={{ color: "var(--fn-text-quaternary)" }}
+                />
               }
               placeholder={t("register.username")}
               size="large"
@@ -207,7 +210,10 @@ export default function RegisterPage() {
 
             <Input.Password
               prefix={
-                <Lock size={16} style={{ color: "var(--fn-text-quaternary)" }} />
+                <Lock
+                  size={16}
+                  style={{ color: "var(--fn-text-quaternary)" }}
+                />
               }
               placeholder={t("register.password")}
               size="large"
@@ -218,7 +224,10 @@ export default function RegisterPage() {
 
             <Input.Password
               prefix={
-                <Lock size={16} style={{ color: "var(--fn-text-quaternary)" }} />
+                <Lock
+                  size={16}
+                  style={{ color: "var(--fn-text-quaternary)" }}
+                />
               }
               placeholder={t("register.confirmPassword")}
               size="large"

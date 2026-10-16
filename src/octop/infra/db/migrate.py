@@ -1572,6 +1572,59 @@ def _ensure_skill_copy_policy_schema(db: DatabasePool) -> None:
     _ensure_column(db, "skill_packages", "copy_policy", "TEXT NOT NULL DEFAULT 'snapshot'")
 
 
+def _ensure_workbench_schema(db: DatabasePool) -> None:
+    pk = _integer_pk_sql(db)
+    number_type = "BIGINT" if db.dialect == "postgresql" else "INTEGER"
+    boolean_type = "SMALLINT" if db.dialect == "postgresql" else "INTEGER"
+    statements = (
+        f"""CREATE TABLE IF NOT EXISTS workbench_projects (
+            id {pk},
+            project_id TEXT NOT NULL UNIQUE,
+            owner_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            icon TEXT NOT NULL DEFAULT '📁',
+            parent_id TEXT,
+            code_enabled {boolean_type} NOT NULL DEFAULT 0,
+            created_at {number_type} NOT NULL,
+            updated_at {number_type} NOT NULL
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_workbench_projects_owner "
+        "ON workbench_projects(owner_user_id, created_at)",
+        f"""CREATE TABLE IF NOT EXISTS workbench_folders (
+            id {pk},
+            folder_id TEXT NOT NULL UNIQUE,
+            owner_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            project_id TEXT NOT NULL REFERENCES workbench_projects(project_id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            created_at {number_type} NOT NULL,
+            updated_at {number_type} NOT NULL
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_workbench_folders_project "
+        "ON workbench_folders(owner_user_id, project_id, created_at)",
+        f"""CREATE TABLE IF NOT EXISTS workbench_thread_assignments (
+            thread_id TEXT PRIMARY KEY REFERENCES threads(thread_id) ON DELETE CASCADE,
+            owner_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            project_id TEXT REFERENCES workbench_projects(project_id) ON DELETE SET NULL,
+            folder_id TEXT REFERENCES workbench_folders(folder_id) ON DELETE SET NULL,
+            updated_at {number_type} NOT NULL,
+            CHECK (folder_id IS NULL OR project_id IS NOT NULL)
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_workbench_thread_assignments_owner "
+        "ON workbench_thread_assignments(owner_user_id, project_id, folder_id)",
+        f"""CREATE TABLE IF NOT EXISTS workbench_project_imports (
+            owner_user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+            imported_at {number_type} NOT NULL
+        )""",
+    )
+    with db.connect() as conn:
+        for statement in statements:
+            conn.execute(statement)
+    # Projects became nestable (parent_id) after the table first shipped.
+    _ensure_column(db, "workbench_projects", "parent_id", "TEXT")
+    # GitHub-imported projects keep the repository link they came from.
+    _ensure_column(db, "workbench_projects", "external_url", "TEXT")
+
+
 def _ensure_bridge_connections_schema(db: DatabasePool) -> None:
     """Fold notes + unique display_name + auto_reconnect into unreleased v19."""
     if not _table_exists(db, "bridge_connections"):
@@ -2056,4 +2109,5 @@ def run_migrations(db: DatabasePool) -> None:
     _ensure_user_role_schema(db)
     _ensure_bridge_connections_schema(db)
     _ensure_user_registration_schema(db)
+    _ensure_workbench_schema(db)
     _grant_default_nav_permissions(db)

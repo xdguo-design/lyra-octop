@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
-  PanelLeftOpen,
   GraduationCap,
   Users,
   Globe,
@@ -109,7 +108,6 @@ import HistoryMigrationBanner from "./components/HistoryMigrationBanner";
 import { apiErrorMessage } from "../../utils/apiError";
 import PwaInstallPrompt from "../../components/PwaInstallPrompt";
 import { promptNeedsUserInput } from "../../utils/quickInputPrefill";
-import { OPEN_NAV_RECORDS_EVENT } from "../../layouts/chatHistoryRail";
 import {
   usePluginToolUis,
   setPluginUiDockHandlers,
@@ -1323,19 +1321,6 @@ function ChatPageInner() {
             {/* Mobile toolbar — session list + optional title + agent profile */}
             {isMobile && (
               <div className={styles.mobileToolbar}>
-                <button
-                  className={styles.menuBtn}
-                  onClick={() => {
-                    if (isMinimalLayout) {
-                      window.dispatchEvent(new Event(OPEN_NAV_RECORDS_EVENT));
-                      return;
-                    }
-                    setSidebarOpen(!sidebarOpen);
-                  }}
-                  title={t("nav.chatHistory") || "会话列表"}
-                >
-                  <PanelLeftOpen size={18} strokeWidth={1.8} />
-                </button>
                 {activeSessionTitle && (
                   <div
                     className={styles.mobileTitle}

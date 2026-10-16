@@ -32,9 +32,14 @@ function isPalette(value: unknown): value is ThemePalette {
   );
 }
 
+/** LYRA 统一品牌：历史存的 rose（Octop 上游默认）一律迁到 tech 蓝。 */
+function normalizeLyraPalette(value: ThemePalette): ThemePalette {
+  return value === "rose" ? "tech" : value;
+}
+
 function readLegacyPalette(): ThemePalette {
   const stored = localStorage.getItem(LEGACY_PALETTE_STORAGE_KEY);
-  if (isPalette(stored)) return stored;
+  if (isPalette(stored)) return normalizeLyraPalette(stored);
   return DEFAULT_PALETTE;
 }
 
@@ -68,9 +73,9 @@ export function readStoredAppearance(): StoredAppearance {
       const preference = isPreference(obj.preference)
         ? obj.preference
         : "system";
-      const palette = isPalette(obj.palette)
-        ? obj.palette
-        : readLegacyPalette();
+      const palette = normalizeLyraPalette(
+        isPalette(obj.palette) ? obj.palette : readLegacyPalette(),
+      );
       const customColor =
         normalizeHexColor(obj.customColor as string) ?? DEFAULT_CUSTOM_COLOR;
       return { preference, palette, customColor };

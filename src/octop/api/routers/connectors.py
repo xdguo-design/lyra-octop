@@ -190,7 +190,9 @@ def _oauth_callback_html(
     return HTMLResponse(f"<html><body>{escape(message)}</body></html>", status_code=status_code)
 
 
-def _resolve_custom_mcp_url(svc: ConnectorService, user_id: int, server_name: str) -> str:
+def _resolve_custom_mcp_spec(
+    svc: ConnectorService, user_id: int, server_name: str
+) -> dict[str, Any]:
     saved = svc.get_custom_servers(user_id)
     raw = saved.get(server_name)
     if not isinstance(raw, dict):
@@ -206,7 +208,7 @@ def _resolve_custom_mcp_url(svc: ConnectorService, user_id: int, server_name: st
     mcp_url = str(raw.get("url") or "").strip()
     if not mcp_url:
         raise OctopError(ErrorCode.CONNECTOR_INVALID_CREDENTIALS, "server url is required")
-    return mcp_url
+    return dict(raw)
 
 
 async def _begin_oauth_flow(
@@ -240,6 +242,7 @@ async def _begin_oauth_flow(
         )
 
     mcp_url: str | None = None
+    custom_spec: dict[str, Any] | None = None
     if target_type == "custom_mcp":
         server_name = str(target.get("server_name") or "").strip()
         if not server_name:
@@ -247,7 +250,8 @@ async def _begin_oauth_flow(
                 ErrorCode.CONNECTOR_INVALID_CREDENTIALS,
                 "custom_mcp target requires server_name",
             )
-        mcp_url = _resolve_custom_mcp_url(_connector_service(server), user.id, server_name)
+        custom_spec = _resolve_custom_mcp_spec(_connector_service(server), user.id, server_name)
+        mcp_url = str(custom_spec.get("url") or "").strip()
 
     try:
         authorize_url, verifier, ctx = await start_oauth_for_target(
@@ -256,12 +260,21 @@ async def _begin_oauth_flow(
             state=state,
             settings_repo=server.services.settings_repo,
             mcp_url=mcp_url,
+            custom_spec=custom_spec,
         )
     except ValueError as exc:
-        raise OctopError(ErrorCode.CONNECTOR_INVALID_CREDENTIALS, str(exc)) from exc
+        raise OctopError(
+            ErrorCode.CONNECTOR_INVALID_CREDENTIALS,
+            str(exc),
+            details={"reason": str(exc)},
+        ) from exc
     except Exception as exc:
         logger.exception("oauth start failed for target %s", target)
-        raise OctopError(ErrorCode.CONNECTOR_INVALID_CREDENTIALS, str(exc)) from exc
+        raise OctopError(
+            ErrorCode.CONNECTOR_INVALID_CREDENTIALS,
+            str(exc),
+            details={"reason": str(exc)},
+        ) from exc
 
     server.services.repos.connector_repo.create_oauth_state(
         state_id=state_id,

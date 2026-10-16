@@ -6,6 +6,41 @@
   border-radius: 10px;
 }
 
+/* ── Dedicated model trigger in the composer action row (desktop) ───── */
+.modelTriggerBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  max-width: 240px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--fn-radius-full);
+  background: transparent;
+  color: var(--fn-text-quaternary);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition:
+    color var(--fn-transition-fast),
+    background var(--fn-transition-fast);
+
+  &:hover {
+    color: var(--fn-text-brand);
+    background: var(--fn-color-brand-bg);
+  }
+}
+
+.modelTriggerBtnActive {
+  color: var(--fn-text-brand);
+  background: var(--fn-color-brand-bg);
+}
+
+.modelTriggerLabel {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .modelMenuColumn {
   display: flex;
   flex-direction: column;

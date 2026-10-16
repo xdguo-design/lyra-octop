@@ -115,8 +115,6 @@ export default function PersonalizationPage() {
     <PageShell
       title={pageTitle}
       subtitle={t("personalization.description")}
-      agentScoped
-      showTeams={showTeams}
       fill={!isMobile}
       pathTabs={pathTabs}
     >

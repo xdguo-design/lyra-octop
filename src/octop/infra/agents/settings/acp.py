@@ -17,6 +17,14 @@ _SETTINGS_PREFIX = "acp_runners:user:"
 _HIDDEN_RUNNERS = frozenset({"qwen_code"})
 # Until octop-harness ships these builtins, merge Octop-side defaults.
 _OCTOP_BUILTIN_RUNNERS: dict[str, dict[str, Any]] = {
+    "zcode": {
+        # ZCode CLI wrapped by a local ACP adapter (newline JSON-RPC on stdio);
+        # each prompt runs `zcode -p <task> --mode yolo` headless.
+        "command": r"D:\Program Files\nodejs\node.exe",
+        "args": [r"D:\WorkSpace\octop-src\acp\zcode-acp.mjs"],
+        "trusted": True,
+        "tool_parse_mode": "update_detail",
+    },
     "kimi_code": {
         "command": "kimi",
         "args": ["acp"],
@@ -37,6 +45,12 @@ _OCTOP_BUILTIN_RUNNERS: dict[str, dict[str, Any]] = {
     },
     "kilo_code": {
         "command": "kilo",
+        "args": ["acp"],
+        "trusted": False,
+        "tool_parse_mode": "update_detail",
+    },
+    "kiro_cli": {
+        "command": "kiro-cli",
         "args": ["acp"],
         "trusted": False,
         "tool_parse_mode": "update_detail",

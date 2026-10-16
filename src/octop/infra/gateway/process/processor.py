@@ -775,7 +775,6 @@ class GlobalProcessor:
             user_id=user_id,
             explicit=None,
             apply_defaults=True,
-            raise_on_failure=False,
         )
         message_kwargs: dict[str, Any] = {}
         attachments = inbound_attachments_from_parts(msg.content)
@@ -1583,13 +1582,11 @@ class GlobalProcessor:
         user_id: int,
         explicit: list[str] | None,
         apply_defaults: bool | None = None,
-        raise_on_failure: bool = True,
     ) -> list[str] | None:
         """Merge turn picks with default_open and ensure tools are loaded.
 
-        Dashboard / HTTP paths should keep ``raise_on_failure=True`` so the
-        client sees a clear MCP load error. IM ingress uses ``False`` so a
-        flaky connector does not abort the whole message turn.
+        Explicit picks are required; a failure in one remains an error. Failed
+        default-open connectors are skipped so they cannot block healthy tools.
         """
         from octop.infra.agents.teams import is_team_agent  # noqa: PLC0415
         from octop.infra.errors import ErrorCode, OctopError  # noqa: PLC0415
@@ -1613,16 +1610,20 @@ class GlobalProcessor:
             connector_user_id=user_id,
         )
         if failed:
-            detail = f"mcp load failed: {', '.join(failed)}"
-            if raise_on_failure:
+            failed_set = set(failed)
+            explicit_set = set(explicit or ())
+            failed_explicit = [name for name in failed if name in explicit_set]
+            if failed_explicit:
+                detail = f"mcp load failed: {', '.join(failed_explicit)}"
                 raise OctopError(ErrorCode.CONNECTOR_MCP_LOAD_FAILED, detail)
+            skipped = [name for name in merged if name in failed_set]
             logger.warning(
-                "skipping turn MCP for agent=%s user=%s (%s)",
+                "skipping failed default MCP for agent=%s user=%s (%s)",
                 agent_id,
                 user_id,
-                detail,
+                ", ".join(skipped),
             )
-            return None
+            return [name for name in merged if name not in failed_set] or None
         return merged
 
     async def _record_stream_error(

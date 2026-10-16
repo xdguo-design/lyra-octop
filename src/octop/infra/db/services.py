@@ -13,6 +13,7 @@ from octop.infra.db.repos.bridge_connections import BridgeConnectionRepo
 from octop.infra.db.repos.care_push import CarePushRepo
 from octop.infra.db.repos.channels import ChannelRepo
 from octop.infra.db.repos.connectors import ConnectorRepo
+from octop.infra.db.repos.creations import CreationRepo
 from octop.infra.db.repos.cron import CronJobRepo
 from octop.infra.db.repos.invites import InviteRepo
 from octop.infra.db.repos.knowledge import KnowledgeRepo
@@ -31,6 +32,7 @@ from octop.infra.db.repos.usage import UsageRepo
 from octop.infra.db.repos.user_policies import UserPolicyRepo
 from octop.infra.db.repos.users import UserRepo
 from octop.infra.db.repos.voice_providers import VoiceProviderRepo
+from octop.infra.db.repos.workbench import WorkbenchRepo
 from octop.infra.utils.paths import PathLayout
 
 
@@ -56,6 +58,7 @@ class RepoBundle:
     storage_backend_repo: BackendRepo
     bridge_connection_repo: BridgeConnectionRepo
     connector_repo: ConnectorRepo
+    creation_repo: CreationRepo
     skill_package_repo: SkillPackageRepo
     published_expert_repo: PublishedExpertRepo
     knowledge_repo: KnowledgeRepo
@@ -63,6 +66,7 @@ class RepoBundle:
     care_push_repo: CarePushRepo
     proactive_care_config_repo: ProactiveCareConfigRepo
     sso_repo: SsoRepo
+    workbench_repo: WorkbenchRepo
 
     @classmethod
     def from_pool(cls, db: DatabasePool) -> RepoBundle:
@@ -86,6 +90,7 @@ class RepoBundle:
             storage_backend_repo=BackendRepo(db),
             bridge_connection_repo=BridgeConnectionRepo(db),
             connector_repo=ConnectorRepo(db),
+            creation_repo=CreationRepo(db),
             skill_package_repo=SkillPackageRepo(db),
             published_expert_repo=PublishedExpertRepo(db),
             knowledge_repo=KnowledgeRepo(db),
@@ -93,6 +98,7 @@ class RepoBundle:
             care_push_repo=CarePushRepo(db),
             proactive_care_config_repo=ProactiveCareConfigRepo(db),
             sso_repo=SsoRepo(db),
+            workbench_repo=WorkbenchRepo(db),
         )
 
 
@@ -179,6 +185,10 @@ class SharedServices:
         return self.repos.connector_repo
 
     @property
+    def creation_repo(self) -> CreationRepo:
+        return self.repos.creation_repo
+
+    @property
     def skill_package_repo(self) -> SkillPackageRepo:
         return self.repos.skill_package_repo
 
@@ -205,6 +215,10 @@ class SharedServices:
     @property
     def sso_repo(self) -> SsoRepo:
         return self.repos.sso_repo
+
+    @property
+    def workbench_repo(self) -> WorkbenchRepo:
+        return self.repos.workbench_repo
 
 
 def build_shared_services(

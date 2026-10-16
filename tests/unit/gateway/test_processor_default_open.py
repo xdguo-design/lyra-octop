@@ -307,7 +307,7 @@ async def test_dashboard_request_attaches_knowledge_base_ids_without_prepending(
 
 
 @pytest.mark.asyncio
-async def test_resolve_turn_mcp_servers_raises_when_prepare_fails() -> None:
+async def test_resolve_turn_mcp_servers_raises_when_explicit_server_fails() -> None:
     agent_manager = MagicMock()
     agent_manager.merge_turn_mcp_servers = MagicMock(return_value=["bad__1"])
     agent_manager.prepare_chat_mcp = AsyncMock(return_value=["bad__1"])
@@ -329,6 +329,6 @@ async def test_resolve_turn_mcp_servers_raises_when_prepare_fails() -> None:
         await processor._resolve_turn_mcp_servers(
             agent_id="a1",
             user_id=1,
-            explicit=None,
+            explicit=["bad__1"],
         )
     assert ei.value.code == ErrorCode.CONNECTOR_MCP_LOAD_FAILED

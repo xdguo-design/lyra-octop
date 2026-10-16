@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 import time
 from typing import Any
@@ -77,9 +78,17 @@ async def _fetch_prm_document(url: str) -> dict[str, Any] | None:
         validate_https_url(url, field="resource_metadata")
     except UnsafeOutboundUrl:
         return None
-    try:
-        resp = await safe_request("GET", url, timeout=15.0)
-    except Exception:
+    resp = None
+    for attempt in range(2):  # one retry: transient connect stalls are common
+        try:
+            resp = await safe_request("GET", url, timeout=15.0)
+            break
+        except Exception:
+            if attempt == 0:
+                await asyncio.sleep(0.5)
+                continue
+            return None
+    if resp is None:
         return None
     if resp.status_code >= 400:
         return None
@@ -154,7 +163,9 @@ async def discover_oauth_from_mcp_url(
           "issuer": str | None,
           "resource": str | None,
           "metadata": dict | None,  # AS metadata when available
-          "scopes_supported": list[str] | None,
+          "scopes_supported": list[str] | None,  # AS-wide scopes
+          "resource_scopes": list[str] | None,  # RFC 9728 PRM scopes (resource-specific)
+          "dcr_supported": bool,  # AS metadata advertises a registration_endpoint
           "error": str | None,
         }
     """
@@ -199,14 +210,17 @@ async def _discover_oauth_from_mcp_url_uncached(url: str) -> dict[str, Any]:
     except Exception as exc:
         return {"available": False, "error": str(exc), "issuer": issuer, "resource": resource}
 
-    if not metadata.get("registration_endpoint"):
-        return {
-            "available": False,
-            "error": "authorization server does not support dynamic client registration",
-            "issuer": issuer,
-            "resource": resource,
-        }
+    # RFC 9728: scopes advertised by the protected resource itself — these
+    # describe what the MCP server needs and are preferred over the AS-wide
+    # scopes_supported (e.g. GitHub's AS metadata only lists offline_access).
+    prm_scopes_raw = prm_doc.get("scopes_supported")
+    resource_scopes = (
+        [str(s) for s in prm_scopes_raw if s]
+        if isinstance(prm_scopes_raw, list) and prm_scopes_raw
+        else None
+    )
 
+    dcr_supported = bool(metadata.get("registration_endpoint"))
     scopes_raw = metadata.get("scopes_supported")
     scopes = [str(s) for s in scopes_raw if s] if isinstance(scopes_raw, list) else None
     return {
@@ -215,5 +229,7 @@ async def _discover_oauth_from_mcp_url_uncached(url: str) -> dict[str, Any]:
         "resource": resource,
         "metadata": metadata,
         "scopes_supported": scopes,
+        "resource_scopes": resource_scopes,
+        "dcr_supported": dcr_supported,
         "error": None,
     }

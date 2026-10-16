@@ -264,7 +264,9 @@
   border-radius: 12px 130px 14px 120px / 120px 14px 140px 12px;
   box-shadow: 2.5px 3.5px 0 rgba(59, 58, 54, 0.22);
   cursor: pointer;
-  transition: transform 0.13s ease, box-shadow 0.13s ease;
+  transition:
+    transform 0.13s ease,
+    box-shadow 0.13s ease;
 
   &:hover {
     transform: translate(-1px, -2px) rotate(-0.6deg);
@@ -276,7 +278,6 @@
     box-shadow: 1px 2px 0 rgba(59, 58, 54, 0.2);
   }
 }
-
 
 /* LYRA product rail: the everyday menu stays short; settings live in the profile popover. */
 .productBrand {
@@ -291,18 +292,28 @@
   cursor: pointer;
   text-align: left;
 }
-.productBrand img { flex: none; display: block; object-fit: contain; }
+.productBrand img {
+  flex: none;
+  display: block;
+  object-fit: contain;
+}
 .productBrandName {
   display: flex;
   min-width: 0;
   flex-direction: column;
   gap: 2px;
-  font: 800 20px/1.06 system-ui, "PingFang SC", sans-serif;
-  letter-spacing: .015em;
+  font:
+    800 20px/1.06 system-ui,
+    "PingFang SC",
+    sans-serif;
+  letter-spacing: 0.015em;
 }
 .productBrandName small {
   white-space: nowrap;
-  font: 400 10.5px/1.25 "PingFang SC", "Microsoft YaHei", sans-serif;
+  font:
+    400 10.5px/1.25 "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
   letter-spacing: 0;
   color: var(--fn-text-tertiary);
 }
@@ -314,7 +325,8 @@
   width: 100%;
   padding: 3px 11px 14px;
 }
-.productNavButton, .productNavActive {
+.productNavButton,
+.productNavActive {
   display: flex;
   align-items: center;
   gap: 11px;
@@ -327,12 +339,25 @@
   color: var(--fn-text-secondary);
   cursor: pointer;
   text-align: left;
-  font: 500 13px/1.35 "PingFang SC", "Microsoft YaHei", sans-serif;
+  font:
+    500 13px/1.35 "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
 }
-.productNavButton:hover { background: var(--fn-sidebar-item-hover); }
-.productNavActive { background: var(--fn-sidebar-item-active, rgba(72,127,225,.11)); color: var(--fn-text-primary); font-weight: 700; }
-.productNavButton svg, .productNavActive svg,
-.productNavButton img, .productNavActive img { flex: none; }
+.productNavButton:hover {
+  background: var(--fn-sidebar-item-hover);
+}
+.productNavActive {
+  background: var(--fn-sidebar-item-active, rgba(72, 127, 225, 0.11));
+  color: var(--fn-text-primary);
+  font-weight: 700;
+}
+.productNavButton svg,
+.productNavActive svg,
+.productNavButton img,
+.productNavActive img {
+  flex: none;
+}
 .cueBadge {
   display: inline-flex;
   margin-left: -3px;
@@ -340,13 +365,15 @@
   border-radius: 18px;
   color: #2955a8;
   background: #d9e8ff;
-  font: 700 10px/1.3 system-ui,sans-serif;
+  font:
+    700 10px/1.3 system-ui,
+    sans-serif;
 }
 .productMorePopup {
   display: grid;
   grid-template-columns: 1fr;
   gap: 2px;
-  max-height: min(65vh,520px);
+  max-height: min(65vh, 520px);
   min-width: 205px;
   padding: 6px;
   overflow-y: auto;
@@ -363,14 +390,26 @@
   color: var(--fn-text-primary);
   text-align: left;
   cursor: pointer;
-  font: 12px "PingFang SC","Microsoft YaHei",sans-serif;
+  font:
+    12px "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
 }
-.productMorePopup button:hover { background: var(--fn-sidebar-item-hover); }
-.productMorePopup svg { flex: none; width: 16px; height: 16px; }
+.productMorePopup button:hover {
+  background: var(--fn-sidebar-item-hover);
+}
+.productMorePopup svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
 .productGroupLabel {
   padding: 21px 11px 5px;
   color: var(--fn-text-tertiary);
-  font: 500 11px/1.3 "PingFang SC", "Microsoft YaHei", sans-serif;
+  font:
+    500 11px/1.3 "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
 }
 .productHistory {
   display: flex;
@@ -392,8 +431,18 @@
   border: 1px solid #2b70e3;
   box-shadow: none;
   border-radius: 10px;
-  font: 600 14px "PingFang SC","Microsoft YaHei",sans-serif;
+  font:
+    600 14px "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
   letter-spacing: 0;
 }
-.newTaskBtn:hover { transform: none; background: #2868df; box-shadow: 0 3px 11px rgba(33,103,220,.18); }
-.newTaskBtn:active { transform: translateY(1px); box-shadow: none; }
+.newTaskBtn:hover {
+  transform: none;
+  background: #2868df;
+  box-shadow: 0 3px 11px rgba(33, 103, 220, 0.18);
+}
+.newTaskBtn:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}

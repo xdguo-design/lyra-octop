@@ -3582,6 +3582,9 @@ class AgentManager:
 
         from octop.infra.agents.middleware.binary_read_guard import BinaryReadGuardMiddleware
         from octop.infra.agents.middleware.browser_profile import BrowserProfileMiddleware
+        from octop.infra.agents.middleware.connected_tools_hint import (
+            ConnectedToolsHintMiddleware,
+        )
         from octop.infra.agents.middleware.octop_ui_offload import OctopUiOffloadMiddleware
         from octop.infra.agents.middleware.reasoning import ReasoningRequestMiddleware
         from octop.infra.agents.middleware.thread_artifacts import ThreadArtifactsMiddleware
@@ -3605,6 +3608,7 @@ class AgentManager:
                 usage_repo=self._repos.usage_repo,
             ),
             ReasoningRequestMiddleware(),
+            ConnectedToolsHintMiddleware(),
             KnowledgeSearchHintMiddleware(),
             BrowserProfileMiddleware(),
             BinaryReadGuardMiddleware(),

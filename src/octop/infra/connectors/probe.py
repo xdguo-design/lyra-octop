@@ -172,6 +172,7 @@ async def _maybe_attach_oauth_discovery(
             "available": True,
             "issuer": discovery.get("issuer"),
             "resource": discovery.get("resource"),
+            "dcr_supported": bool(discovery.get("dcr_supported")),
         }
     else:
         result["oauth"] = {"available": False}

@@ -372,7 +372,6 @@ export default function ACPPage() {
     <PageShell
       title={t("pageShell.acp.title")}
       subtitle={t("pageShell.acp.subtitle")}
-      agentScoped
     >
       <ACPPanel />
     </PageShell>

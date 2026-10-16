@@ -116,6 +116,8 @@ export interface ConnectorProbeResult {
     available: boolean;
     issuer?: string;
     resource?: string;
+    /** False when the AS has no dynamic registration (needs pre-registered client). */
+    dcr_supported?: boolean;
   };
 }
 
@@ -147,6 +149,12 @@ export interface CustomMcpServerSpec {
   default_open?: boolean;
   shared?: boolean;
   oauth?: CustomMcpOAuthPreview;
+  /** Pre-registered OAuth client for servers without dynamic registration (e.g. GitHub MCP). */
+  oauth_client_id?: string;
+  /** Write-only; empty on save keeps the stored secret. */
+  oauth_client_secret?: string;
+  /** True when a stored secret exists (redacted server view). */
+  oauth_client_secret_configured?: boolean;
 }
 
 export type OAuthStartTarget =

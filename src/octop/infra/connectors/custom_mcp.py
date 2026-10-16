@@ -19,8 +19,10 @@ CUSTOM_MCP_DISPLAY_NAME = "自定义 MCP"
 _SERVER_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 _META_KEYS = frozenset({"enabled", "display_name", "default_open", "shared"})
 _OAUTH_KEY = "oauth"
-_SECRET_KEYS = frozenset({_OAUTH_KEY})
-_HARNESS_STRIP_KEYS = _META_KEYS | _SECRET_KEYS
+_OAUTH_CLIENT_ID_KEY = "oauth_client_id"
+_OAUTH_CLIENT_SECRET_KEY = "oauth_client_secret"
+_SECRET_KEYS = frozenset({_OAUTH_KEY, _OAUTH_CLIENT_SECRET_KEY})
+_HARNESS_STRIP_KEYS = _META_KEYS | _SECRET_KEYS | {_OAUTH_CLIENT_ID_KEY}
 _DISPLAY_NAME_MAX = 64
 _MCP_STREAMABLE_HTTP_ACCEPT = "application/json, text/event-stream"
 
@@ -215,6 +217,15 @@ def normalize_server_spec(name: str, raw: Any) -> dict[str, Any]:
         elif oauth.get("required") is True:
             spec[_OAUTH_KEY] = {"required": True}
 
+    # Pre-registered OAuth client for servers without dynamic registration
+    # (e.g. GitHub MCP). Empty secret means "keep the stored one" on edits.
+    oauth_client_id = str(raw.get(_OAUTH_CLIENT_ID_KEY) or "").strip()
+    if oauth_client_id:
+        spec[_OAUTH_CLIENT_ID_KEY] = oauth_client_id
+    oauth_client_secret = str(raw.get(_OAUTH_CLIENT_SECRET_KEY) or "").strip()
+    if oauth_client_secret:
+        spec[_OAUTH_CLIENT_SECRET_KEY] = oauth_client_secret
+
     return spec
 
 
@@ -320,9 +331,21 @@ def build_oauth_storage(
     return out
 
 
+def static_oauth_client_from_spec(spec: dict[str, Any]) -> dict[str, Any] | None:
+    """Pre-registered OAuth client credentials stored on a custom server spec."""
+    client_id = str(spec.get(_OAUTH_CLIENT_ID_KEY) or "").strip()
+    if not client_id:
+        return None
+    client_secret = str(spec.get(_OAUTH_CLIENT_SECRET_KEY) or "").strip()
+    out: dict[str, Any] = {"client_id": client_id}
+    if client_secret:
+        out["client_secret"] = client_secret
+    return out
+
+
 def redact_server_for_api(spec: dict[str, Any]) -> dict[str, Any]:
     """Remove secrets; expose oauth preview for the dashboard."""
-    out = {k: v for k, v in spec.items() if k != _OAUTH_KEY}
+    out = {k: v for k, v in spec.items() if k not in (_OAUTH_KEY, _OAUTH_CLIENT_SECRET_KEY)}
     if oauth_configured(spec):
         oauth = oauth_tokens_from_spec(spec)
         preview: dict[str, Any] = {"configured": True}
@@ -331,6 +354,8 @@ def redact_server_for_api(spec: dict[str, Any]) -> dict[str, Any]:
         out[_OAUTH_KEY] = preview
     elif oauth_required(spec):
         out[_OAUTH_KEY] = {"configured": False, "required": True}
+    if str(spec.get(_OAUTH_CLIENT_SECRET_KEY) or "").strip():
+        out[f"{_OAUTH_CLIENT_SECRET_KEY}_configured"] = True
     return out
 
 
@@ -346,7 +371,11 @@ def merge_preserved_oauth(
     new_servers: dict[str, Any],
     existing: dict[str, Any],
 ) -> dict[str, Any]:
-    """Drop client-supplied oauth blobs; keep stored tokens per server name."""
+    """Drop client-supplied oauth blobs; keep stored tokens per server name.
+
+    Also keeps the stored pre-registered ``oauth_client_secret`` when the
+    incoming edit leaves it empty (the dashboard never echoes the secret back).
+    """
     out: dict[str, Any] = {}
     for name, raw in new_servers.items():
         if not isinstance(raw, dict):
@@ -361,6 +390,14 @@ def merge_preserved_oauth(
                 spec[_OAUTH_KEY] = dict(old_oauth)
             elif isinstance(old_oauth, dict) and old_oauth.get("required") is True:
                 spec[_OAUTH_KEY] = {"required": True}
+            old_secret = str(old.get(_OAUTH_CLIENT_SECRET_KEY) or "").strip()
+            has_client_id = bool(str(spec.get(_OAUTH_CLIENT_ID_KEY) or "").strip())
+            if (
+                old_secret
+                and has_client_id
+                and not str(spec.get(_OAUTH_CLIENT_SECRET_KEY) or "").strip()
+            ):
+                spec[_OAUTH_CLIENT_SECRET_KEY] = old_secret
         out[name] = spec
     return out
 

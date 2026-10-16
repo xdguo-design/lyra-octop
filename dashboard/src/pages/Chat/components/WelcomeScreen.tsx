@@ -4,9 +4,9 @@ import { useWelcomeQuickCardsLayout } from "../hooks/useWelcomeQuickCardsLayout"
 import WelcomeQuickCards, { WelcomeQuickCardProbe } from "./WelcomeQuickCards";
 import styles from "../index.module.less";
 
-// Animated WebP keeps alpha on Safari; VP9 WebM alpha is unreliable there.
-const MASCOT_PEEK = "/octop-mascot-peek.webp";
-const MASCOT_TYPE = "/octop-mascot-type.webp";
+// LYRA 统一品牌：欢迎屏头像与小恐龙空状态同源；保留点击切换的交互结构。
+const MASCOT_PEEK = "/lyra-dino.svg";
+const MASCOT_TYPE = "/lyra-dino.svg";
 const MASCOT_IMAGES = [MASCOT_PEEK, MASCOT_TYPE];
 
 function getRandomMascot(current?: string): string {

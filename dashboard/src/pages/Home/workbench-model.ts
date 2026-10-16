@@ -39,7 +39,8 @@ export function visibleConversationMessages(
   return messages.filter((message) => {
     if (message.role === "user") return true;
     if (message.role !== "assistant") return false;
-    if (message.toolData || message.hitlData || message.type === "tool") return false;
+    if (message.toolData || message.hitlData || message.type === "tool")
+      return false;
     if (message.speakerAgentId && message.speakerAgentId !== hostAgentId) {
       return false;
     }
@@ -59,7 +60,8 @@ export function resolvePrivatePlatformUrl(
     if (url.username || url.password) return null;
     if (url.hostname !== dashboardHostname) return null;
     // Browsers block a plain HTTP iframe under a private HTTPS dashboard.
-    if (dashboardProtocol === "https:" && url.protocol !== "https:") return null;
+    if (dashboardProtocol === "https:" && url.protocol !== "https:")
+      return null;
     url.hash = "";
     return url.toString();
   } catch {

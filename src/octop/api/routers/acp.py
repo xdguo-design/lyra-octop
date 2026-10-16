@@ -31,6 +31,7 @@ _BUILTIN_RUNNERS = frozenset(
         "cursor_cli",
         "pi",
         "kilo_code",
+        "kiro_cli",
     }
 )
 _ALLOWED_PARSE_MODES = frozenset({"call_title", "update_detail", "call_detail"})

@@ -1,4 +1,9 @@
-export type CaptchaMode = "slider" | "image" | "checkbox" | "invisible" | "popup";
+export type CaptchaMode =
+  | "slider"
+  | "image"
+  | "checkbox"
+  | "invisible"
+  | "popup";
 
 /** Answer length of the built-in image captcha (server-side CHALLENGE_LENGTH). */
 export const IMAGE_CAPTCHA_LENGTH = 4;

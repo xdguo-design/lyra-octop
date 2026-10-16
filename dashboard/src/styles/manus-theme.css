@@ -12,6 +12,7 @@
 /* ---------- Manus palette: light ---------- */
 :root,
 html[data-theme="light"] {
+  color-scheme: light;
   /* surfaces */
   --fn-bg-primary: #ffffff;
   --fn-bg-secondary: #f7f7f7;
@@ -83,6 +84,7 @@ html[data-theme="light"] {
 
 /* ---------- Manus palette: dark ---------- */
 html[data-theme="dark"] {
+  color-scheme: dark;
   --fn-bg-primary: #1a1a1a;
   --fn-bg-secondary: #202020;
   --fn-bg-tertiary: #262626;
@@ -179,6 +181,25 @@ html[data-theme="dark"] {
   background: var(--fn-bg-primary) !important;
   box-shadow: none !important;
 }
+/* a bare input inside an affix wrapper stays naked in every state — the
+   wrapper carries the single hairline and the focus ring (otherwise the
+   inner input renders a second box inside the wrapper) */
+.octop-input-affix-wrapper .octop-input,
+.octop-input-group .octop-input,
+.octop-input-affix-wrapper .octop-input:hover,
+.octop-input-affix-wrapper .octop-input:focus {
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+/* the wrapper is the visible control — never draw the keyboard focus ring
+   on the naked inner input (it renders a second box inside the wrapper) */
+.octop-input-affix-wrapper .octop-input:focus-visible,
+.octop-input-group .octop-input:focus-visible,
+.octop-select-selector .octop-input:focus-visible {
+  outline: none !important;
+}
 .octop-input:hover,
 .octop-input-affix-wrapper:hover,
 .octop-select-selector:hover,
@@ -199,6 +220,17 @@ html[data-theme="dark"] .octop-input-affix-wrapper-focused,
 html[data-theme="dark"] .octop-select-focused .octop-select-selector,
 html[data-theme="dark"] .octop-picker-focused {
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08) !important;
+}
+/* Chrome paints autofilled fields blue only on the inner input's box;
+   repaint in theme surface + freeze its background transition so the
+   wrapper reads as one clean field in every state. */
+.octop-input:-webkit-autofill,
+.octop-input:-webkit-autofill:hover,
+.octop-input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--fn-bg-primary) inset !important;
+  -webkit-text-fill-color: var(--fn-text-primary) !important;
+  caret-color: var(--fn-text-primary);
+  transition: background-color 99999s ease-in-out 0s;
 }
 
 /* buttons — quiet by default, solid black primary like Manus */
@@ -299,7 +331,8 @@ html[data-theme="dark"] .octop-picker-focused {
   outline-offset: 2px;
   border-radius: 8px;
 }
-html[data-theme="dark"] :where(button, a, input, textarea, select, [tabindex]):focus-visible {
+html[data-theme="dark"]
+  :where(button, a, input, textarea, select, [tabindex]):focus-visible {
   outline-color: #ffffff !important;
 }
 

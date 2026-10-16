@@ -17,7 +17,6 @@ interface HeaderProps {
  * Desktop GitHub / theme controls moved into the account popover.
  */
 export default function Header({ onToggle, isMobile }: HeaderProps) {
-
   if (!isMobile) return null;
 
   // iOS PWA (`apple-mobile-web-app-status-bar-style: black-translucent`) draws
@@ -82,7 +81,9 @@ export default function Header({ onToggle, isMobile }: HeaderProps) {
             display: "block",
           }}
         />
-        <strong style={{ fontSize: 16, color: "var(--fn-text-primary)" }}>LYRA</strong>
+        <strong style={{ fontSize: 16, color: "var(--fn-text-primary)" }}>
+          LYRA
+        </strong>
       </div>
 
       <div

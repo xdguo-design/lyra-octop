@@ -172,6 +172,7 @@ def build_app(server: OctopServer) -> FastAPI:
         channels,
         chat,
         connectors,
+        creations,
         cron,
         desktop,
         envs,
@@ -207,6 +208,7 @@ def build_app(server: OctopServer) -> FastAPI:
         user_roles,
         users,
         voice,
+        workbench,
         workspace,
     )
     from octop.api.routers.filesystem import router as filesystem_router
@@ -239,6 +241,8 @@ def build_app(server: OctopServer) -> FastAPI:
             _RouterMount(chat.router, "/api", ["chat"]),
             _RouterMount(slash.router, "/api", ["slash"]),
             _RouterMount(connectors.router, "/api", ["connectors"]),
+            _RouterMount(creations.router, "/api", ["creations"]),
+            _RouterMount(workbench.router, "/api", ["workbench"]),
             _RouterMount(bridge.router, "/api", ["bridge"]),
             _RouterMount(knowledge_bases.router, "/api", ["knowledge"]),
             _RouterMount(internal_mcp.router, "/api", ["internal-mcp"]),

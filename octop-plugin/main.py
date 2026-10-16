@@ -11,12 +11,13 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 import threading
 import time
 import urllib.request
 
-PLANET_DIR = r"D:\WorkSpace\lyra-planet"
-PLANET_URL = "http://127.0.0.1:8130/"
+PLANET_DIR = os.environ.get("LYRA_PLANET_DIR") or r"D:\WorkSpace\lyra-planet"
+PLANET_URL = os.environ.get("LYRA_PLANET_URL") or "http://127.0.0.1:8130/"
 HEALTH_URL = PLANET_URL + "api/health"
 LOG_PATH = os.path.join(PLANET_DIR, "data", "octop-launch.log")
 
@@ -26,7 +27,9 @@ _DETACHED = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GRO
 # 不在 Octop 自身 venv、也不在 uv 托管 Python 里，因此不能依赖 PATH 里
 # 第一个叫 python 的解释器；逐个探测「能 import uvicorn」再用。
 _PY_CANDIDATES = [
+    os.environ.get("LYRA_PLANET_PYTHON"),
     r"D:\Python\Python312\python.exe",   # 本机已知可用，放最前
+    "python3",                           # Linux/容器
     "python",                            # PATH 兜底（可能是 uv 托管 Python，探测不过会跳过）
     "py",                                # Windows py 启动器
 ]
@@ -56,13 +59,15 @@ def _start_service() -> None:
     os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
     log = open(LOG_PATH, "ab")
     for py in _PY_CANDIDATES:
-        if not _py_works(py):
+        if not py or not _py_works(py):
             continue
-        subprocess.Popen(
-            [py, "-m", "uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8130"],
-            cwd=PLANET_DIR, stdout=log, stderr=log,
-            creationflags=_DETACHED,
-        )
+        cmd = [py, "-m", "uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8130"]
+        if sys.platform == "win32":
+            subprocess.Popen(cmd, cwd=PLANET_DIR, stdout=log, stderr=log,
+                             creationflags=_DETACHED)
+        else:
+            subprocess.Popen(cmd, cwd=PLANET_DIR, stdout=log, stderr=log,
+                             start_new_session=True)
         return
     raise RuntimeError("星球乐园服务拉起失败：找不到装有 uvicorn 的 Python")
 
