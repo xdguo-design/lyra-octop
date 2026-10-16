@@ -63,10 +63,12 @@ def normalize_catalog(raw: object) -> list[dict[str, str]]:
 
 async def _fetch_from_freellm(path: str, max_bytes: int) -> bytes:
     # Both URL paths are constructed by us; callers cannot supply host or redirects.
-    async with httpx.AsyncClient(timeout=12, follow_redirects=False, trust_env=False) as client:
-        async with client.stream(
+    async with (
+        httpx.AsyncClient(timeout=12, follow_redirects=False, trust_env=False) as client,
+        client.stream(
             "GET", _ORIGIN + path, headers={"Accept": "application/json, text/plain"}
-        ) as response:
+        ) as response,
+    ):
             if response.status_code != 200:
                 raise FreeLLMSyncError(f"FreeLLM returned HTTP {response.status_code}")
             if response.headers.get("content-length") and int(response.headers["content-length"]) > max_bytes:
