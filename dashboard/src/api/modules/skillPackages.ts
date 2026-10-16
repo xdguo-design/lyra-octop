@@ -131,6 +131,33 @@ export const skillPackagesApi = {
       `/skill-packages/hub/rankings?type=${encodeURIComponent(type)}`,
     ),
 
+  freeLLMExportPreview: (packageId: string, slug: string) =>
+    request<{
+      status: "review_required";
+      slug: string;
+      name: string;
+      description: string;
+      markdown: string;
+      reviewed_sha256: string;
+      published: false;
+    }>(
+      `/skill-packages/${encodeURIComponent(packageId)}/skills/${encodeURIComponent(slug)}/freellm/export`,
+    ),
+
+  freeLLMSubmitForReview: (packageId: string, slug: string, digest: string) =>
+    request<{
+      status: "submitted_for_review";
+      published: false;
+      pull_request_url: string;
+      digest: string;
+    }>(
+      `/skill-packages/${encodeURIComponent(packageId)}/skills/${encodeURIComponent(slug)}/freellm/submit`,
+      {
+        method: "POST",
+        body: JSON.stringify({ reviewed_sha256: digest, confirm_public: true }),
+      },
+    ),
+
   hubInstall: (
     packageId: string,
     body: {
