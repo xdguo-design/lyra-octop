@@ -307,8 +307,12 @@ class ConnectorReadinessItem(BaseModel):
     name: str
     kind: str | None = None
     status: Literal[
-        "not_configured", "not_selected", "authorization_required",
-        "mode_blocked", "not_loaded", "registered",
+        "not_configured",
+        "not_selected",
+        "authorization_required",
+        "mode_blocked",
+        "not_loaded",
+        "registered",
     ]
     tools: list[str] = Field(default_factory=list)
     # Registration is NOT proof that the provider API call will succeed.
@@ -346,20 +350,24 @@ def describe_connector_readiness(
             status = "not_loaded"
         else:
             status = "registered"
-        output.append(ConnectorReadinessItem(
-            name=name,
-            kind=str(record.get("kind")) if record else None,
-            status=status,
-            tools=matches if status == "registered" else [],
-        ))
+        output.append(
+            ConnectorReadinessItem(
+                name=name,
+                kind=str(record.get("kind")) if record else None,
+                status=status,
+                tools=matches if status == "registered" else [],
+            )
+        )
     # Configured but unselected integrations cannot be used in this turn.
     for name, record in by_name.items():
         if name not in selected:
-            output.append(ConnectorReadinessItem(
-                name=name,
-                kind=str(record.get("kind") or ""),
-                status="not_selected",
-            ))
+            output.append(
+                ConnectorReadinessItem(
+                    name=name,
+                    kind=str(record.get("kind") or ""),
+                    status="not_selected",
+                )
+            )
     return output
 
 
@@ -389,6 +397,9 @@ async def get_tool_readiness(
     return ConnectorReadinessResponse(
         mode=mode,
         connectors=describe_connector_readiness(
-            selected=chosen, mode=mode, instances=visible, loaded_tools=loaded,
+            selected=chosen,
+            mode=mode,
+            instances=visible,
+            loaded_tools=loaded,
         ),
     )
