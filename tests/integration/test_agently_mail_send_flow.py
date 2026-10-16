@@ -12,7 +12,13 @@ from octop.infra.connectors.gateway.adapters import agently_cli
 from octop.infra.connectors.gateway.protocol import handle_mcp_request
 
 
-def _call(creds: dict[str, Any], method: str, *, name: str = "", args: dict[str, Any] | None = None) -> dict[str, Any]:
+def _call(
+    creds: dict[str, Any],
+    method: str,
+    *,
+    name: str = "",
+    args: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     params = {"name": name, "arguments": args or {}} if method == "tools/call" else {}
     return handle_mcp_request(
         kind="agently-cli",
@@ -73,7 +79,9 @@ def test_agent_mail_gateway_send_after_confirmation_only(gateway: list[list[str]
     assert "--to=xdguo0527@gmail.com" in gateway[1]
     assert gateway[1][-1] != "--dry-run"
 
-    replay = _call(creds, "tools/call", name="agently_send", args={**args, "confirmation_token": token})
+    replay = _call(
+        creds, "tools/call", name="agently_send", args={**args, "confirmation_token": token}
+    )
     assert replay["result"]["isError"] is True
     assert len(gateway) == 2
 
@@ -90,7 +98,9 @@ def test_mail_confirmation_is_bound_to_original_recipient(gateway: list[list[str
     )
     assert changed["result"]["isError"] is True
     assert len(gateway) == 1
-    success = _data(_call(creds, "tools/call", name="agently_send", args={**args, "confirmation_token": token}))
+    success = _data(
+        _call(creds, "tools/call", name="agently_send", args={**args, "confirmation_token": token})
+    )
     assert success["queued"] is True
     assert len(gateway) == 2
 
