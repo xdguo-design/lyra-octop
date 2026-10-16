@@ -454,7 +454,10 @@ async def freellm_export_preview(
     manifest = (store.package_skills_dir(package_id) / slug / "SKILL.md").read_text(encoding="utf-8")
     # No network write: the owner must inspect secrets, licenses, and sources
     # and explicitly approve publication through a protected GitHub PR.
+    from octop.infra.skills.freellm_submission import submission_digest
+
     return {
+        "reviewed_sha256": submission_digest(manifest),
         "status": "review_required",
         "target": "https://github.com/xdguo-design/freellm",
         "slug": slug,
