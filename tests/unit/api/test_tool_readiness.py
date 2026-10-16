@@ -126,7 +126,9 @@ async def test_readiness_does_not_load_unselected_or_unauthorized_mail() -> None
 
 
 @pytest.mark.asyncio
-async def test_readiness_load_error_does_not_fake_registration(caplog: pytest.LogCaptureFixture) -> None:
+async def test_readiness_load_error_does_not_fake_registration(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     registry = MagicMock()
     registry.prepare_chat_mcp = AsyncMock(side_effect=RuntimeError("temporary load failure"))
     await prepare_selected_connector_readiness(

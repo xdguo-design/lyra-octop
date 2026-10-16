@@ -406,11 +406,7 @@ async def prepare_selected_connector_readiness(
     except Exception:
         # The final status will remain not_loaded if registration failed.
         # Do not report a successful provider operation merely from a preflight.
-        logger.exception(
-            "tool readiness preflight failed for agent=%s servers=%s",
-            agent_id,
-            names,
-        )
+        logger.exception("tool readiness preflight failed for agent=%s servers=%s", agent_id, names)
 
 
 @router.get(
@@ -437,12 +433,15 @@ async def get_tool_readiness(
     if "selected" in request.query_params:
         chosen = [name for name in request.query_params.getlist("selected") if name]
     else:
-        chosen = registry.merge_turn_mcp_servers(
-            user.id,
-            None,
-            apply_defaults=True,
-            extra_defaults=registry.default_mcp_servers(agent_id),
-        ) or []
+        chosen = (
+            registry.merge_turn_mcp_servers(
+                user.id,
+                None,
+                apply_defaults=True,
+                extra_defaults=registry.default_mcp_servers(agent_id),
+            )
+            or []
+        )
     visible = registry._connector_svc.list_instances_for_api(user.id)
     await prepare_selected_connector_readiness(
         registry=registry,
