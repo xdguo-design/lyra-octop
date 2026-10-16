@@ -180,3 +180,30 @@ html[data-skin="orbit"][data-theme="dark"] .octop-card,
 html[data-skin="orbit"][data-theme="dark"] .octop-modal-content {
   box-shadow: 0 9px 32px rgba(3,9,26,.25) !important;
 }
+
+/* Doodle keeps the original hand-drawn look in light mode; night mode is
+   warm charcoal instead of the cream paper used by the light-only crayon CSS. */
+html[data-skin="doodle"][data-theme="dark"] {
+  --fn-bg-primary: #202429; --fn-bg-secondary: #282d31; --fn-bg-tertiary: #30353a;
+  --fn-bg-elevated: #202429; --fn-bg-layout: #111416; --fn-bg-container: #202429;
+  --fn-bg-sidebar: #22252a; --fn-bg-page: #111416; --fn-bg-toolbar: #282d31;
+  --fn-bg-code: #282d31; --fn-surface: #202429; --fn-text-primary: #f2f0ea;
+  --fn-text-secondary: #b2ada3; --fn-text-tertiary: #898780;
+  --fn-border-primary: #4c4b46; --fn-border-input: #67645c;
+  --fn-border-secondary: #373937; --fn-border: #4c4b46; --fn-border-color: #4c4b46;
+  --fn-card-border-normal: #4c4b46; --fn-sidebar-bg: #22252a;
+  --fn-sidebar-border: #4c4b46; --fn-header-bg: #202429;
+  --fn-card-radius: 14px; --fn-radius-md: 9px;
+  --manus-radius-card: 14px; --manus-radius-control: 9px;
+}
+
+/* Complete derived surfaces for components still using legacy --fn-* aliases. */
+html[data-skin] {
+  --fn-bg-base: var(--fn-bg-primary);
+  --fn-bg-page: var(--fn-bg-layout);
+  --fn-surface-sunken: var(--fn-bg-secondary);
+  --fn-bg-subtle: var(--fn-bg-secondary);
+  --fn-bg-secondary-hover: var(--fn-bg-tertiary);
+  --fn-bg-secondary-active: var(--fn-bg-tertiary);
+  --fn-sidebar-item-hover: color-mix(in srgb, var(--fn-text-primary) 6%, transparent);
+}
