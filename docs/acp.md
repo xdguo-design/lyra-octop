@@ -35,8 +35,21 @@ Legacy per-agent `config_json.acp.runners` is migrated to the user-global store 
 | `kimi_code` | `kimi` | `acp` |
 | `cursor_cli` | `agent` | `acp` |
 | `pi` | `npx` | `-y`, `pi-acp` |
+| `kilo_code` | `kilo` | `acp` |
 
 Install the CLI on the host where `octop run` executes, ensure it is on `PATH` (or set an absolute `command` in the runner drawer). Built-in runners cannot be deleted; custom runners can be added from **Add runner**.
+
+#### Kilo Code (optional external coding agent)
+
+Kilo Code CLI v1+ documents an ACP entrypoint. Install and configure it on the **Octop server host**, not merely in the user's browser:
+
+```bash
+npm install -g @kilocode/cli
+kilo --version
+# Configure Kilo's model/provider in its CLI first, then enable the runner from Octop's ACP page.
+```
+
+Use runner ID `kilo_code`, command `kilo`, args `["acp"]`. It is **disabled and untrusted by default**. After installing/configuring Kilo, explicitly enable its runner and the main agent's outbound `acp_runner` tool. Verify an innocuous read-only request before allowing edits. Keep workspace, network and tool permissions narrow; do not use blanket `--auto` on a privileged host. The ACP runner delegates coding tasks; Octop remains the conversation owner, approval boundary, and memory owner. A smoke test is still needed on a host with Kilo installed.
 
 ### Enable delegation in chat
 

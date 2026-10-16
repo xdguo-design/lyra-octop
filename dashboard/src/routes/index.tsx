@@ -6,6 +6,7 @@ const ExpertsPage = lazy(() => import("../pages/Experts"));
 const CronJobsPage = lazy(() => import("../pages/Control/CronJobs"));
 const ConnectorsPage = lazy(() => import("../pages/Agent/Connectors"));
 const SkillPackagesPage = lazy(() => import("../pages/SkillPackages"));
+const ResourceMarketplacePage = lazy(() => import("../pages/ResourceMarketplace"));
 const KnowledgeBasesPage = lazy(() => import("../pages/KnowledgeBases"));
 const BridgePage = lazy(() => import("../pages/Settings/Bridge"));
 const PersonalizationPage = lazy(
@@ -53,6 +54,7 @@ export const pathToKey: Record<string, string> = {
   "/tasks": "tasks",
   "/connectors": "connectors",
   "/skill-packages": "skill-packages",
+  "/skill-packages/manage": "skill-packages",
   "/knowledge-bases": "knowledge-bases",
   "/bridge": "bridge",
   "/personalization": "personalization",
@@ -153,7 +155,8 @@ export const routeConfigs: RouteConfig[] = [
   { path: "/experts", element: <ExpertsPage /> },
   { path: "/tasks", element: <CronJobsPage /> },
   { path: "/connectors", element: <ConnectorsPage /> },
-  { path: "/skill-packages", element: <SkillPackagesPage /> },
+  { path: "/skill-packages", element: <ResourceMarketplacePage /> },
+  { path: "/skill-packages/manage", element: <SkillPackagesPage /> },
   { path: "/knowledge-bases", element: <KnowledgeBasesPage /> },
   { path: "/bridge", element: <BridgePage /> },
   {

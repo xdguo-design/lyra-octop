@@ -34,6 +34,7 @@ describe("index.html boot theme", () => {
   beforeEach(() => {
     localStorage.removeItem(THEME_STORAGE_KEY);
     document.documentElement.removeAttribute("data-theme");
+    document.documentElement.removeAttribute("data-skin");
     stubMatchMedia(true);
   });
 
@@ -41,6 +42,7 @@ describe("index.html boot theme", () => {
     window.matchMedia = originalMatchMedia;
     localStorage.removeItem(THEME_STORAGE_KEY);
     document.documentElement.removeAttribute("data-theme");
+    document.documentElement.removeAttribute("data-skin");
   });
 
   it("styles the splash from data-theme, not OS color scheme", () => {
@@ -84,6 +86,19 @@ describe("index.html boot theme", () => {
     stubMatchMedia(false);
     eval(bootThemeScript());
     expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+  });
+
+  it("sets the selected skin before first paint", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ preference: "dark", palette: "teal", skin: "forest" }));
+    eval(bootThemeScript());
+    expect(document.documentElement.getAttribute("data-skin")).toBe("forest");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+  });
+
+  it("uses the old visual skin for legacy saved themes", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "light");
+    eval(bootThemeScript());
+    expect(document.documentElement.getAttribute("data-skin")).toBe("doodle");
   });
 
   it("migrates a legacy plain theme string", () => {

@@ -16,6 +16,7 @@ export const BUILTIN_RUNNER_ORDER = [
   "kimi_code",
   "cursor_cli",
   "pi",
+  "kilo_code",
 ] as const;
 
 export type BuiltinRunnerKey = (typeof BUILTIN_RUNNER_ORDER)[number];
@@ -32,6 +33,7 @@ export const RUNNER_ICONS: Record<string, string> = {
   kimi_code: moonshotIcon,
   cursor_cli: cursorIcon,
   pi: piIcon,
+  kilo_code: customRunnerIcon,
 };
 
 export const RUNNER_LABEL_KEYS: Record<string, string> = {
@@ -42,6 +44,7 @@ export const RUNNER_LABEL_KEYS: Record<string, string> = {
   kimi_code: "acp.runner_kimi_code",
   cursor_cli: "acp.runner_cursor_cli",
   pi: "acp.runner_pi",
+  kilo_code: "acp.runner_kilo_code",
 };
 
 export const RUNNER_INTRO_KEYS: Record<string, string> = {
@@ -52,6 +55,7 @@ export const RUNNER_INTRO_KEYS: Record<string, string> = {
   kimi_code: "acp.intro_kimi_code",
   cursor_cli: "acp.intro_cursor_cli",
   pi: "acp.intro_pi",
+  kilo_code: "acp.intro_kilo_code",
 };
 
 export function runnerIcon(key: string): string {
