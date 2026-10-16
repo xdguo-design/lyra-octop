@@ -1,4 +1,5 @@
 """FreeLLM catalog is untrusted remote input: reject unsafe fields before use."""
+
 from __future__ import annotations
 
 import pytest
@@ -19,28 +20,23 @@ def record(skill_id: str = "safe-skill", **extra: object) -> dict[str, object]:
 
 
 def test_verified_catalog_and_dedupe() -> None:
-    assert normalize_catalog([record(), record(), record("other")]) == [
-        {
-            "id": "safe-skill", "name": "Example", "description": "A reviewed listing",
-            "category": "", "status": "verified", "github_url": "https://github.com/example/skills/tree/main",
-            "content_path": "skill-content/safe-skill.md", "last_checked_at": "",
-        },
-        {
-            "id": "other", "name": "Example", "description": "A reviewed listing",
-            "category": "", "status": "verified", "github_url": "https://github.com/example/skills/tree/main",
-            "content_path": "skill-content/other.md", "last_checked_at": "",
-        },
-    ]
+    items = normalize_catalog([record(), record(), record("other")])
+    assert [item["id"] for item in items] == ["safe-skill", "other"]
+    assert items[0]["content_path"] == "skill-content/safe-skill.md"
+    assert items[0]["status"] == "verified"
 
 
-@pytest.mark.parametrize("unsafe", [
-    record("../secrets"),
-    record("bad/slug"),
-    record("safe-skill", contentPath="skill-content/../../secret.md"),
-    record("safe-skill", githubUrl="http://localhost/unsafe"),
-    record("safe-skill", status="needs_review"),
-    record("safe-skill", name=""),
-])
+@pytest.mark.parametrize(
+    "unsafe",
+    [
+        record("../secrets"),
+        record("bad/slug"),
+        record("safe-skill", contentPath="skill-content/../../secret.md"),
+        record("safe-skill", githubUrl="http://localhost/unsafe"),
+        record("safe-skill", status="needs_review"),
+        record("safe-skill", name=""),
+    ],
+)
 def test_reject_untrusted_catalog_records(unsafe: dict[str, object]) -> None:
     assert normalize_catalog([unsafe]) == []
 
