@@ -43,6 +43,7 @@ vi.mock("../api/modules/preferences", () => ({
 
 vi.mock("./ThemeSwitcher", () => ({ default: () => null }));
 vi.mock("./PaletteSwitcher", () => ({ default: () => null }));
+vi.mock("./ThemeGallery", () => ({ default: () => null }));
 
 vi.mock("../pages/Admin/Users/ProfileAvatar", () => ({
   ProfileAvatar: () => <span data-testid="profile-avatar" />,

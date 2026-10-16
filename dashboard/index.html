@@ -40,6 +40,7 @@
       (function () {
         var KEY = "theme";
         var mode = "light";
+        var skin = "doodle";
         function systemDark() {
           try {
             return window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -54,6 +55,9 @@
             pref = raw;
           } else if (raw) {
             var parsed = JSON.parse(raw);
+            if (parsed && ["doodle", "cloud", "forest", "orbit", "journal", "terminal"].indexOf(parsed.skin) !== -1) {
+              skin = parsed.skin;
+            }
             if (
               parsed &&
               (parsed.preference === "light" ||
@@ -70,6 +74,7 @@
           if (systemDark()) mode = "dark";
         }
         document.documentElement.setAttribute("data-theme", mode);
+        document.documentElement.setAttribute("data-skin", skin);
         var themeColor = mode === "dark" ? "#1a1a1a" : "#ffffff";
         var metas = document.querySelectorAll('meta[name="theme-color"]');
         for (var i = 0; i < metas.length; i++) {

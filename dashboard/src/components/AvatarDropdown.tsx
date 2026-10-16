@@ -41,7 +41,7 @@ import {
 import { useUserRole } from "../hooks/useUserRole";
 import { useIsMobile } from "../hooks/useIsMobile";
 import ThemeSwitcher from "./ThemeSwitcher";
-import PaletteSwitcher from "./PaletteSwitcher";
+import ThemeGallery from "./ThemeGallery";
 import type { OctopUser } from "../api/modules/auth";
 import { useLayoutMode } from "../context/LayoutModeContext";
 import type { LayoutMode } from "../layouts/layoutModeStorage";
@@ -645,7 +645,7 @@ export default function AvatarDropdown({
             {t("account.paletteHint")}
           </p>
         </div>
-        <PaletteSwitcher />
+        <ThemeGallery />
       </section>
 
       {ssoRows.length > 0 && (

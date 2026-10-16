@@ -3437,8 +3437,15 @@
     "myAccount": "My Account",
     "settings": "Personal Settings",
     "appearance": "Appearance",
-    "palette": "Palette",
-    "paletteHint": "Choose a brand palette, independent of light/dark mode.",
+    "palette": "Brand accent",
+    "paletteHint": "Combine with any visual skin",
+    "themeMode": "Appearance mode",
+    "themeModeHint": "Independent of visual style",
+    "allThemes": "All themes",
+    "themeApplyHint": "Click to switch the entire interface",
+    "themeSelected": "Active",
+    "themeChooseColor": "Choose your own color",
+    "themeReset": "Restore default theme",
     "language": "Language",
     "languageHint": "Choose the console display language.",
     "themeLight": "Light",
@@ -3495,7 +3502,23 @@
     "ssoUnbindSuccess": "Single sign-on unlinked",
     "ssoBindFailed": "Could not start account linking",
     "ssoUnbindFailed": "Could not unlink single sign-on",
-    "ssoPopupBlocked": "Allow pop-ups to continue with single sign-on."
+    "ssoPopupBlocked": "Allow pop-ups to continue with single sign-on.",
+    "skin": {
+      "doodle": "Sketchbook",
+      "cloud": "Cloud Glass",
+      "forest": "Forest Calm",
+      "orbit": "Orbit Blue",
+      "journal": "Paper & Ink",
+      "terminal": "Terminal"
+    },
+    "skinDesc": {
+      "doodle": "Warm paper and hand-drawn edges",
+      "cloud": "Soft mist and airy glass cards",
+      "forest": "Sage greens and generous whitespace",
+      "orbit": "Midnight blues and cosmic depth",
+      "journal": "Warm stationery and literary type",
+      "terminal": "Monospace geometry and crisp lines"
+    }
   },
   "user": {
     "title": "User Settings",

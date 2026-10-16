@@ -11,6 +11,7 @@ import {
   writeStoredAppearance,
   type ThemePreference,
 } from "../styles/appearanceStorage";
+import { DEFAULT_SKIN, type VisualSkin } from "../styles/visualSkins";
 import {
   DEFAULT_PALETTE,
   customPaletteCssVars,
@@ -33,6 +34,9 @@ interface ThemeContextValue {
   setPreference: (p: ThemePreference) => void;
   /** Brand color palette (orthogonal to light/dark) */
   palette: ThemePalette;
+  /** The visual surface and typography preset. */
+  skin: VisualSkin;
+  setSkin: (skin: VisualSkin) => void;
   /** Set brand palette */
   setPalette: (p: ThemePalette) => void;
   /** Brand hex for the "custom" palette */
@@ -50,6 +54,8 @@ const ThemeContext = createContext<ThemeContextValue>({
   preference: "system",
   setPreference: () => {},
   palette: DEFAULT_PALETTE,
+  skin: DEFAULT_SKIN,
+  setSkin: () => {},
   setPalette: () => {},
   customColor: "",
   setCustomColor: () => {},
@@ -74,6 +80,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [preference, setPreferenceState] = useState<ThemePreference>(() => {
     const stored = loadAppearanceOnBoot();
     document.documentElement.setAttribute("data-palette", stored.palette);
+    document.documentElement.setAttribute("data-skin", stored.skin ?? DEFAULT_SKIN);
     document.documentElement.setAttribute(
       "data-theme",
       resolveMode(stored.preference),
@@ -85,6 +92,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // loadAppearanceOnBoot is idempotent for the migrated JSON shape.
     return loadAppearanceOnBoot().palette;
   });
+
+  const [skin, setSkinState] = useState<VisualSkin>(
+    () => loadAppearanceOnBoot().skin ?? DEFAULT_SKIN,
+  );
 
   const [customColor, setCustomColorState] = useState<string>(
     () => loadAppearanceOnBoot().customColor ?? "",
@@ -109,11 +120,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setMode(resolveMode(preference));
   }, [preference]);
 
-  // Persist preference + palette together (mode is derived, not stored)
+  // Persist preference, palette and visual skin together (mode is derived).
   useEffect(() => {
-    writeStoredAppearance({ preference, palette, customColor });
+    writeStoredAppearance({ preference, palette, skin, customColor });
     document.documentElement.setAttribute("data-palette", palette);
-  }, [preference, palette, customColor]);
+    document.documentElement.setAttribute("data-skin", skin);
+  }, [preference, palette, skin, customColor]);
 
   // Inject the runtime-derived CSS variables for the custom palette. The
   // style element is reused across renders; content updates on change.
@@ -153,6 +165,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setPreferenceState(p);
   }, []);
 
+  const setSkin = useCallback((value: VisualSkin) => {
+    setSkinState(value);
+  }, []);
+
   const setPalette = useCallback((p: ThemePalette) => {
     setPaletteState(p);
   }, []);
@@ -180,6 +196,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         preference,
         setPreference,
         palette,
+        skin,
+        setSkin,
         setPalette,
         customColor,
         setCustomColor,
