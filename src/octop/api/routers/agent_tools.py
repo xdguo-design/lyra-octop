@@ -301,3 +301,94 @@ async def patch_tool_setting(
         await registry.persist_plugin_tools_config(agent_id, merged)
 
     return await get_tool_settings(agent_id, request, server, user)
+
+
+class ConnectorReadinessItem(BaseModel):
+    name: str
+    kind: str | None = None
+    status: Literal[
+        "not_configured", "not_selected", "authorization_required",
+        "mode_blocked", "not_loaded", "registered",
+    ]
+    tools: list[str] = Field(default_factory=list)
+    # Registration is NOT proof that the provider API call will succeed.
+    provider_verified: bool = False
+
+
+class ConnectorReadinessResponse(BaseModel):
+    mode: Literal["ask", "plan", "craft"]
+    connectors: list[ConnectorReadinessItem]
+
+
+def describe_connector_readiness(
+    *,
+    selected: list[str],
+    mode: str,
+    instances: list[dict[str, Any]],
+    loaded_tools: set[str],
+) -> list[ConnectorReadinessItem]:
+    """Pure preflight for email, GitHub MCP, and any other connector.
+
+    Never infer permissions from the tool's label or the model's claims.
+    """
+    by_name = {str(item.get("mcp_server_name")): item for item in instances}
+    output: list[ConnectorReadinessItem] = []
+    for name in dict.fromkeys(selected):
+        record = by_name.get(name)
+        matches = sorted(tool for tool in loaded_tools if tool.startswith(name + "_"))
+        if record is None:
+            status = "not_configured"
+        elif mode in ("ask", "plan"):
+            status = "mode_blocked"
+        elif record.get("status") != "active" or not record.get("has_credentials"):
+            status = "authorization_required"
+        elif not matches:
+            status = "not_loaded"
+        else:
+            status = "registered"
+        output.append(ConnectorReadinessItem(
+            name=name,
+            kind=str(record.get("kind")) if record else None,
+            status=status,
+            tools=matches if status == "registered" else [],
+        ))
+    # Configured but unselected integrations cannot be used in this turn.
+    for name, record in by_name.items():
+        if name not in selected:
+            output.append(ConnectorReadinessItem(
+                name=name,
+                kind=str(record.get("kind") or ""),
+                status="not_selected",
+            ))
+    return output
+
+
+@router.get(
+    "/{agent_id}/tool-readiness",
+    summary="Explain effective connector availability for this agent and turn",
+    response_model=ConnectorReadinessResponse,
+)
+async def get_tool_readiness(
+    agent_id: str,
+    request: Request,
+    mode: Literal["ask", "plan", "craft"] = "craft",
+    server: OctopServer = Depends(get_server),
+    user: Any = Depends(current_user),
+) -> ConnectorReadinessResponse:
+    if server.app_runtime is None:
+        raise OctopError(ErrorCode.INTERNAL_ERROR, "agent runtime unavailable")
+    registry = server.app_runtime.agent_registry
+    row = registry.get_row(agent_id)
+    if row is None:
+        raise OctopError(ErrorCode.AGENT_NOT_FOUND, f"agent {agent_id!r} not found")
+    _assert_agent_owner(row, user)
+    chosen = request.query_params.getlist("selected")
+    visible = registry._connector_svc.list_instances_for_api(user.id)
+    agent = registry.get_agent(agent_id)
+    loaded = set(getattr(agent, "_mcp_tool_name_set", frozenset()))
+    return ConnectorReadinessResponse(
+        mode=mode,
+        connectors=describe_connector_readiness(
+            selected=chosen, mode=mode, instances=visible, loaded_tools=loaded,
+        ),
+    )
