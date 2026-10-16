@@ -366,6 +366,105 @@ async def create_from_skillhub(
     return _package_payload_with_creator(server, store, result.row)
 
 
+
+# FreeLLM is a public *catalog*, not a trusted execution source. Only explicit,
+# authenticated imports are allowed; exports are previews, never auto-published.
+class FreeLLMImportBody(BaseModel):
+    skill_id: str
+    overwrite: bool = False
+
+
+@router.get("/freellm/catalog", summary="Browse verified FreeLLM skills")
+async def freellm_catalog(
+    user: User = Depends(require_permission("skill_packages")),
+) -> dict[str, Any]:
+    from octop.infra.skills.freellm_catalog import FreeLLMSyncError, list_freellm_skills
+
+    try:
+        items = await list_freellm_skills()
+    except (FreeLLMSyncError, OSError) as exc:
+        raise OctopError(ErrorCode.SKILL_IMPORT_FAILED, "FreeLLM catalog unavailable") from exc
+    return {"source": "https://freellm.top/skills/", "items": items, "count": len(items)}
+
+
+@router.get("/freellm/{skill_id}/preview", summary="Preview untrusted FreeLLM SKILL.md")
+async def freellm_preview(
+    skill_id: str,
+    user: User = Depends(require_permission("skill_packages")),
+) -> dict[str, Any]:
+    from octop.infra.skills.freellm_catalog import FreeLLMSyncError, preview_freellm_skill
+
+    try:
+        return await preview_freellm_skill(skill_id)
+    except (FreeLLMSyncError, OSError) as exc:
+        raise OctopError(ErrorCode.SKILL_IMPORT_FAILED, "FreeLLM skill preview unavailable") from exc
+
+
+@router.post(
+    "/{package_id}/skills/freellm/import",
+    status_code=status.HTTP_201_CREATED,
+    summary="Import a reviewed FreeLLM Skill into a package on explicit request",
+)
+async def freellm_import_to_package(
+    package_id: str,
+    body: FreeLLMImportBody,
+    request: Request,
+    server: OctopServer = Depends(get_server),
+    user: User = Depends(require_permission("skill_packages")),
+) -> dict[str, Any]:
+    from octop.infra.skills.freellm_catalog import FreeLLMSyncError, preview_freellm_skill
+
+    store = _store(server)
+    row = _package_or_404(store, package_id, locale=resolve_request_locale(request))
+    store.assert_can_mutate(row, user)
+    try:
+        skill = await preview_freellm_skill(body.skill_id)
+    except (FreeLLMSyncError, OSError) as exc:
+        raise OctopError(ErrorCode.SKILL_IMPORT_FAILED, "FreeLLM skill import unavailable") from exc
+    # Namespace the slug to avoid silently replacing locally authored skills.
+    slug = f"freellm-{skill['id']}"
+    return await create_package_skill(
+        package_id,
+        CreatePackageSkillBody(
+            name=slug,
+            content=skill["markdown"],
+            overwrite=body.overwrite,
+        ),
+        request,
+        server,
+        user,
+    )
+
+
+@router.get(
+    "/{package_id}/skills/{slug}/freellm/export",
+    summary="Export a reviewable Skill for submission to FreeLLM",
+)
+async def freellm_export_preview(
+    package_id: str,
+    slug: str,
+    request: Request,
+    server: OctopServer = Depends(get_server),
+    user: User = Depends(require_permission("skill_packages")),
+) -> dict[str, Any]:
+    store = _store(server)
+    row = _package_or_404(store, package_id, locale=resolve_request_locale(request))
+    store.assert_can_mutate(row, user)
+    skill = _package_skill_or_404(store, package_id, slug)
+    manifest = (store.package_skills_dir(package_id) / slug / "SKILL.md").read_text(encoding="utf-8")
+    # No network write: the owner must inspect secrets, licenses, and sources
+    # and explicitly approve publication through a protected GitHub PR.
+    return {
+        "status": "review_required",
+        "target": "https://github.com/xdguo-design/freellm",
+        "slug": slug,
+        "name": skill["name"],
+        "description": skill["description"],
+        "markdown": manifest,
+        "published": False,
+    }
+
+
 @router.get("/{package_id}", summary="Get a global skill package and its skills")
 async def get_skill_package(
     package_id: str,
