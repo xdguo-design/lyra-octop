@@ -3887,12 +3887,12 @@
     "myAccount": "我的账户",
     "settings": "个人设置",
     "appearance": "外观",
-    "palette": "配色",
-    "paletteHint": "选择并预览完整界面配色，立即生效，刷新后保留。",
+    "palette": "品牌配色",
+    "paletteHint": "可与任意风格组合",
     "themeMode": "显示模式",
-    "themeModeHint": "可独立于主题配色切换",
+    "themeModeHint": "与风格主题独立切换",
     "allThemes": "全部主题",
-    "themeApplyHint": "点击立即应用，刷新后保留",
+    "themeApplyHint": "点击切换整套界面风格",
     "themeSelected": "使用中",
     "themeChooseColor": "选择自己的颜色",
     "themeReset": "恢复默认主题",
@@ -3952,7 +3952,23 @@
     "ssoUnbindSuccess": "已解除单点登录",
     "ssoBindFailed": "无法开始绑定",
     "ssoUnbindFailed": "无法解除绑定",
-    "ssoPopupBlocked": "请允许弹出窗口以继续单点登录。"
+    "ssoPopupBlocked": "请允许弹出窗口以继续单点登录。",
+    "skin": {
+      "doodle": "手绘纸感",
+      "cloud": "云海玻璃",
+      "forest": "松林呼吸",
+      "orbit": "星轨蓝调",
+      "journal": "纸墨书房",
+      "terminal": "终端矩阵"
+    },
+    "skinDesc": {
+      "doodle": "奶油纸张与手绘边框",
+      "cloud": "轻盈蓝雾与玻璃卡片",
+      "forest": "鼠尾草绿与柔和留白",
+      "orbit": "深蓝星夜与科技质感",
+      "journal": "暖纸色调与衬线排版",
+      "terminal": "等宽字形与利落线框"
+    }
   },
   "user": {
     "title": "用户设置",

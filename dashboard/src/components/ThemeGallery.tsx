@@ -7,8 +7,8 @@ import {
   DEFAULT_PALETTE,
   PALETTE_SWATCH,
   VALID_PALETTES,
-  type ThemePalette,
 } from "../styles/themePalettes";
+import { DEFAULT_SKIN, VISUAL_SKINS } from "../styles/visualSkins";
 import styles from "./ThemeGallery.module.less";
 
 const modes = [
@@ -17,54 +17,21 @@ const modes = [
   { key: "system", Icon: Monitor, labelKey: "header.themeSystem" },
 ] as const;
 
-function ThemePreview({ color, dark }: { color: string; dark: boolean }) {
-  return (
-    <span className={`${styles.preview} ${dark ? styles.previewDark : ""}`} aria-hidden="true">
-      <span className={styles.previewRail}>
-        <span className={styles.previewRailLogo} style={{ background: color }} />
-        <span className={styles.previewRailLine} />
-        <span className={styles.previewRailLineShort} />
-      </span>
-      <span className={styles.previewContent}>
-        <span className={styles.previewHeading} />
-        <span className={styles.previewText} />
-        <span className={styles.previewTextShort} />
-        <span className={styles.previewAction} style={{ background: color }} />
-      </span>
-    </span>
-  );
-}
-
-/**
- * Personal appearance presets: palette and light/dark are separate axes.
- * Every card uses the same ThemeContext as the rest of the application:
- * switching is immediate and persists through appearanceStorage on reload.
- */
+/** Miniature scene uses the exact surface/rail colors behind each real skin. */
 export default function ThemeGallery() {
   const { t } = useTranslation();
   const {
-    preference,
-    setPreference,
-    palette,
-    setPalette,
-    customColor,
-    setCustomColor,
-    isDark,
+    preference, setPreference, palette, setPalette,
+    customColor, setCustomColor, skin, setSkin, isDark,
   } = useTheme();
-
-  const selectPalette = (value: ThemePalette) => setPalette(value);
 
   return (
     <div className={styles.root}>
-      <div className={styles.modeHeading}>
-        <span>{t("account.themeMode", "显示模式")}</span>
-        <span className={styles.modeHint}>{t("account.themeModeHint", "可独立于主题配色切换")}</span>
+      <div className={styles.sectionHeading}>
+        <strong>{t("account.themeMode", "显示模式")}</strong>
+        <span>{t("account.themeModeHint", "与风格主题独立切换")}</span>
       </div>
-      <div
-        className={styles.modeOptions}
-        role="group"
-        aria-label={t("account.themeMode", "显示模式")}
-      >
+      <div className={styles.modeOptions} role="group" aria-label={t("account.themeMode", "显示模式")}>
         {modes.map(({ key, Icon, labelKey }) => (
           <button
             key={key}
@@ -79,70 +46,103 @@ export default function ThemeGallery() {
         ))}
       </div>
 
-      <div className={styles.galleryHeading}>
+      <div className={styles.sectionHeading}>
         <strong>{t("account.allThemes", "全部主题")}</strong>
-        <span>{t("account.themeApplyHint", "点击立即应用，刷新后保留")}</span>
+        <span>{t("account.themeApplyHint", "点击切换整套界面风格")}</span>
       </div>
-      <div className={styles.grid} role="group" aria-label={t("account.allThemes", "全部主题")}>
+      <div className={styles.skinGrid} role="group" aria-label={t("account.allThemes", "全部主题")}>
+        {VISUAL_SKINS.map((definition) => {
+          const selected = definition.id === skin;
+          const colors = isDark ? definition.dark : definition.light;
+          const name = t(`account.skin.${definition.id}`);
+          return (
+            <button
+              key={definition.id}
+              type="button"
+              className={`${styles.skinCard} ${selected ? styles.selected : ""}`}
+              aria-label={name}
+              aria-pressed={selected}
+              onClick={() => setSkin(definition.id)}
+            >
+              <span
+                className={styles.skinPreview}
+                style={{ backgroundColor: colors.canvas, color: colors.text }}
+                aria-hidden="true"
+              >
+                <span className={styles.skinRail} style={{ backgroundColor: colors.sidebar }}>
+                  <span className={styles.skinLogo} style={{ backgroundColor: colors.accent }} />
+                  <span className={styles.skinRailLine} style={{ backgroundColor: colors.muted }} />
+                  <span className={styles.skinRailLineShort} style={{ backgroundColor: colors.muted }} />
+                </span>
+                <span className={styles.skinWork}>
+                  <span className={styles.skinHeaderLine} style={{ backgroundColor: colors.text }} />
+                  <span
+                    className={styles.skinMiniCard}
+                    style={{ backgroundColor: colors.surface, borderColor: colors.border, borderRadius: definition.radius / 2 }}
+                  >
+                    <span className={styles.skinTextLine} style={{ backgroundColor: colors.muted }} />
+                    <span className={styles.skinTextLineShort} style={{ backgroundColor: colors.muted }} />
+                    <span className={styles.skinAction} style={{ backgroundColor: colors.accent }} />
+                  </span>
+                </span>
+              </span>
+              <span className={styles.skinFooter}>
+                <span className={styles.skinName}>{name}</span>
+                {selected ? <Check size={15} aria-label={t("account.themeSelected", "使用中")} /> : null}
+              </span>
+              <span className={styles.skinDescription}>{t(`account.skinDesc.${definition.id}`)}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className={styles.sectionHeading}>
+        <strong>{t("account.palette", "品牌配色")}</strong>
+        <span>{t("account.paletteHint", "可与任意风格组合")}</span>
+      </div>
+      <div className={styles.paletteGrid} role="group" aria-label={t("account.palette", "品牌配色")}>
         {VALID_PALETTES.map((key) => {
-          const selected = palette === key;
-          const label = t(`header.palette.${key}`);
+          const selected = key === palette;
           return (
             <button
               key={key}
               type="button"
-              className={`${styles.card} ${selected ? styles.selected : ""}`}
-              aria-label={label}
+              className={`${styles.paletteOption} ${selected ? styles.paletteSelected : ""}`}
+              aria-label={t(`header.palette.${key}`)}
               aria-pressed={selected}
-              onClick={() => selectPalette(key)}
+              onClick={() => setPalette(key)}
             >
-              <ThemePreview color={PALETTE_SWATCH[key]} dark={isDark} />
-              <span className={styles.cardFooter}>
-                <span className={styles.cardName}>{label}</span>
-                {selected ? (
-                  <span className={styles.selectedMark} aria-label={t("account.themeSelected", "当前主题")}>
-                    <Check size={13} strokeWidth={2.5} />
-                    <span>{t("account.themeSelected", "使用中")}</span>
-                  </span>
-                ) : (
-                  <span className={styles.colorDot} style={{ background: PALETTE_SWATCH[key] }} aria-hidden="true" />
-                )}
-              </span>
+              <span className={styles.paletteDot} style={{ backgroundColor: PALETTE_SWATCH[key] }} aria-hidden="true" />
+              <span className={styles.paletteLabel}>{t(`header.palette.${key}`)}</span>
+              {selected ? <Check size={12} aria-hidden="true" /> : null}
             </button>
           );
         })}
         <ColorPicker
           value={customColor}
           disabledAlpha
-          onChangeComplete={(color: AggregationColor) => {
-            setCustomColor(color.toHexString());
-          }}
+          onChangeComplete={(color: AggregationColor) => setCustomColor(color.toHexString())}
         >
           <button
             type="button"
-            className={`${styles.card} ${styles.customCard} ${palette === "custom" ? styles.selected : ""}`}
+            className={`${styles.paletteOption} ${palette === "custom" ? styles.paletteSelected : ""}`}
             aria-label={t("header.palette.custom")}
             aria-pressed={palette === "custom"}
           >
-            <span className={styles.customPreview} aria-hidden="true">
-              <span className={styles.customPaletteIcon}><Palette size={24} /></span>
-              <span className={styles.customHint}>{t("account.themeChooseColor", "选择自己的颜色")}</span>
+            <span className={styles.customPalette} style={palette === "custom" ? { background: customColor } : undefined}>
+              <Palette size={14} aria-hidden="true" />
             </span>
-            <span className={styles.cardFooter}>
-              <span className={styles.cardName}>{t("header.palette.custom")}</span>
-              {palette === "custom" ? (
-                <span className={styles.selectedMark}><Check size={13} />{t("account.themeSelected", "使用中")}</span>
-              ) : (
-                <span className={styles.colorDot} style={{ background: customColor }} aria-hidden="true" />
-              )}
-            </span>
+            <span className={styles.paletteLabel}>{t("header.palette.custom")}</span>
+            {palette === "custom" ? <Check size={12} aria-hidden="true" /> : null}
           </button>
         </ColorPicker>
       </div>
+
       <button
         type="button"
         className={styles.resetButton}
         onClick={() => {
+          setSkin(DEFAULT_SKIN);
           setPalette(DEFAULT_PALETTE);
           setPreference("system");
         }}
