@@ -75,7 +75,6 @@ function ThemedApp() {
   const themeConfig = {
     algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
     token: {
-      borderRadius: 10,
       ...(isMobile
         ? {
             fontSize: 15,
