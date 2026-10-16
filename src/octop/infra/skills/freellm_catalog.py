@@ -3,6 +3,7 @@
 Remote SKILL.md content is untrusted. Fetching or previewing never executes it.
 Publishing requires a separate, explicitly approved workflow.
 """
+
 from __future__ import annotations
 
 import json
@@ -48,16 +49,18 @@ def normalize_catalog(raw: object) -> list[dict[str, str]]:
         if not isinstance(name, str) or not name.strip():
             continue
         seen.add(skill_id)
-        result.append({
-            "id": skill_id,
-            "name": name[:160],
-            "description": str(entry.get("description") or "")[:450],
-            "category": str(entry.get("category") or "")[:64],
-            "status": "verified",
-            "github_url": source[:1024],
-            "content_path": path,
-            "last_checked_at": str(entry.get("lastCheckedAt") or "")[:32],
-        })
+        result.append(
+            {
+                "id": skill_id,
+                "name": name[:160],
+                "description": str(entry.get("description") or "")[:450],
+                "category": str(entry.get("category") or "")[:64],
+                "status": "verified",
+                "github_url": source[:1024],
+                "content_path": path,
+                "last_checked_at": str(entry.get("lastCheckedAt") or "")[:32],
+            }
+        )
     return result
 
 
@@ -69,23 +72,28 @@ async def _fetch_from_freellm(path: str, max_bytes: int) -> bytes:
             "GET", _ORIGIN + path, headers={"Accept": "application/json, text/plain"}
         ) as response,
     ):
-            if response.status_code != 200:
-                raise FreeLLMSyncError(f"FreeLLM returned HTTP {response.status_code}")
-            if response.headers.get("content-length") and int(response.headers["content-length"]) > max_bytes:
+        if response.status_code != 200:
+            raise FreeLLMSyncError(f"FreeLLM returned HTTP {response.status_code}")
+        if (
+            response.headers.get("content-length")
+            and int(response.headers["content-length"]) > max_bytes
+        ):
+            raise FreeLLMSyncError("FreeLLM response exceeds size limit")
+        chunks: list[bytes] = []
+        size = 0
+        async for chunk in response.aiter_bytes():
+            size += len(chunk)
+            if size > max_bytes:
                 raise FreeLLMSyncError("FreeLLM response exceeds size limit")
-            chunks: list[bytes] = []
-            size = 0
-            async for chunk in response.aiter_bytes():
-                size += len(chunk)
-                if size > max_bytes:
-                    raise FreeLLMSyncError("FreeLLM response exceeds size limit")
-                chunks.append(chunk)
+            chunks.append(chunk)
     return b"".join(chunks)
 
 
 async def list_freellm_skills() -> list[dict[str, str]]:
     try:
-        raw = json.loads((await _fetch_from_freellm(_CATALOG_PATH, _MAX_CATALOG_BYTES)).decode("utf-8"))
+        raw = json.loads(
+            (await _fetch_from_freellm(_CATALOG_PATH, _MAX_CATALOG_BYTES)).decode("utf-8")
+        )
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise FreeLLMSyncError("FreeLLM returned an invalid catalog") from exc
     return normalize_catalog(raw)
