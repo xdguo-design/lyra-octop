@@ -88,8 +88,8 @@ async def submit_review_pull_request(
                 "base": "dev",
                 "body": (
                     "Submitted from LYRA after the package owner's explicit review.\n\n"
-                    f"- Original Skill slug: \`{slug}\`\n"
-                    f"- SHA-256: \`{digest}\`\n"
+                    f"- Original Skill slug: `{slug}`\n"
+                    f"- SHA-256: `{digest}`\n"
                     "- Review provenance, author/license, secrets, prompt injection and "
                     "sidecar file dependencies before curating this into data/skills.json.\n"
                     "- Do not auto-publish this PR.\n"
