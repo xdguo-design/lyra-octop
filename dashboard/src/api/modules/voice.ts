@@ -18,6 +18,7 @@ export interface VoiceProviderRow {
   capability: "stt" | "tts" | "both";
   base_url: string | null;
   api_key: string | null;
+  api_key_configured: boolean;
   extra: Record<string, unknown>;
   note: string | null;
   enabled: boolean;

@@ -68,6 +68,8 @@ def test_run_migrations_creates_tables(db: SqlitePool):
         "sso_providers",
         "sso_login_states",
         "trajectory_events",
+        "admission_registration_sessions",
+        "admission_registration_turns",
     }
     assert expected.issubset(names)
     assert "knowledge_base_members" not in names
@@ -99,7 +101,7 @@ def test_run_migrations_idempotent(db: SqlitePool):
         sso_indexes = {
             r["name"] for r in conn.execute("PRAGMA index_list(sso_providers)").fetchall()
         }
-    assert v == 22
+    assert v == 26
     assert "login_failed_count" in cols
     assert "login_locked_until" in cols
     assert "preferences_json" in cols
@@ -154,7 +156,7 @@ def test_repair_legacy_schema_ensures_columns(tmp_path: Path) -> None:
             (
                 Path(__file__).resolve().parents[3]
                 / "src/octop/infra/db/migrations/001_initial.sql"
-            ).read_text()
+            ).read_text(encoding="utf-8")
         )
         # Simulate a schema version ahead of what the columns reflect
         conn.execute("UPDATE _schema_version SET version = 2")
@@ -206,14 +208,14 @@ def test_migration_002_idempotent_when_column_already_present(tmp_path: Path) ->
             (
                 Path(__file__).resolve().parents[3]
                 / "src/octop/infra/db/migrations/001_initial.sql"
-            ).read_text()
+            ).read_text(encoding="utf-8")
         )
         conn.execute("ALTER TABLE cron_jobs ADD COLUMN mcp_servers TEXT NOT NULL DEFAULT '[]'")
     run_migrations(pool)
     with pool.connect() as conn:
         v = conn.execute("SELECT version FROM _schema_version").fetchone()[0]
         cron_cols = {r["name"] for r in conn.execute("PRAGMA table_info(cron_jobs)").fetchall()}
-    assert v == 22
+    assert v == 26
     assert "mcp_servers" in cron_cols
     assert "skill_packages" in {
         r["name"]
@@ -229,7 +231,7 @@ def test_migration_005_preserves_populated_users_and_constraints(tmp_path: Path)
         Path(__file__).resolve().parents[3] / "src/octop/infra/db/migrations/001_initial.sql"
     )
     with pool.connect() as conn:
-        conn.executescript(initial_migration.read_text())
+        conn.executescript(initial_migration.read_text(encoding="utf-8"))
         conn.execute("UPDATE _schema_version SET version = 4")
         conn.execute(
             """
@@ -346,14 +348,14 @@ def test_stuck_version_6_without_permissions_column_is_repaired(tmp_path: Path) 
             (
                 Path(__file__).resolve().parents[3]
                 / "src/octop/infra/db/migrations/001_initial.sql"
-            ).read_text()
+            ).read_text(encoding="utf-8")
         )
         conn.execute("UPDATE _schema_version SET version = 6")
     run_migrations(pool)
     with pool.connect() as conn:
         cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
         version = conn.execute("SELECT version FROM _schema_version").fetchone()[0]
-    assert version == 22
+    assert version == 26
     assert "permissions" in cols
 
 
@@ -366,7 +368,7 @@ def test_schema_v10_without_projection_tables_is_repaired(tmp_path: Path) -> Non
             (
                 Path(__file__).resolve().parents[3]
                 / "src/octop/infra/db/migrations/001_initial.sql"
-            ).read_text()
+            ).read_text(encoding="utf-8")
         )
         conn.execute("UPDATE _schema_version SET version = 10")
     run_migrations(pool)
@@ -378,7 +380,7 @@ def test_schema_v10_without_projection_tables_is_repaired(tmp_path: Path) -> Non
         }
         kb_cols = {r["name"] for r in conn.execute("PRAGMA table_info(knowledge_bases)").fetchall()}
         cron_cols = {r["name"] for r in conn.execute("PRAGMA table_info(cron_jobs)").fetchall()}
-    assert version == 22
+    assert version == 26
     assert {"thread_messages", "thread_history_projection", "trajectory_events"}.issubset(
         table_names
     )
@@ -399,7 +401,7 @@ def test_ahead_of_max_schema_version_clamps_to_max(tmp_path: Path) -> None:
             (
                 Path(__file__).resolve().parents[3]
                 / "src/octop/infra/db/migrations/001_initial.sql"
-            ).read_text()
+            ).read_text(encoding="utf-8")
         )
         conn.execute("UPDATE _schema_version SET version = 8")
     run_migrations(pool)
@@ -413,10 +415,29 @@ def test_ahead_of_max_schema_version_clamps_to_max(tmp_path: Path) -> None:
             r["name"]
             for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         }
-    assert version == 22
+    assert version == 26
     assert "skill_package_id" in pkg_cols
     assert "published_expert_id" in pub_cols
     assert "user_invites" in invite_tables
+
+
+def test_current_watermark_repairs_missing_admission_session_tables(tmp_path: Path) -> None:
+    pool = SqlitePool(tmp_path / "octop.db")
+    run_migrations(pool)
+    with pool.connect() as conn:
+        conn.execute("DROP TABLE admission_registration_turns")
+        conn.execute("DROP TABLE admission_registration_sessions")
+
+    run_migrations(pool)
+
+    with pool.connect() as conn:
+        tables = {
+            row["name"]
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        }
+        version = conn.execute("SELECT version FROM _schema_version").fetchone()[0]
+    assert version == 26
+    assert {"admission_registration_sessions", "admission_registration_turns"}.issubset(tables)
 
 
 def test_current_watermark_repairs_pre_v13_connectors_schema(tmp_path: Path) -> None:
@@ -427,7 +448,7 @@ def test_current_watermark_repairs_pre_v13_connectors_schema(tmp_path: Path) -> 
             (
                 Path(__file__).resolve().parents[3]
                 / "src/octop/infra/db/migrations/001_initial.sql"
-            ).read_text()
+            ).read_text(encoding="utf-8")
         )
         conn.execute("UPDATE _schema_version SET version = 13")
         conn.execute(
@@ -480,7 +501,7 @@ def test_pre_squash_schema_version_clamped_and_knowledge_tables_filled(
             (
                 Path(__file__).resolve().parents[3]
                 / "src/octop/infra/db/migrations/001_initial.sql"
-            ).read_text()
+            ).read_text(encoding="utf-8")
         )
         # Simulate a develop DB whose recorded version is ahead of the
         # consolidated max, so reconcile clamps and repairs knowledge tables.
@@ -496,7 +517,7 @@ def test_pre_squash_schema_version_clamped_and_knowledge_tables_filled(
             for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         }
         user_cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
-    assert version == 22
+    assert version == 26
     assert "permissions" in user_cols
     assert {
         "published_experts",
@@ -644,7 +665,9 @@ def test_v7_sqlite_sql_upgrades_legacy_text_pks(tmp_path: Path) -> None:
             "id, kb_id, filename, content_type, byte_size, created_at, updated_at) "
             "VALUES ('doc1', 'kb1', 'a.md', 'text/markdown', 1, 1, 1)"
         )
-        conn.executescript((migrations / "007_resource_identity_and_profile.sql").read_text())
+        conn.executescript(
+            (migrations / "007_resource_identity_and_profile.sql").read_text(encoding="utf-8")
+        )
 
     with pool.connect() as conn:
         version = conn.execute("SELECT version FROM _schema_version").fetchone()[0]
@@ -702,7 +725,7 @@ def test_v14_to_v15_adds_sso_provider_kind_without_rebuilding(tmp_path: Path) ->
         bound = conn.execute(
             "SELECT sso_provider_id FROM users WHERE username = 'sso-admin'"
         ).fetchone()[0]
-    assert version == 22
+    assert version == 26
     assert int(row["id"]) == int(provider_id)
     assert row["kind"] == "oidc"
     assert row["extra"] == "{}"

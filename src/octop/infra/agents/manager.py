@@ -224,6 +224,10 @@ def _memory_extract_settings(
     out: dict[str, Any] = _memory_aux_model_settings(mem, supported_fields, is_ref_usable)
     if "memory_enabled" in supported_fields and isinstance(mem.get("memory_enabled"), bool):
         out["memory_enabled"] = mem["memory_enabled"]
+    if "memory_jsonl_enabled" in supported_fields and isinstance(
+        mem.get("memory_jsonl_enabled"), bool
+    ):
+        out["memory_jsonl_enabled"] = mem["memory_jsonl_enabled"]
     if "memory_extract_on_session_end" in supported_fields and isinstance(
         mem.get("extract_on_session_end"), bool
     ):
@@ -2268,7 +2272,25 @@ class AgentManager:
         )
         if self._harness_manager is not None:
             self._harness_manager.set_langfuse(self._langfuse.harness_config())
+            for row in self._repos.agent_repo.list_all(include_disabled=False):
+                self._disable_agent_langfuse_if_opted_out(row.agent_id)
         return view
+
+    def _disable_agent_langfuse_if_opted_out(
+        self, agent_id: str, agent: HarnessAgent | None = None
+    ) -> None:
+        observability = self.get_config(agent_id).get("observability")
+        if not isinstance(observability, dict) or observability.get("langfuse") is not False:
+            return
+        if agent is None:
+            try:
+                agent = self.get_agent(agent_id)
+            except OctopError:
+                return
+        target = agent
+        set_callbacks = getattr(target, "set_langfuse_callbacks", None)
+        if callable(set_callbacks):
+            set_callbacks(None)
 
     async def save_media_generation(
         self,
@@ -2974,6 +2996,7 @@ class AgentManager:
         from octop.infra.agents.teams import is_team_agent  # noqa: PLC0415
 
         team_host = is_team_agent(row)
+        self._disable_agent_langfuse_if_opted_out(row.agent_id, agent)
         uid = self._connector_uid_for(row)
         if uid is not None and not team_host:
             inject_missing_gateway_tools(
@@ -3766,6 +3789,14 @@ class AgentManager:
             **_memory_extract_settings(cfg, is_ref_usable=self._providers.is_model_ref_usable),
             **_resolve_memory_backend_kwargs(cfg, workspace_dir=workspace_dir, config=self._config),
         )
+        if "checkpointer" in _HARNESS_AGENT_CONFIG_FIELDS and cfg.get("checkpointer") is False:
+            harness_cfg.checkpointer = False
+        if "session_log_enabled" in _HARNESS_AGENT_CONFIG_FIELDS and isinstance(
+            cfg.get("session_log_enabled"), bool
+        ):
+            harness_cfg.session_log_enabled = cfg["session_log_enabled"]
+        if "team_enabled" in _HARNESS_AGENT_CONFIG_FIELDS and cfg.get("team_enabled") is False:
+            harness_cfg.team_enabled = False
         if "tools_disabled" in _HARNESS_AGENT_CONFIG_FIELDS:
             from octop.infra.agents.settings.tool_catalog import effective_tools_disabled
             from octop.infra.agents.teams import host_tools_disabled

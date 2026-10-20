@@ -21,6 +21,7 @@ import { request } from "../../../api/request";
 import { AgentAdvancedConfigFields } from "../../../components/AgentAdvancedConfigFields";
 import ExpertColorPicker from "../../../components/ExpertColorPicker";
 import AgentTrajectoryField from "./AgentTrajectoryField";
+import AgentModelReasoningFields from "./AgentModelReasoningFields";
 import { workspaceApi } from "../../../api/modules/workspace";
 import { skillPackagesApi } from "../../../api/modules/skillPackages";
 import { apiErrorMessage, isNotFoundApiError } from "../../../utils/apiError";
@@ -139,6 +140,8 @@ interface EditFormValues {
   welcome_message?: string;
   is_shared?: boolean;
   default_model: string;
+  reasoning_mode?: "auto" | "enabled" | "disabled";
+  reasoning_effort?: string;
   conversation_mode: ConversationMode;
   backend_choice: string;
   composite_default: string;
@@ -234,6 +237,7 @@ function EditAgentDrawerBody({
   const skillDisplayName = useSkillDisplayName();
   const [workspaceDrawerOpen, setWorkspaceDrawerOpen] = useState(false);
   const [form] = Form.useForm<EditFormValues>();
+  const selectedModel = Form.useWatch("default_model", form);
   const [workspaceFiles, setWorkspaceFiles] = useState<string[]>([]);
   const [agentSkills, setAgentSkills] = useState<SkillSummary[]>([]);
   const [agentSubagents, setAgentSubagents] = useState<SubagentSummary[]>([]);
@@ -293,6 +297,10 @@ function EditAgentDrawerBody({
         if (cancelled) return;
 
         const cfg = ag.config ?? {};
+        const selectedModel = defaultModelToForm(ag.default_model);
+        const reasoningConfig = cfg.reasoning as
+          | { mode?: EditFormValues["reasoning_mode"]; effort?: string }
+          | undefined;
         setAgentConfig(cfg);
         const colorFromRow =
           typeof ag.color === "string"
@@ -315,7 +323,15 @@ function EditAgentDrawerBody({
           welcome_message:
             typeof ag.welcome_message === "string" ? ag.welcome_message : "",
           is_shared: agent.is_shared ?? false,
-          default_model: defaultModelToForm(ag.default_model),
+          default_model: selectedModel,
+          reasoning_mode:
+            reasoningConfig?.mode ??
+            models.find(
+              (model) =>
+                `${model.provider_name}/${model.model}` === selectedModel,
+            )?.reasoning_config?.default_mode ??
+            "auto",
+          reasoning_effort: reasoningConfig?.effort,
           conversation_mode: parseConversationMode(cfg.conversation_mode),
           backend_choice: parsedBackend.backendChoice,
           composite_default: parsedBackend.compositeDefault,
@@ -389,7 +405,7 @@ function EditAgentDrawerBody({
     return () => {
       cancelled = true;
     };
-  }, [agent.agent_id, agent.state, form, message, t]);
+  }, [agent.agent_id, agent.state, form, message, models, t]);
 
   const handleSave = useCallback(async () => {
     const values = await form.validateFields();
@@ -435,11 +451,16 @@ function EditAgentDrawerBody({
       const nextColor = isCuratedPalette(colorPalette)
         ? expertPaletteColor(colorPalette)
         : colorPalette;
+      const stored = form.getFieldsValue(true) as EditFormValues;
       const nextConfig = omitAgentRuntimeConfig({
         ...agentConfig,
         backend: backendSpec,
         enable_trajectory: values.enable_trajectory === true,
         conversation_mode: values.conversation_mode,
+        reasoning: {
+          mode: stored.reasoning_mode ?? "auto",
+          effort: stored.reasoning_effort ?? null,
+        },
       });
       delete nextConfig.color;
       delete nextConfig.icon_name;
@@ -476,7 +497,6 @@ function EditAgentDrawerBody({
         }
       }
 
-      const stored = form.getFieldsValue(true) as EditFormValues;
       await request(`/agents/${agent.agent_id}`, {
         method: "PATCH",
         body: JSON.stringify({
@@ -843,7 +863,20 @@ function EditAgentDrawerBody({
                   options={buildModelSelectOptions(
                     models,
                     t("experts.defaultModelAuto"),
+                  ).filter(
+                    (option) =>
+                      !agentConfig.admission_demo_agent || option.value !== "",
                   )}
+                  onChange={(value: string) => {
+                    const capability = models.find(
+                      (model) =>
+                        `${model.provider_name}/${model.model}` === value,
+                    )?.reasoning_config;
+                    form.setFieldsValue({
+                      reasoning_mode: capability?.default_mode ?? "auto",
+                      reasoning_effort: undefined,
+                    });
+                  }}
                   showSearch
                   filterOption={(input, opt) =>
                     ((opt?.label as string) ?? "")
@@ -852,6 +885,15 @@ function EditAgentDrawerBody({
                   }
                 />
               </Form.Item>
+
+              <AgentModelReasoningFields
+                capability={
+                  models.find(
+                    (model) =>
+                      `${model.provider_name}/${model.model}` === selectedModel,
+                  )?.reasoning_config
+                }
+              />
 
               <AgentBackendFields
                 backends={backends}

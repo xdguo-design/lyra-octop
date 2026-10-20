@@ -215,6 +215,7 @@ export default function ChatInputActionsRow({
   contextMaxTokens = 128_000,
   availableModels,
   selectedModel,
+  defaultModel,
   onModelChange,
   reasoningMode = "auto",
   reasoningEffort = null,
@@ -491,6 +492,30 @@ export default function ChatInputActionsRow({
   const openModelReasoning = (modelRef: string) => {
     if (selectedModel !== modelRef) onModelChange?.(modelRef);
     setReasoningModelRef(modelRef);
+  };
+
+  // Quick deep-thinking chip next to the model trigger: resolve the
+  // capability of the model that will actually serve the turn (explicit
+  // pick → agent default), same fallback order as useChatContextWindow.
+  const effectiveModelRef = selectedModel ?? defaultModel ?? null;
+  const effectiveReasoningCapability = (availableModels ?? []).find(
+    (model) => modelOptionValue(model) === effectiveModelRef,
+  )?.reasoning_config;
+  const showReasoningToggle = Boolean(
+    onReasoningChange &&
+      effectiveReasoningCapability?.toggle &&
+      effectiveReasoningCapability.adapter !== "status_only",
+  );
+  // "auto" lights the chip when the provider default is thinking-on.
+  const reasoningToggleActive =
+    reasoningMode === "enabled" ||
+    (reasoningMode === "auto" &&
+      effectiveReasoningCapability?.default_mode === "enabled");
+  const handleReasoningToggle = () => {
+    onReasoningChange?.(
+      reasoningToggleActive ? "disabled" : "enabled",
+      reasoningEffort,
+    );
   };
 
   const reasoningMenu = reasoningModelCapability ? (
@@ -1001,6 +1026,31 @@ export default function ChatInputActionsRow({
               </button>
             </Tooltip>
           </Popover>
+        )}
+        {showReasoningToggle && !useCompactControls && (
+          <Tooltip
+            title={
+              reasoningToggleActive
+                ? t("chat.reasoningEnabled", "开启")
+                : t("chat.reasoningDisabled", "关闭")
+            }
+            mouseEnterDelay={0.4}
+          >
+            <button
+              type="button"
+              aria-pressed={reasoningToggleActive}
+              data-testid="composer-reasoning-toggle"
+              className={`${styles.modelTriggerBtn} ${
+                reasoningToggleActive ? styles.modelTriggerBtnActive : ""
+              }`}
+              onClick={handleReasoningToggle}
+            >
+              <Brain size={15} />
+              <span className={styles.modelTriggerLabel}>
+                {t("chat.deepThinking", "深度思考")}
+              </span>
+            </button>
+          </Tooltip>
         )}
         {showOverflowMenu && (
           <Popover

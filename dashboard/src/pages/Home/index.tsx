@@ -1,4 +1,11 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import MainLayout from "../../layouts/MainLayout";
 import { Modal, Popover, Dropdown, Select, Input, Button } from "antd";
@@ -9,6 +16,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Bot,
+  Check,
   Cpu,
   ChevronRight,
   ChevronDown,
@@ -19,6 +27,7 @@ import {
   HardDrive,
   Library,
   Layers3,
+  LogOut,
   Mic,
   Monitor,
   Moon,
@@ -45,12 +54,18 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { request } from "../../api/request";
+import { clearAuthToken, request } from "../../api/request";
 import {
   octopThreadsApi,
+  CHAT_HISTORY_PAGE_SIZE,
   type OctopThread,
 } from "../../api/modules/octopThreads";
-import { creationsApi, type CreationItem } from "../../api/modules/creations";
+import {
+  creationsApi,
+  type CreationItem,
+  type ProjectLaunchStatus,
+} from "../../api/modules/creations";
+import AuthImage from "../../components/AuthImage";
 import {
   workbenchApi,
   type WorkbenchAssignment,
@@ -71,18 +86,22 @@ import {
   ProfileAvatarPicker,
 } from "../Admin/Users/ProfileAvatar";
 import type { ResolvedModel } from "../../api/types";
-import { applyUserLocale } from "../../utils/locale";
+import { applyGuestLocale, applyUserLocale } from "../../utils/locale";
 import { useTheme } from "../../context/ThemeContext";
 import { useChat } from "../Chat/hooks/useChat";
 import {
   confirmDeleteConversation,
   deleteConversation,
 } from "../Chat/utils/deleteConversation";
+import { clipThreadTitle } from "../Chat/utils/threadTitle";
 import { type ThemePreference } from "../../styles/appearanceStorage";
+import { VISUAL_SKINS, type VisualSkin } from "../../styles/visualSkins";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { useChatAttachments } from "../Chat/hooks/useChatAttachments";
 import ExpertAgentAvatar from "../Chat/components/ExpertAgentAvatar";
+import AssistantTurnView from "../Chat/components/AssistantTurnView";
+import { groupConsecutiveAssistantMessages } from "../Chat/utils/messageGrouping";
 import EmojiPicker from "../../components/EmojiPicker";
 import ProjectCodeBrowser from "./ProjectCodeBrowser";
 import { BUILT_IN_CREATIONS } from "../Creations/builtInCreations";
@@ -93,6 +112,7 @@ import {
   canDelegate,
   resolvePrivatePlatformUrl,
   selectPrimaryAgent,
+  supportsLocalProjectPreview,
   visibleConversationMessages,
 } from "./workbench-model";
 import "./home-workbench.css";
@@ -110,6 +130,27 @@ interface MeUser {
   display_name: string | null;
   avatar_icon?: string | null;
   avatar_url?: string | null;
+}
+
+function isLaunchableProjectUrl(value: string | null): boolean {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      url.hostname.toLowerCase() === "github.com" &&
+      !url.port &&
+      /^\/xdguo-design\/data-upload-product(?:\.git)?\/?$/i.test(
+        url.pathname,
+      ) &&
+      !url.search &&
+      !url.hash &&
+      !url.username &&
+      !url.password
+    );
+  } catch {
+    return false;
+  }
 }
 
 const NAV_ITEMS = [
@@ -221,14 +262,24 @@ const THEME_OPTIONS = [
   Icon: typeof Sun;
 }[];
 
-const THEME_GALLERY_OPTIONS = [
-  "breezy",
-  "classicQQ",
-  "peacekeeperAutumn",
-  "together",
-  "ripple",
-  "companion",
-] as const;
+const THEME_GALLERY_ORDER = [
+  "cloud",
+  "doodle",
+  "journal",
+  "forest",
+  "orbit",
+  "terminal",
+  "clearSky",
+  "cloudSea",
+  "greatWall",
+  "mogaoCaves",
+  "changbaiMountain",
+  "woodland",
+  "bambooForest",
+] satisfies VisualSkin[];
+const THEME_GALLERY_OPTIONS = THEME_GALLERY_ORDER.map(
+  (id) => VISUAL_SKINS.find((skin) => skin.id === id)!,
+);
 
 /** Legacy project data is imported once into account storage. */
 function legacyProjectsStorageKey(agentId: string | null) {
@@ -289,6 +340,7 @@ export default function HomePage() {
     }
   });
   const [moreOpen, setMoreOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [user, setUser] = useState<MeUser | null>(null);
   const [nameDraft, setNameDraft] = useState("");
   const [nameSaving, setNameSaving] = useState(false);
@@ -402,6 +454,15 @@ export default function HomePage() {
   const [platformFrameReady, setPlatformFrameReady] = useState(false);
   const [platformSettingsOpen, setPlatformSettingsOpen] = useState(false);
   const [platformItems, setPlatformItems] = useState<CreationItem[]>([]);
+  const [projectPreviewUrls, setProjectPreviewUrls] = useState<
+    Record<string, string>
+  >({});
+  const [projectLaunchStatuses, setProjectLaunchStatuses] = useState<
+    Record<string, ProjectLaunchStatus>
+  >({});
+  const [launchingProjectId, setLaunchingProjectId] = useState<string | null>(
+    null,
+  );
   const [platformCatalogError, setPlatformCatalogError] = useState(false);
   const [selectedPlatformId, setSelectedPlatformId] = useState("app:planet");
   const [platformUrl, setPlatformUrl] = useState(initialPlatformUrl);
@@ -409,7 +470,12 @@ export default function HomePage() {
   const taskEpoch = useRef(0);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  const { preference, setPreference } = useTheme();
+  const { preference, setPreference, skin, setSkin } = useTheme();
+  const themeArtwork = VISUAL_SKINS.find((definition) => definition.id === skin)
+    ?.image;
+  const themeArtworkStyle = themeArtwork
+    ? ({ "--wb-theme-art": `url("${themeArtwork}")` } as CSSProperties)
+    : undefined;
   const { i18n, t } = useTranslation();
   const currentLocale = (i18n.language || "zh").startsWith("zh") ? "zh" : "en";
   const handleLocaleChange = async (lang: string) => {
@@ -862,6 +928,7 @@ export default function HomePage() {
       <Dropdown
         trigger={["click"]}
         placement="bottomLeft"
+        overlayClassName="wb-theme-popup"
         menu={taskMenuFor(thread)}
       >
         <button type="button" className="wb-task-more" aria-label="任务操作">
@@ -943,6 +1010,7 @@ export default function HomePage() {
           <Dropdown
             trigger={["click"]}
             placement="bottomRight"
+            overlayClassName="wb-theme-popup"
             menu={projectMenu(project)}
           >
             <button
@@ -1211,6 +1279,7 @@ export default function HomePage() {
   const {
     messages,
     isStreaming,
+    liveSpeakers,
     historyLoading,
     historyError,
     sendMessage,
@@ -1234,6 +1303,11 @@ export default function HomePage() {
     () => visibleConversationMessages(messages, agentId),
     [messages, agentId],
   );
+  const visibleMessageGroups = useMemo(
+    () =>
+      groupConsecutiveAssistantMessages(visibleMessages, agentId ?? undefined),
+    [visibleMessages, agentId],
+  );
   const hasPendingApproval = messages.some(
     (m) => m.hitlData?.status === "pending",
   );
@@ -1241,22 +1315,28 @@ export default function HomePage() {
     () => [
       ...BUILT_IN_CREATIONS.map((item) => ({
         id: `app:${item.id}`,
+        itemId: null,
         name: t(item.titleKey),
         description: t(item.descriptionKey),
-        url: item.url,
+        url: item.url
+          ? new URL(item.url, window.location.origin).toString()
+          : null,
         thumb: item.thumb,
+        launchable: false,
         builtIn: true,
       })),
       ...platformItems.map((item) => ({
         id: item.item_id,
+        itemId: item.item_id,
         name: item.name,
         description: item.description,
-        url: item.url,
-        thumb: null,
+        url: projectPreviewUrls[item.item_id] || item.url,
+        thumb: item.thumbnail_url,
+        launchable: isLaunchableProjectUrl(item.url),
         builtIn: false,
       })),
     ],
-    [platformItems, t],
+    [platformItems, projectPreviewUrls, t],
   );
   const selectedPlatform = platformEntries.find(
     (item) => item.id === selectedPlatformId,
@@ -1304,6 +1384,40 @@ export default function HomePage() {
         if (!cancelled) {
           setPlatformItems(data.items);
           setPlatformCatalogError(false);
+          if (user?.role === "admin") {
+            void Promise.all(
+              data.items
+                .filter(
+                  (item) =>
+                    item.kind === "service" && isLaunchableProjectUrl(item.url),
+                )
+                .map(async (item) => {
+                  try {
+                    const status = await creationsApi.launchStatus(
+                      item.item_id,
+                    );
+                    setProjectLaunchStatuses((previous) => ({
+                      ...previous,
+                      [item.item_id]: status,
+                    }));
+                    if (status.status === "running" && status.url) {
+                      setProjectPreviewUrls((previous) => ({
+                        ...previous,
+                        [item.item_id]: status.url!,
+                      }));
+                    } else {
+                      setProjectPreviewUrls((previous) => {
+                        const next = { ...previous };
+                        delete next[item.item_id];
+                        return next;
+                      });
+                    }
+                  } catch {
+                    // A launch profile can be absent on another Octop host.
+                  }
+                }),
+            );
+          }
         }
       })
       .catch(() => {
@@ -1312,7 +1426,7 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [platformOpen]);
+  }, [platformOpen, user?.role]);
 
   useEffect(() => {
     setThreads([]);
@@ -1322,7 +1436,18 @@ export default function HomePage() {
     void octopThreadsApi
       .list(agentId, 30)
       .then((rows) => {
-        if (!cancelled) setThreads(rows);
+        if (!cancelled) {
+          setThreads((current) =>
+            rows.map((thread) => {
+              const optimisticTitle = current.find(
+                (item) => item.thread_id === thread.thread_id,
+              )?.title;
+              return thread.title || !optimisticTitle
+                ? thread
+                : { ...thread, title: optimisticTitle };
+            }),
+          );
+        }
       })
       .catch(() => {
         if (!cancelled) setError("暂时无法获取会话历史。");
@@ -1383,6 +1508,78 @@ export default function HomePage() {
   useEffect(() => {
     if (activeThread && agentId) void loadHistory(activeThread);
   }, [activeThread, agentId, loadHistory]);
+
+  const activeThreadTitle = threads.find(
+    (item) => item.thread_id === activeThread,
+  )?.title;
+  const hasActiveThread = threads.some(
+    (item) => item.thread_id === activeThread,
+  );
+  useEffect(() => {
+    if (
+      !activeThread ||
+      !agentId ||
+      !hasActiveThread ||
+      activeThreadTitle ||
+      historyLoading
+    )
+      return;
+    let cancelled = false;
+    void (async () => {
+      let offset = 0;
+      let firstQuestion = "";
+      while (!cancelled) {
+        let page = await octopThreadsApi.history(agentId, activeThread, {
+          limit: CHAT_HISTORY_PAGE_SIZE,
+          offset,
+        });
+        while (page.history_loading && !cancelled) {
+          await new Promise((resolve) =>
+            window.setTimeout(
+              resolve,
+              Math.max(
+                500,
+                Math.min(page.history_retry_after_ms ?? 1500, 5000),
+              ),
+            ),
+          );
+          if (cancelled) return;
+          page = await octopThreadsApi.history(agentId, activeThread, {
+            limit: CHAT_HISTORY_PAGE_SIZE,
+            offset,
+          });
+        }
+        const question = page.messages.find(
+          (item) => item.role === "user" && typeof item.content === "string",
+        );
+        if (question && typeof question.content === "string") {
+          firstQuestion = question.content;
+        }
+        if (!page.has_more) break;
+        offset += page.limit ?? CHAT_HISTORY_PAGE_SIZE;
+      }
+      const title = clipThreadTitle(firstQuestion);
+      if (!title || cancelled) return;
+      await octopThreadsApi.rename(agentId, activeThread, title);
+      if (cancelled) return;
+      setThreads((current) =>
+        current.map((item) =>
+          item.thread_id === activeThread && !item.title
+            ? { ...item, title }
+            : item,
+        ),
+      );
+    })().catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeThread,
+    activeThreadTitle,
+    agentId,
+    hasActiveThread,
+    historyLoading,
+  ]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
@@ -1505,6 +1702,15 @@ export default function HomePage() {
     navigate(path);
   };
 
+  const handleLogout = async () => {
+    setMobileNavOpen(false);
+    setSettingsOpen(false);
+    await authApi.logout();
+    clearAuthToken();
+    await applyGuestLocale();
+    navigate("/login", { replace: true });
+  };
+
   const chooseProjectAssignment = (
     projectId: string | null,
     folderId: string | null = null,
@@ -1619,6 +1825,9 @@ export default function HomePage() {
     const text = (provided ?? input).trim();
     if (!text || !agentId || sending || isStreaming || hasPendingApproval)
       return;
+    const firstQuestionTitle = activeThread
+      ? threads.find((item) => item.thread_id === activeThread)?.title || ""
+      : clipThreadTitle(text);
     const epoch = taskEpoch.current;
     setSending(true);
     setError("");
@@ -1636,7 +1845,7 @@ export default function HomePage() {
             thread_id: created.thread_id,
             session_key: created.session_key,
             channel_type: "dashboard",
-            title: text.slice(0, 50),
+            title: firstQuestionTitle,
             last_active: now,
             created_at: now,
             model_ref: selectedModel,
@@ -1675,7 +1884,7 @@ export default function HomePage() {
           t.thread_id === threadId
             ? {
                 ...t,
-                title: t.title || text.slice(0, 50),
+                title: t.title || firstQuestionTitle,
                 last_active: Math.floor(Date.now() / 1000),
               }
             : t,
@@ -1717,7 +1926,66 @@ export default function HomePage() {
     setPlatformOpen(true);
     setPlatformSettingsOpen(false);
   };
-  const openPlatformEntry = (entry: (typeof platformEntries)[number]) => {
+  const openPlatformEntry = async (entry: (typeof platformEntries)[number]) => {
+    if (entry.launchable && entry.itemId) {
+      if (
+        !supportsLocalProjectPreview(
+          window.location.hostname,
+          window.location.protocol,
+        )
+      ) {
+        setError(t("workbench.home.platforms.localPreviewOnly"));
+        return;
+      }
+      if (user?.role !== "admin") {
+        setError(t("workbench.home.platforms.previewFailed"));
+        return;
+      }
+      setError("");
+      setLaunchingProjectId(entry.itemId);
+      try {
+        const status = await creationsApi.startProject(entry.itemId);
+        setProjectLaunchStatuses((previous) => ({
+          ...previous,
+          [entry.itemId!]: status,
+        }));
+        if (status.thumbnail_url) {
+          setPlatformItems((previous) =>
+            previous.map((item) =>
+              item.item_id === entry.itemId
+                ? { ...item, thumbnail_url: status.thumbnail_url }
+                : item,
+            ),
+          );
+        }
+        if (status.status !== "running" || !status.url) {
+          setProjectPreviewUrls((previous) => {
+            const next = { ...previous };
+            delete next[entry.itemId!];
+            return next;
+          });
+          setError(
+            status.logs
+              ? `${t("workbench.home.platforms.previewFailed")} ${status.logs}`
+              : t("workbench.home.platforms.previewFailed"),
+          );
+          return;
+        }
+        setProjectPreviewUrls((previous) => ({
+          ...previous,
+          [entry.itemId!]: status.url!,
+        }));
+        setSelectedPlatformId(entry.id);
+        setPlatformFrameReady(false);
+        setPlatformSettingsOpen(false);
+        return;
+      } catch {
+        setError(t("workbench.home.platforms.previewFailed"));
+        return;
+      } finally {
+        setLaunchingProjectId(null);
+      }
+    }
     if (!entry.url) {
       setSelectedPlatformId(entry.id);
       setPlatformFrameReady(false);
@@ -1811,7 +2079,7 @@ export default function HomePage() {
       const updated = await authApi.updateProfile(nameDraft.trim() || null);
       setUser(updated);
       nameDirtyRef.current = false;
-      message.success("显示名称已保存");
+      message.success(t("home.profile.displayNameSaved"));
     } catch (e) {
       message.error(apiErrorMessage(e, "保存失败，请重试"));
     } finally {
@@ -1857,7 +2125,7 @@ export default function HomePage() {
     setPwError("");
     try {
       await authApi.changePassword(pwOld, pwNext);
-      message.success("密码已修改，下次登录请使用新密码");
+      message.success(t("home.profile.passwordChanged"));
       setPwOpen(false);
     } catch (e) {
       setPwError(apiErrorMessage(e, "密码修改失败，请重试"));
@@ -1898,6 +2166,7 @@ export default function HomePage() {
         (mobileNavOpen ? " is-mobile-nav-open" : "") +
         (sideCollapsed ? " wb-side-collapsed" : "")
       }
+      style={themeArtworkStyle}
     >
       {!platformVisible && mobileNavOpen && (
         <button
@@ -1962,6 +2231,7 @@ export default function HomePage() {
             ))}
             <Popover
               trigger="click"
+              overlayClassName="wb-theme-popup"
               open={moreOpen}
               onOpenChange={setMoreOpen}
               placement="rightTop"
@@ -2010,6 +2280,7 @@ export default function HomePage() {
                 <Dropdown
                   trigger={["click"]}
                   placement="bottomRight"
+                  overlayClassName="wb-theme-popup"
                   menu={{
                     items: [
                       {
@@ -2144,25 +2415,86 @@ export default function HomePage() {
                 archivedThreads.map((thread) => renderTaskRow(thread))}
             </div>
           )}
-          <button
-            type="button"
-            className="wb-sidebar-footer"
-            onClick={() => {
-              setMobileNavOpen(false);
-              setSettingsOpen(true);
-            }}
-            aria-label="打开设置"
-          >
-            <ProfileAvatar
-              url={user?.avatar_url}
-              icon={user?.avatar_icon}
-              kind="user"
-              className="wb-user-avatar"
-            />
-            <span>{displayName}</span>
-            <span className="wb-footer-space" />
-            <Settings2 size={16} />
-          </button>
+          <div className="wb-sidebar-footer-row">
+            <Dropdown
+              trigger={["click"]}
+              placement="topRight"
+              overlayClassName="wb-account-dropdown"
+              arrow={false}
+              open={accountMenuOpen}
+              onOpenChange={setAccountMenuOpen}
+              popupRender={() => (
+                <div className="wb-account-menu">
+                  <div className="wb-account-head">
+                    <ProfileAvatar
+                      url={user?.avatar_url}
+                      icon={user?.avatar_icon}
+                      kind="user"
+                      className="wb-account-avatar"
+                    />
+                    <div className="wb-account-meta">
+                      <div className="wb-account-name">
+                        <span className="wb-account-display">
+                          {displayName}
+                        </span>
+                        {user?.role === "admin" && (
+                          <span className="wb-account-role">管理员</span>
+                        )}
+                      </div>
+                      {user?.username && (
+                        <span className="wb-account-handle">
+                          @{user.username}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="wb-account-group">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                        setMobileNavOpen(false);
+                        setSettingsOpen(true);
+                      }}
+                    >
+                      <Settings2 size={16} />
+                      <span>设置</span>
+                      <ChevronRight size={14} className="wb-account-chevron" />
+                    </button>
+                  </div>
+                  <div className="wb-account-group wb-account-group-danger">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                        void handleLogout();
+                      }}
+                    >
+                      <LogOut size={16} />
+                      <span>{t("auth.logout")}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            >
+              <button
+                type="button"
+                className="wb-sidebar-footer"
+                aria-label="账户菜单"
+                aria-haspopup="menu"
+              >
+                <ProfileAvatar
+                  url={user?.avatar_url}
+                  icon={user?.avatar_icon}
+                  kind="user"
+                  className="wb-user-avatar"
+                />
+                <span>{displayName}</span>
+                <span className="wb-footer-space" />
+                <ChevronRight size={16} />
+              </button>
+            </Dropdown>
+          </div>
         </aside>
       )}
 
@@ -2274,44 +2606,100 @@ export default function HomePage() {
               {platformEntries.map((entry) => {
                 const deployed = Boolean(entry.url);
                 return (
-                  <button
-                    type="button"
-                    key={entry.id}
-                    className={
-                      "wb-platform-app" +
-                      (selectedPlatformId === entry.id ? " is-active" : "") +
-                      (!deployed ? " is-unavailable" : "")
-                    }
-                    onClick={() => openPlatformEntry(entry)}
-                  >
-                    {entry.thumb ? (
-                      <img src={entry.thumb} alt="" />
-                    ) : (
-                      <span className="wb-platform-app-icon">
-                        <Layers3 size={18} />
+                  <div className="wb-platform-app-row" key={entry.id}>
+                    <button
+                      type="button"
+                      disabled={Boolean(
+                        entry.launchable && launchingProjectId === entry.itemId,
+                      )}
+                      className={
+                        "wb-platform-app" +
+                        (selectedPlatformId === entry.id ? " is-active" : "") +
+                        (!deployed ? " is-unavailable" : "")
+                      }
+                      onClick={() => void openPlatformEntry(entry)}
+                    >
+                      {entry.thumb ? (
+                        entry.thumb.startsWith("/api/creations/") ? (
+                          <AuthImage
+                            url={entry.thumb}
+                            alt=""
+                            className="wb-platform-app-image"
+                          />
+                        ) : (
+                          <img src={entry.thumb} alt="" />
+                        )
+                      ) : (
+                        <span className="wb-platform-app-icon">
+                          <Layers3 size={18} />
+                        </span>
+                      )}
+                      <span className="wb-platform-app-copy">
+                        <b>{entry.name}</b>
+                        <small>
+                          {entry.description ||
+                            t("workbench.home.platforms.noDescription")}
+                        </small>
                       </span>
-                    )}
-                    <span className="wb-platform-app-copy">
-                      <b>{entry.name}</b>
-                      <small>
-                        {entry.description ||
-                          t("workbench.home.platforms.noDescription")}
-                      </small>
-                    </span>
-                    {!deployed && (
-                      <small className="wb-platform-app-status">
-                        {t("workbench.home.platforms.notDeployed")}
-                      </small>
-                    )}
-                    {deployed &&
-                      !resolvePrivatePlatformUrl(
-                        entry.id === "app:planet"
-                          ? platformUrl
-                          : entry.url || "",
-                        window.location.hostname,
-                        window.location.protocol,
-                      ) && <ExternalLink size={14} />}
-                  </button>
+                      {!deployed && (
+                        <small className="wb-platform-app-status">
+                          {t("workbench.home.platforms.notDeployed")}
+                        </small>
+                      )}
+                      {entry.launchable &&
+                        launchingProjectId === entry.itemId && (
+                          <small
+                            className="wb-platform-app-status"
+                            role="status"
+                          >
+                            {t("workbench.home.platforms.starting")}
+                          </small>
+                        )}
+                      {deployed &&
+                        !resolvePrivatePlatformUrl(
+                          entry.id === "app:planet"
+                            ? platformUrl
+                            : entry.url || "",
+                          window.location.hostname,
+                          window.location.protocol,
+                        ) && <ExternalLink size={14} />}
+                    </button>
+                    {entry.launchable &&
+                      user?.role === "admin" &&
+                      projectLaunchStatuses[entry.itemId!]?.status ===
+                        "running" && (
+                        <button
+                          type="button"
+                          className="wb-platform-stop"
+                          disabled={launchingProjectId === entry.itemId}
+                          onClick={async () => {
+                            setLaunchingProjectId(entry.itemId!);
+                            try {
+                              const status = await creationsApi.stopProject(
+                                entry.itemId!,
+                              );
+                              setProjectLaunchStatuses((previous) => ({
+                                ...previous,
+                                [entry.itemId!]: status,
+                              }));
+                              setProjectPreviewUrls((previous) => {
+                                const next = { ...previous };
+                                delete next[entry.itemId!];
+                                return next;
+                              });
+                            } catch {
+                              setError(
+                                t("workbench.home.platforms.previewFailed"),
+                              );
+                            } finally {
+                              setLaunchingProjectId(null);
+                            }
+                          }}
+                        >
+                          {t("workbench.home.platforms.stop")}
+                        </button>
+                      )}
+                  </div>
                 );
               })}
             </nav>
@@ -2498,46 +2886,52 @@ export default function HomePage() {
                         会话加载失败。可以从高级对话中重试。
                       </div>
                     )}
-                    {visibleMessages.map((message) => (
-                      <article
-                        key={message.id}
-                        className={
-                          "wb-chat-message " +
-                          (message.role === "user" ? "is-user" : "is-agent")
-                        }
-                      >
-                        <div className="wb-chat-avatar">
-                          {message.role === "user" ? (
-                            displayName.slice(0, 1)
-                          ) : (
-                            <ExpertAgentAvatar
-                              iconName={primary?.icon_name}
-                              iconUrl={primary?.icon_url}
-                              color={primary?.color}
-                              size={30}
-                            />
-                          )}
-                        </div>
-                        <div className="wb-chat-message-body">
-                          <div className="wb-chat-author">
-                            {message.role === "user"
-                              ? "你"
-                              : primary?.name || "主 Agent"}
-                            <time>{formatTime(message.timestamp)}</time>
+                    {visibleMessageGroups.map((group, index) => {
+                      if (group.isGroup) {
+                        return (
+                          <AssistantTurnView
+                            key={group.messages[0]?.id ?? index}
+                            messages={group.messages}
+                            agentId={agentId}
+                            isTurnInProgress={
+                              isStreaming &&
+                              index === visibleMessageGroups.length - 1
+                            }
+                            liveSpeakers={liveSpeakers}
+                          />
+                        );
+                      }
+                      const userMessage = group.messages[0];
+                      if (!userMessage || userMessage.role !== "user")
+                        return null;
+                      return (
+                        <article
+                          key={userMessage.id}
+                          className="wb-chat-message is-user"
+                        >
+                          <div className="wb-chat-avatar">
+                            {displayName.slice(0, 1)}
                           </div>
-                          <div className="wb-chat-text">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                              {message.content}
-                            </ReactMarkdown>
+                          <div className="wb-chat-message-body">
+                            <div className="wb-chat-author">
+                              你<time>{formatTime(userMessage.timestamp)}</time>
+                            </div>
+                            <div className="wb-chat-text">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {userMessage.content}
+                              </ReactMarkdown>
+                            </div>
                           </div>
+                        </article>
+                      );
+                    })}
+                    {isStreaming &&
+                      !visibleMessageGroups[visibleMessageGroups.length - 1]
+                        ?.isGroup && (
+                        <div className="wb-thinking">
+                          <Sparkles size={15} /> 主 Agent 正在处理任务…
                         </div>
-                      </article>
-                    ))}
-                    {isStreaming && (
-                      <div className="wb-thinking">
-                        <Sparkles size={15} /> 主 Agent 正在处理任务…
-                      </div>
-                    )}
+                      )}
                     {hasPendingApproval && (
                       <div className="wb-approval">
                         <Wrench size={17} />
@@ -2657,6 +3051,7 @@ export default function HomePage() {
                     <Dropdown
                       trigger={["click"]}
                       placement="topLeft"
+                      overlayClassName="wb-theme-popup"
                       menu={{
                         items: agentMenuItems,
                         onClick: handleAgentMenu,
@@ -2688,6 +3083,7 @@ export default function HomePage() {
                     <Dropdown
                       trigger={["click"]}
                       placement="topLeft"
+                      overlayClassName="wb-theme-popup"
                       menu={{
                         items: modelMenuItems,
                         onClick: handleModelMenu,
@@ -2713,6 +3109,7 @@ export default function HomePage() {
                     <Dropdown
                       trigger={["click"]}
                       placement="topLeft"
+                      overlayClassName="wb-theme-popup"
                       menu={{ items: plusMenuItems, onClick: handlePlusMenu }}
                     >
                       <button
@@ -2892,6 +3289,7 @@ export default function HomePage() {
               </div>
               <Select
                 value={currentLocale}
+                classNames={{ popup: { root: "wb-theme-popup" } }}
                 style={{ width: 170 }}
                 onChange={(v) => void handleLocaleChange(v)}
                 options={[
@@ -2926,14 +3324,36 @@ export default function HomePage() {
             </div>
             <div
               className="wb-set-gallery"
-              role="list"
+              role="group"
               aria-label={t("workbench.home.themeGallery.title")}
             >
-              {THEME_GALLERY_OPTIONS.map((key) => (
-                <div className="wb-set-gallery-card" key={key} role="listitem">
-                  <span>{t(`workbench.home.themeGallery.themes.${key}`)}</span>
-                </div>
-              ))}
+              {THEME_GALLERY_OPTIONS.map((option) => {
+                const selected = skin === option.id;
+                return (
+                  <button
+                    className={
+                      "wb-set-gallery-card" + (selected ? " is-active" : "")
+                    }
+                    key={option.id}
+                    type="button"
+                    aria-label={t(
+                      `workbench.home.themeGallery.themes.${option.galleryKey}`,
+                    )}
+                    aria-pressed={selected}
+                    style={{
+                      backgroundImage: `linear-gradient(180deg, rgba(8, 15, 28, 0.02) 25%, rgba(8, 15, 28, 0.62) 100%), url("${option.image}")`,
+                    }}
+                    onClick={() => setSkin(option.id)}
+                  >
+                    <span>
+                      {t(
+                        `workbench.home.themeGallery.themes.${option.galleryKey}`,
+                      )}
+                    </span>
+                    {selected ? <Check size={14} aria-hidden="true" /> : null}
+                  </button>
+                );
+              })}
               <div
                 className="wb-set-gallery-card is-coming-soon"
                 role="listitem"

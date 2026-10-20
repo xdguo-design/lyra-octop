@@ -56,6 +56,7 @@ async def submit_review_pull_request(
         "X-GitHub-Api-Version": "2022-11-28",
     }
     async with httpx.AsyncClient(timeout=20, trust_env=False, follow_redirects=False) as client:
+
         async def github(method: str, endpoint: str, **kwargs: Any) -> dict[str, Any]:
             response = await client.request(
                 method, _REPOSITORY_API + endpoint, headers=headers, **kwargs
@@ -74,9 +75,7 @@ async def submit_review_pull_request(
         base_sha = dev.get("object", {}).get("sha")
         if not isinstance(base_sha, str) or not re.fullmatch(r"[a-f0-9]{40}", base_sha):
             raise FreeLLMSyncError("Cannot resolve the FreeLLM dev branch")
-        await github(
-            "POST", "/git/refs", json={"ref": f"refs/heads/{branch}", "sha": base_sha}
-        )
+        await github("POST", "/git/refs", json={"ref": f"refs/heads/{branch}", "sha": base_sha})
         await github(
             "PUT",
             "/contents/" + path,

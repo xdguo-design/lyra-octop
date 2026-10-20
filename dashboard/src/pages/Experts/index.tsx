@@ -218,8 +218,8 @@ export default function ExpertsPage() {
   const ownedAgents = useMemo(() => ownedExperts(agents), [agents]);
   const [localAgents, setLocalAgents] = useState<OctopAgent[]>(ownedAgents);
   const expertAgents = useMemo(
-    () => localAgents.filter((item) => item.kind !== "team"),
-    [localAgents],
+    () => agents.filter((item) => item.kind !== "team"),
+    [agents],
   );
   const teamAgents = useMemo(
     () => localAgents.filter((item) => item.kind === "team"),
@@ -520,7 +520,8 @@ export default function ExpertsPage() {
                   }}
                   onEdit={(id) =>
                     setEditAgent(
-                      localAgents.find((a) => a.agent_id === id) ?? null,
+                      visibleExpertAgents.find((a) => a.agent_id === id) ??
+                        null,
                     )
                   }
                   onDeleted={handleDeleted}

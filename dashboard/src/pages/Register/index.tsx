@@ -3,21 +3,23 @@ import { useNavigate } from "react-router-dom";
 import { Input, Button } from "antd";
 import { message } from "@/utils/antdMessage";
 
-import { User, Lock, IdCard } from "lucide-react";
+import { Mail, KeyRound, Lock, IdCard } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { clearAuthToken } from "../../api";
 import { authApi } from "../../api/modules/auth";
 import { apiErrorMessage } from "../../utils/apiError";
 import { applyGuestLocale } from "../../utils/locale";
-import { useTheme } from "../../context/ThemeContext";
 import CaptchaField, { type CaptchaFieldHandle } from "../Login/CaptchaField";
 import { type PublicCaptchaConfig } from "../Login/captchaAdapters";
 
 export default function RegisterPage() {
   const { t } = useTranslation();
-  const { isDark } = useTheme();
   const navigate = useNavigate();
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [emailCode, setEmailCode] = useState("");
+  const [sentEmail, setSentEmail] = useState("");
+  const [sendingCode, setSendingCode] = useState(false);
+  const [codeCooldown, setCodeCooldown] = useState(0);
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -29,6 +31,16 @@ export default function RegisterPage() {
     provider: "slider",
   });
   const captchaRef = useRef<CaptchaFieldHandle>(null);
+  const normalizedEmail = email.trim().toLowerCase();
+
+  useEffect(() => {
+    if (codeCooldown <= 0) return;
+    const timer = window.setTimeout(
+      () => setCodeCooldown((remaining) => Math.max(0, remaining - 1)),
+      1000,
+    );
+    return () => window.clearTimeout(timer);
+  }, [codeCooldown]);
 
   useEffect(() => {
     void applyGuestLocale();
@@ -64,26 +76,49 @@ export default function RegisterPage() {
   };
 
   const handleRegister = async () => {
-    if (!username || !password || !captchaReady) return;
+    if (
+      !normalizedEmail ||
+      !emailCode ||
+      sentEmail !== normalizedEmail ||
+      !password
+    )
+      return;
     if (password !== confirmPassword) {
       message.error(t("register.passwordMismatch"));
       return;
     }
     setLoading(true);
     try {
-      const token = await captchaRef.current?.getToken();
       await authApi.register({
-        username: username.trim(),
+        email: normalizedEmail,
+        email_code: emailCode,
         password,
         display_name: displayName.trim() || null,
-        captcha_token: token,
       });
       setDone(true);
     } catch (err) {
       message.error(apiErrorMessage(err, t("register.failed"), t));
-      resetCaptcha();
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSendCode = async () => {
+    if (!normalizedEmail || !captchaReady || codeCooldown > 0) return;
+    setSendingCode(true);
+    try {
+      const token = await captchaRef.current?.getToken();
+      await authApi.sendRegistrationCode(normalizedEmail, token);
+      setSentEmail(normalizedEmail);
+      setEmailCode("");
+      setCodeCooldown(60);
+      message.success(t("register.codeSent"));
+      resetCaptcha();
+    } catch (err) {
+      message.error(apiErrorMessage(err, t("register.codeSendFailed"), t));
+      resetCaptcha();
+    } finally {
+      setSendingCode(false);
     }
   };
 
@@ -117,19 +152,52 @@ export default function RegisterPage() {
           margin: "0 16px",
         }}
       >
-        <img
-          src={
-            isDark ? "/logo_horizontal_white.png" : "/logo_horizontal_dark.png"
-          }
-          alt="Octop"
+        <div
+          role="img"
+          aria-label="LYRA 私有云工作台"
           style={{
-            height: 48,
-            width: "auto",
-            maxWidth: 260,
-            objectFit: "contain",
-            display: "block",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
           }}
-        />
+        >
+          <img
+            src="/lyra-dino.svg"
+            alt=""
+            style={{
+              height: 56,
+              width: 56,
+              objectFit: "contain",
+              display: "block",
+            }}
+          />
+          <span
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: 3,
+              color: "var(--fn-text-primary)",
+              fontSize: 25,
+              fontWeight: 800,
+              lineHeight: 1.05,
+              letterSpacing: "0.02em",
+            }}
+          >
+            LYRA
+            <small
+              style={{
+                fontSize: 12,
+                fontWeight: 400,
+                lineHeight: 1.3,
+                letterSpacing: "0.08em",
+                color: "var(--fn-text-tertiary)",
+              }}
+            >
+              私有云工作台
+            </small>
+          </span>
+        </div>
 
         {done ? (
           <>
@@ -153,7 +221,9 @@ export default function RegisterPage() {
                 textAlign: "center",
               }}
             >
-              {t("register.submittedHint", { username })}
+              {t("register.submittedHint", {
+                email: sentEmail || normalizedEmail,
+              })}
             </p>
             <Button
               type="primary"
@@ -181,18 +251,59 @@ export default function RegisterPage() {
 
             <Input
               prefix={
-                <User
+                <Mail
                   size={16}
                   style={{ color: "var(--fn-text-quaternary)" }}
                 />
               }
-              placeholder={t("register.username")}
+              placeholder={t("register.email")}
+              type="email"
+              maxLength={254}
               size="large"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              value={email}
+              onChange={(e) => {
+                const nextEmail = e.target.value;
+                setEmail(nextEmail);
+                if (nextEmail.trim().toLowerCase() !== sentEmail) {
+                  setSentEmail("");
+                  setEmailCode("");
+                  setCodeCooldown(0);
+                }
+              }}
               autoFocus
               style={{ borderRadius: 10 }}
             />
+
+            <div style={{ display: "flex", gap: 8, width: "100%" }}>
+              <Input
+                prefix={
+                  <KeyRound
+                    size={16}
+                    style={{ color: "var(--fn-text-quaternary)" }}
+                  />
+                }
+                placeholder={t("register.emailCode")}
+                inputMode="numeric"
+                maxLength={6}
+                size="large"
+                value={emailCode}
+                onChange={(e) =>
+                  setEmailCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+                }
+                style={{ borderRadius: 10, flex: 1, minWidth: 0 }}
+              />
+              <Button
+                size="large"
+                loading={sendingCode}
+                disabled={!normalizedEmail || !captchaReady || codeCooldown > 0}
+                onClick={() => void handleSendCode()}
+                style={{ borderRadius: 10, flexShrink: 0 }}
+              >
+                {codeCooldown > 0
+                  ? t("register.resendCountdown", { seconds: codeCooldown })
+                  : t("register.sendCode")}
+              </Button>
+            </div>
 
             <Input
               prefix={
@@ -253,7 +364,11 @@ export default function RegisterPage() {
               loading={loading}
               onClick={handleRegister}
               disabled={
-                !username || !password || !confirmPassword || !captchaReady
+                !normalizedEmail ||
+                emailCode.length !== 6 ||
+                sentEmail !== normalizedEmail ||
+                !password ||
+                !confirmPassword
               }
               style={{ borderRadius: 10, height: 44, fontWeight: 500 }}
             >

@@ -163,14 +163,23 @@ function ChatPageInner() {
       ((location.state as { prefillInput?: string } | null)?.prefillInput ??
         ""),
   );
+  // Set when navigated from the speech page: start composer dictation as soon
+  // as the composer handle exists (speech page no longer records itself).
+  const autoVoiceRef = useRef(
+    Boolean((location.state as { autoVoice?: boolean } | null)?.autoVoice),
+  );
   // Imperative handle to push a new prefill into the already-mounted ChatInput.
   const chatInputRef = useRef<ChatInputHandle | null>(null);
 
   // Clear the router state after consuming prefillInput so it doesn't persist
   // on subsequent visits or page refreshes.
   useEffect(() => {
-    if (prefillInputRef.current) {
+    if (prefillInputRef.current || autoVoiceRef.current) {
       navigate(location.pathname, { replace: true, state: {} });
+    }
+    if (autoVoiceRef.current) {
+      autoVoiceRef.current = false;
+      chatInputRef.current?.startVoiceInput();
     }
     // Only run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps

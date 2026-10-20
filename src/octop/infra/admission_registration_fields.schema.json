@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://octop.local/contracts/admission-registration/v1/fields",
+  "title": "AdmissionRegistrationFields",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "idNumber", "phone", "nationality", "ethnicity", "nativeRegion", "residentRegion", "addressDetail", "employerName", "employerAddress", "marriage", "occupation", "emergencyContact", "relationship"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+    "idNumber": { "type": "string", "minLength": 1, "maxLength": 32 },
+    "phone": { "type": "string", "pattern": "^1[3-9][0-9]{9}$" },
+    "nationality": { "type": "string", "minLength": 1, "maxLength": 40 },
+    "ethnicity": { "type": "string", "minLength": 1, "maxLength": 40 },
+    "nativeRegion": { "$ref": "#/$defs/region" },
+    "residentRegion": { "$ref": "#/$defs/region" },
+    "addressDetail": { "type": "string", "maxLength": 200 },
+    "employerName": { "$ref": "#/$defs/workText" },
+    "employerAddress": { "$ref": "#/$defs/workText" },
+    "marriage": { "enum": ["未婚", "已婚", "离异", "丧偶"] },
+    "occupation": { "enum": ["职工", "农民", "退休", "无业", "学生", "其他"] },
+    "emergencyContact": { "type": "string", "minLength": 1, "maxLength": 40, "pattern": "^[A-Za-z\\u4e00-\\u9fff· ]+$" },
+    "relationship": { "enum": ["配偶", "子女", "父母", "祖父母/外祖父母", "孙辈/外孙辈", "兄弟姐妹", "其他亲属", "非亲属"] }
+  },
+  "$defs": {
+    "region": { "type": "array", "items": { "type": "string", "minLength": 1 }, "oneOf": [{ "maxItems": 0 }, { "minItems": 2, "maxItems": 2 }, { "minItems": 3, "maxItems": 3 }] },
+    "workText": { "type": "string", "maxLength": 50, "pattern": "^[A-Za-z0-9\\u4e00-\\u9fff·（）()\\- ]*$" }
+  }
+}

@@ -1,4 +1,9 @@
 {
+    "email_registration": {
+        "subject": "Your Octop verification code",
+        "body": "Your verification code is {code}. It expires in 10 minutes. If you did not request it, ignore this email.",
+        "pending_message": "Registration submitted. An administrator must approve this account before you can sign in."
+    },
     "slash": {
         "error": {
             "unknown_command": "Unknown command: /{name}. Type /help for available commands."
@@ -400,6 +405,9 @@
         "USERNAME_TAKEN": "Username is already taken.",
         "EMAIL_TAKEN": "Email is already taken.",
         "EMAIL_INVALID": "Invalid email address.",
+        "EMAIL_VERIFICATION_FAILED": "The email verification code is invalid or expired.",
+        "EMAIL_DELIVERY_UNAVAILABLE": "Email verification is not configured on this server.",
+        "EMAIL_DELIVERY_FAILED": "The verification email could not be sent. Try again later.",
         "PASSWORD_SAME_AS_OLD": "New password must be different from the current password.",
         "PASSWORD_NOT_SET": "This account signs in through a directory and has no local password to change.",
         "PASSWORD_TOO_WEAK": "Password is too weak: at least 8 characters with letters and digits.",
@@ -452,6 +460,10 @@
         "SLASH_BAD_ARGS": "Invalid arguments.",
         "ATTACHMENT_UNSUPPORTED_TYPE": "This file type is not supported.",
         "ATTACHMENT_TOO_LARGE": "This attachment exceeds the {max_mb} MB size limit.",
+        "FILE_READ_BUSY": "The file reader is busy. Retry in a moment.",
+        "FILE_READ_TOO_LARGE": "This file exceeds the automatic read size limit.",
+        "FILE_INTEGRITY_FAILED": "The stored file changed after upload and cannot be read as this revision.",
+        "FILE_READ_FAILED": "The file could not be read safely.",
         "VOICE_BROWSER_ONLY": "Voice input is only available in the browser.",
         "VOICE_KIND_UNSUPPORTED": "Unsupported voice provider.",
         "VOICE_CAPABILITY_MISMATCH": "Voice capability does not match.",
@@ -741,7 +753,8 @@
         "model_call_failed": "The model call failed after several retries. Wait a moment and retry. If it keeps failing, check the model settings or switch models.",
         "model_call_failed_detail": "The model call failed: {detail}",
         "model_retry_prompt": "The model API request failed. Do not pretend the task succeeded.\n\nWhat happened: {guidance}\n\nExplain this to the user in their language and suggest the next step. Do not retry the same failing request unchanged.\n\nTechnical detail: {detail}",
-        "path_outside_root": "The file path is outside this expert's storage root, so it cannot be read or written. Use a path under the storage root, or widen the storage root in expert settings (on Windows, set an explicit drive path such as D:/octop-data)."
+        "path_outside_root": "This file is outside the expert's authorized workspace. Attach it to this chat to let the agent read it and return an edited copy; the original file will not be changed.",
+        "path_outside_root_recovery": "The requested host path is outside the authorized workspace. Do not search the host filesystem, guess virtual paths, or suggest widening access. If this file is already attached to the conversation, use the workspace-relative path supplied with that attachment. Otherwise, ask the user to attach or drop the file into chat. Use the available tools for its format, save the edited result as a separate file under outbound/, and provide it with send_file_to_user. Never overwrite the source or claim to have read or edited a file until the tools confirm success."
     },
     "attachment": {
         "header": "[Attachment] {filename}",
@@ -927,6 +940,36 @@
         "version_unavailable": "The installer finished, but the installed Octop version could not be verified.",
         "version_mismatch": "The installer finished, but installed version {actual} does not match requested version {expected}.",
         "version_not_newer": "The installer finished, but installed version {actual} is not newer than {previous}."
+    },
+    "api": {
+        "channels": {
+            "dingtalk_authorization_failed": "DingTalk authorization failed.",
+            "dingtalk_connection_check_failed": "DingTalk connection check failed.",
+            "dingtalk_missing_client_id": "DingTalk did not return a client ID.",
+            "dingtalk_missing_client_secret": "DingTalk did not return a client secret.",
+            "dingtalk_registration_not_found": "DingTalk registration session not found.",
+            "dingtalk_registration_poll_failed": "Failed to poll DingTalk application registration.",
+            "dingtalk_registration_start_failed": "Failed to start DingTalk application registration.",
+            "dingtalk_unknown_registration_status": "DingTalk returned an unknown registration status."
+        },
+        "validation": {
+            "skill_name_invalid": "Skill name is required and must not contain path separators or start with .",
+            "skill_display_name_too_long": "Skill display name is too long.",
+            "skill_label_too_long": "Localized skill label is too long.",
+            "skill_summary_too_long": "Localized skill summary is too long.",
+            "skill_icon_url_invalid": "Skill icon URL must use HTTP or HTTPS.",
+            "plugin_id_required": "A plugin_id is required for plugin tools.",
+            "subagent_slug_invalid": "Subagent slug is required and must not contain / or start with .",
+            "team_host_tools_fixed": "Team host tools are fixed to member dispatch.",
+            "tool_name_required": "A tool name is required.",
+            "mobile_device_required": "A device identifier is required.",
+            "mobile_device_required_when_enabling": "A device identifier is required to enable mobile device control.",
+            "mobile_device_not_connected": "ADB device is not connected: {device}",
+            "critical_tool_cannot_be_disabled": "Critical tool {tool} cannot be disabled.",
+            "memory_aux_model_unavailable": "Auxiliary model {model} is not enabled on a usable provider.",
+            "memory_extract_extra_body_object": "extract_extra_body must be a JSON object.",
+            "memory_extract_trigger_mode_invalid": "Extraction trigger mode must be idle or interval."
+        }
     },
     "ldap": {
         "test": {

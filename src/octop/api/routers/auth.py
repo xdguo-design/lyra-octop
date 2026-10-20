@@ -11,11 +11,12 @@ from pydantic import BaseModel, Field
 
 from octop.api.common.client_ip import resolve_client_ip
 from octop.api.deps import current_user, get_server, sign_token
+from octop.i18n import tr
 from octop.infra.auth.captcha import current_env, ensure_captcha, load_effective, public_config
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.email import normalize_email
 from octop.infra.users.permissions import effective_permissions
-from octop.infra.utils.locale import normalize_locale
+from octop.infra.utils.locale import normalize_locale, resolve_request_locale
 
 logger = logging.getLogger(__name__)
 
@@ -77,12 +78,20 @@ class ChangePasswordBody(BaseModel):
 
 
 class RegisterBody(BaseModel):
-    # Same charset the admin create-user form enforces; the public endpoint must
-    # not accept logins that the rest of the product cannot address.
-    username: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.-]+$")
+    email: str = Field(min_length=3, max_length=254)
+    email_code: str = Field(min_length=6, max_length=6, pattern=r"^[0-9]{6}$")
     password: str
-    captcha_token: str | None = Field(default=None, max_length=4096)
     display_name: str | None = None
+
+
+class RegisterCodeBody(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    captcha_token: str | None = Field(default=None, max_length=4096)
+
+
+class RegisterCodeResponse(BaseModel):
+    sent: bool
+    cooldown_seconds: int
 
 
 class CaptchaChallengeResponse(BaseModel):
@@ -108,18 +117,15 @@ async def get_captcha_challenge() -> CaptchaChallengeResponse:
 
 
 @router.post(
-    "/register", status_code=201, summary="Self-service registration (needs admin approval)"
+    "/register/code",
+    summary="Send an email verification code for registration",
+    response_model=RegisterCodeResponse,
 )
-async def register(
-    body: RegisterBody, request: Request, server: Any = Depends(get_server)
+async def request_registration_code(
+    body: RegisterCodeBody, request: Request, server: Any = Depends(get_server)
 ) -> dict[str, Any]:
-    """Create a pending account. It cannot sign in until an administrator approves it.
-
-    The captcha follows the active provider config: with the built-in ``image``
-    provider the token is ``<challenge_id>:<answer>``. Registration is rate
-    limited per client because the endpoint is unauthenticated.
-    """
-    from octop.infra.users.registration import register_public
+    """Send a one-time code after captcha verification and per-IP throttling."""
+    from octop.infra.users.registration import request_registration_code as send_code
 
     if server.user_manager.count() == 0:
         raise OctopError(ErrorCode.SETUP_REQUIRED, "initial admin not created")
@@ -128,19 +134,45 @@ async def register(
         server.services.secret_repo,
         current_env(),
     )
-    await ensure_captcha(effective, body.captcha_token, _client_ip(request))
-    user = await register_public(
+    client_ip = _client_ip(request)
+    await ensure_captcha(effective, body.captcha_token, client_ip)
+    await send_code(
+        services=server.services,
+        email=body.email,
+        client_id=client_ip,
+        locale=resolve_request_locale(request),
+    )
+    return {"sent": True, "cooldown_seconds": 60}
+
+
+@router.post(
+    "/register", status_code=201, summary="Self-service email registration (needs admin approval)"
+)
+async def register(
+    body: RegisterBody, request: Request, server: Any = Depends(get_server)
+) -> dict[str, Any]:
+    """Create a pending account. It cannot sign in until an administrator approves it.
+
+    The email code is one-time and is consumed before the account is created.
+    New accounts remain pending until an administrator approves them.
+    """
+    from octop.infra.users.registration import register_public as create_account
+
+    if server.user_manager.count() == 0:
+        raise OctopError(ErrorCode.SETUP_REQUIRED, "initial admin not created")
+    user = await create_account(
         user_manager=server.user_manager,
         services=server.services,
-        username=body.username,
+        email=body.email,
+        email_code=body.email_code,
         password=body.password,
         display_name=body.display_name,
-        client_id=_client_ip(request),
+        locale=resolve_request_locale(request),
     )
     return {
         "registered": True,
         "user": {"id": user.id, "username": user.username},
-        "message": "Registration submitted. An administrator must approve it before you can sign in.",
+        "message": tr("email_registration.pending_message", user.locale),
     }
 
 

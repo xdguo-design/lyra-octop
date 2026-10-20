@@ -303,6 +303,7 @@ function FileAttachmentList({
           filename={file.filename}
           agentId={agentId}
           workspacePath={file.workspacePath}
+          readStatus={file.readStatus}
         />
       ))}
     </div>

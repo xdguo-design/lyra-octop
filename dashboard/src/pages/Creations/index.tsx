@@ -15,7 +15,6 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import type { OctopAgent } from "../../context/AgentContext";
 import AuthImage from "../../components/AuthImage";
 import { request } from "../../api/request";
 import {
@@ -24,6 +23,7 @@ import {
   type CreationFolder,
   type CreationItem,
   type CreationItemInput,
+  type ProjectLaunchStatus,
 } from "../../api/modules/creations";
 import {
   BUILT_IN_CREATIONS,
@@ -32,12 +32,7 @@ import {
 import { message } from "../../utils/antdMessage";
 import "./creations.css";
 
-type CreationCategory =
-  | "platform"
-  | "service"
-  | "repository"
-  | "applet"
-  | "agent";
+type CreationCategory = "platform" | "service" | "repository" | "applet";
 
 interface BaseCreation {
   id: string;
@@ -49,20 +44,15 @@ interface BaseCreation {
 
 interface AppCreation extends BaseCreation {
   type: "app";
-  thumb: string;
+  thumb?: string;
   url: string;
+  route?: string;
 }
 
 interface ExternalCreation extends BaseCreation {
   type: "external";
-  thumb: string;
+  thumb?: string;
   url: string | null;
-}
-
-interface AgentCreation extends BaseCreation {
-  type: "agent";
-  agentId: string;
-  state: string;
 }
 
 interface UserCreation extends BaseCreation {
@@ -72,7 +62,7 @@ interface UserCreation extends BaseCreation {
   thumbnailUrl: string | null;
 }
 
-type Creation = AppCreation | ExternalCreation | AgentCreation | UserCreation;
+type Creation = AppCreation | ExternalCreation | UserCreation;
 type Dialog = "folder" | "entry" | "card" | null;
 
 function isGithubRepositoryUrl(value: string | null): boolean {
@@ -82,8 +72,28 @@ function isGithubRepositoryUrl(value: string | null): boolean {
     return (
       url.protocol === "https:" &&
       url.hostname === "github.com" &&
-      /^\/[^/]+\/[^/]+\/?$/.test(url.pathname) &&
-      !url.pathname.endsWith(".git") &&
+      /^\/[^/]+\/[^/]+(?:\.git)?\/?$/.test(url.pathname) &&
+      !url.search &&
+      !url.hash &&
+      !url.username &&
+      !url.password
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isLaunchableProjectUrl(value: string | null): boolean {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      url.hostname.toLowerCase() === "github.com" &&
+      !url.port &&
+      /^\/xdguo-design\/data-upload-product(?:\.git)?\/?$/i.test(
+        url.pathname,
+      ) &&
       !url.search &&
       !url.hash &&
       !url.username &&
@@ -100,12 +110,37 @@ function creationCategory(item: CreationItem): CreationCategory {
     : item.kind;
 }
 
+function creationUrlLabel(value: string): string | null {
+  try {
+    const hostname = new URL(value).hostname.replace(/^\[|\]$/g, "");
+    if (hostname.includes(":") || /^\d+(?:\.\d+){3}$/.test(hostname)) {
+      return null;
+    }
+    return value.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  } catch {
+    return null;
+  }
+}
+
+function hasUrlCredentials(value: string): boolean {
+  try {
+    const url = new URL(value);
+    const authority = value.match(/^https?:\/\/([^/?#]*)/i)?.[1] ?? "";
+    return Boolean(url.username || url.password || authority.includes("@"));
+  } catch {
+    return false;
+  }
+}
+
 function creationThumbnail(creation: Creation): string | null {
   if (creation.type === "app" || creation.type === "external") {
-    return creation.thumb;
+    return creation.thumb || null;
   }
   if (creation.type === "service" && creation.thumbnailUrl) {
     return creation.thumbnailUrl;
+  }
+  if (creation.type === "service" && isLaunchableProjectUrl(creation.url)) {
+    return "/workbench/thumbs/data-upload-product.png";
   }
   if (creation.type === "service" && creation.url) {
     const hostname = new URL(creation.url).hostname.replace(/^www\./, "");
@@ -125,28 +160,6 @@ function loadStarred(): Set<string> {
   }
 }
 
-function agentsToCreations(
-  agents: OctopAgent[],
-  cardFolders: Record<string, string>,
-  t: (key: string, options?: { defaultValue?: string }) => string,
-): AgentCreation[] {
-  return agents
-    .filter((agent) => !agent.bridge)
-    .map((agent) => ({
-      type: "agent" as const,
-      id: "agent:" + agent.agent_id,
-      agentId: agent.agent_id,
-      title: agent.name || agent.agent_id,
-      desc: `${t(`creationsPage.agentKinds.${agent.kind ?? "other"}`)} · ${t(
-        `creationsPage.agentStates.${agent.state ?? "unknown"}`,
-        { defaultValue: agent.state ?? t("creationsPage.agentStates.unknown") },
-      )}`,
-      category: "agent" as const,
-      state: agent.state,
-      folderId: cardFolders[`agent:${agent.agent_id}`] ?? null,
-    }));
-}
-
 export default function CreationsPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -154,8 +167,10 @@ export default function CreationsPage() {
   const [tab, setTab] = useState<CreationCategory | "all">("all");
   const [selectedFolder, setSelectedFolder] = useState("all");
   const [starred, setStarred] = useState<Set<string>>(loadStarred);
-  const [agents, setAgents] = useState<OctopAgent[]>([]);
-  const [agentsLoading, setAgentsLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [launchStatuses, setLaunchStatuses] = useState<
+    Record<string, ProjectLaunchStatus>
+  >({});
   const [folders, setFolders] = useState<CreationFolder[]>([]);
   const [items, setItems] = useState<CreationItem[]>([]);
   const [cardFolders, setCardFolders] = useState<Record<string, string>>({});
@@ -164,6 +179,10 @@ export default function CreationsPage() {
   );
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [projectPreview, setProjectPreview] = useState<{
+    title: string;
+    url: string;
+  } | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [entryKind, setEntryKind] = useState<CreationItem["kind"]>("platform");
@@ -174,6 +193,7 @@ export default function CreationsPage() {
   );
   const [formName, setFormName] = useState("");
   const [formDescription, setFormDescription] = useState("");
+  const [formCategory, setFormCategory] = useState<CreationCategory>("applet");
   const [formUrl, setFormUrl] = useState("");
   const [formFolder, setFormFolder] = useState("");
   const [formSaving, setFormSaving] = useState(false);
@@ -190,15 +210,12 @@ export default function CreationsPage() {
 
   useEffect(() => {
     let alive = true;
-    void request<OctopAgent[]>("/agents")
+    void request<{ role?: string }>("/auth/me")
       .then((value) => {
-        if (alive) setAgents(Array.isArray(value) ? value : []);
+        if (alive) setIsAdmin(value.role === "admin");
       })
       .catch(() => {
-        if (alive) setAgents([]);
-      })
-      .finally(() => {
-        if (alive) setAgentsLoading(false);
+        if (alive) setIsAdmin(false);
       });
     void refreshCreations().catch(() => {
       if (alive) message.error(t("creationsPage.messages.loadFailed"));
@@ -208,6 +225,35 @@ export default function CreationsPage() {
     };
   }, [refreshCreations, t]);
 
+  useEffect(() => {
+    if (!isAdmin) return;
+    let alive = true;
+    const targets = items.filter(
+      (item) => item.kind === "service" && isLaunchableProjectUrl(item.url),
+    );
+    void Promise.all(
+      targets.map(async (item) => {
+        try {
+          return [
+            item.item_id,
+            await creationsApi.launchStatus(item.item_id),
+          ] as const;
+        } catch {
+          return null;
+        }
+      }),
+    ).then((results) => {
+      if (!alive) return;
+      setLaunchStatuses((previous) => ({
+        ...previous,
+        ...Object.fromEntries(results.filter((result) => result !== null)),
+      }));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [isAdmin, items]);
+
   const creations = useMemo<Creation[]>(() => {
     const apps = BUILT_IN_CREATIONS.filter((app) => app.type === "app").map(
       (app) => {
@@ -216,6 +262,7 @@ export default function CreationsPage() {
           ...app,
           title: meta?.name?.trim() || t(app.titleKey),
           desc: meta?.description?.trim() || t(app.descriptionKey),
+          category: meta?.category ?? app.category,
           folderId: cardFolders[`app:${app.id}`] ?? null,
         };
       },
@@ -228,10 +275,10 @@ export default function CreationsPage() {
         ...item,
         title: meta?.name?.trim() || t(item.titleKey),
         desc: meta?.description?.trim() || t(item.descriptionKey),
+        category: meta?.category ?? item.category,
         folderId: cardFolders[`app:${item.id}`] ?? null,
       };
     });
-    const agentsList = agentsToCreations(agents, cardFolders, t);
     const userItems = items.map((item) => ({
       type: item.kind,
       id: item.item_id,
@@ -249,8 +296,8 @@ export default function CreationsPage() {
       url: item.url,
       thumbnailUrl: item.thumbnail_url,
     }));
-    return [...userItems, ...apps, ...manusApps, ...agentsList];
-  }, [agents, cardFolders, cardMeta, items, t]);
+    return [...userItems, ...apps, ...manusApps];
+  }, [cardFolders, cardMeta, items, t]);
 
   const categories: Array<CreationCategory | "all"> = [
     "all",
@@ -258,7 +305,6 @@ export default function CreationsPage() {
     "applet",
     "service",
     "repository",
-    "agent",
   ];
   const visible = useMemo(() => {
     const kw = keyword.trim().toLowerCase();
@@ -387,6 +433,7 @@ export default function CreationsPage() {
     const meta = cardMeta[`app:${creation.id}`];
     setFormName(meta?.name || t(source.titleKey));
     setFormDescription(meta?.description || t(source.descriptionKey));
+    setFormCategory(meta?.category ?? source.category);
     setFormUrl("");
     setFormFolder("");
     setDialog("card");
@@ -402,6 +449,15 @@ export default function CreationsPage() {
       message.error(t("creationsPage.messages.invalidGithubUrl"));
       return;
     }
+    if (
+      dialog === "entry" &&
+      entryKind !== "platform" &&
+      formUrl.trim() &&
+      hasUrlCredentials(formUrl.trim())
+    ) {
+      message.error(t("creationsPage.messages.urlCredentialsNotAllowed"));
+      return;
+    }
     setFormSaving(true);
     try {
       if (dialog === "folder") {
@@ -412,9 +468,11 @@ export default function CreationsPage() {
         }
       } else if (dialog === "card" && editingCardId) {
         const cardId = editingCardId.slice("app:".length);
+        const source = BUILT_IN_CREATIONS.find((item) => item.id === cardId);
         const saved = await creationsApi.setCardMeta("app", cardId, {
           name: formName.trim() || null,
           description: formDescription.trim() || null,
+          category: source ? formCategory : null,
         });
         setCardMeta((previous) => ({ ...previous, [editingCardId]: saved }));
       } else if (dialog === "entry") {
@@ -469,9 +527,17 @@ export default function CreationsPage() {
   };
 
   const openCreation = (creation: Creation) => {
-    if (creation.type === "agent") return;
-    if (creation.type === "app") setOpenId(creation.id);
-    else if (creation.type === "external") {
+    if (creation.type === "service" && isLaunchableProjectUrl(creation.url)) {
+      if (isAdmin) void openProjectPreview(creation);
+      else if (creation.url)
+        window.open(creation.url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    if (creation.type === "app" && creation.route) navigate(creation.route);
+    else if (creation.type === "app") {
+      setProjectPreview(null);
+      setOpenId(creation.id);
+    } else if (creation.type === "external") {
       if (creation.url)
         window.open(creation.url, "_blank", "noopener,noreferrer");
     } else if (
@@ -487,6 +553,58 @@ export default function CreationsPage() {
           }),
         },
       });
+    }
+  };
+
+  const launchProject = async (itemId: string, stop = false) => {
+    if (!stop) {
+      setLaunchStatuses((previous) => ({
+        ...previous,
+        [itemId]: {
+          status: "starting",
+          url: null,
+          logs: null,
+          thumbnail_url: null,
+        },
+      }));
+    }
+    try {
+      const status = stop
+        ? await creationsApi.stopProject(itemId)
+        : await creationsApi.startProject(itemId);
+      setLaunchStatuses((previous) => ({ ...previous, [itemId]: status }));
+      if (status.thumbnail_url) {
+        setItems((previous) =>
+          previous.map((item) =>
+            item.item_id === itemId
+              ? { ...item, thumbnail_url: status.thumbnail_url }
+              : item,
+          ),
+        );
+      }
+      if (status.status === "failed")
+        message.error(
+          `${t("creationsPage.actions.previewFailed")}${
+            status.logs ? `: ${status.logs}` : ""
+          }`,
+        );
+      return status;
+    } catch {
+      message.error(t("creationsPage.actions.previewFailed"));
+      return null;
+    }
+  };
+
+  const openProjectPreview = async (creation: UserCreation) => {
+    const current = launchStatuses[creation.itemId];
+    if (current?.status === "starting") return;
+    const status =
+      current?.status === "running" && current.url
+        ? current
+        : await launchProject(creation.itemId);
+    if (status?.status === "running" && status.url) {
+      setOpenId(null);
+      setProjectPreview({ title: creation.title, url: status.url });
     }
   };
 
@@ -515,11 +633,8 @@ export default function CreationsPage() {
           ),
         );
       } else {
-        const cardType = creation.type === "agent" ? "agent" : "app";
-        const cardId =
-          creation.type === "agent" ? creation.agentId : creation.id;
-        await creationsApi.setCardFolder(cardType, cardId, nextFolder);
-        const key = `${cardType}:${cardId}`;
+        await creationsApi.setCardFolder("app", creation.id, nextFolder);
+        const key = `app:${creation.id}`;
         setCardFolders((previous) => {
           const next = { ...previous };
           if (nextFolder) next[key] = nextFolder;
@@ -590,6 +705,7 @@ export default function CreationsPage() {
         desc: t(openedSource.descriptionKey),
       }
     : null;
+  const activePreview = opened ?? projectPreview;
 
   return (
     <div className="cr-page">
@@ -734,19 +850,14 @@ export default function CreationsPage() {
       </div>
 
       <div className="cr-grid">
-        {agentsLoading ? (
-          <p className="cr-loading">
-            {t("creationsPage.builtIn.agentLoading")}
-          </p>
-        ) : null}
         {visible.map((creation) => {
           const thumbnail = creationThumbnail(creation);
+          const urlLabel = creation.url ? creationUrlLabel(creation.url) : null;
           return (
             <div key={creation.id} className="cr-card">
               <button
                 type="button"
                 className="cr-thumb"
-                disabled={creation.type === "agent"}
                 onClick={() => openCreation(creation)}
                 aria-label={
                   creation.type === "platform"
@@ -765,11 +876,12 @@ export default function CreationsPage() {
                     alt=""
                     loading="lazy"
                     draggable={false}
+                    className={
+                      thumbnail === "/workbench/thumbs/data-upload-product.png"
+                        ? "cr-thumb-fit"
+                        : undefined
+                    }
                   />
-                ) : creation.type === "agent" ? (
-                  <span className="cr-thumb-agent">
-                    <img src="/lyra-dino.svg" alt="" draggable={false} />
-                  </span>
                 ) : (
                   <span className={`cr-thumb-symbol cr-thumb-${creation.type}`}>
                     {creation.type === "platform" ? (
@@ -786,20 +898,90 @@ export default function CreationsPage() {
                 )}
               </button>
               <div className="cr-body">
-                <strong className="cr-name">{creation.title}</strong>
-                <small className="cr-meta">{creation.desc}</small>
+                {creation.type === "service" &&
+                isLaunchableProjectUrl(creation.url) ? (
+                  <button
+                    type="button"
+                    className="cr-name cr-name-action"
+                    aria-label={t("creationsPage.actions.open", {
+                      name: creation.title,
+                    })}
+                    onClick={() => openCreation(creation)}
+                  >
+                    {creation.title}
+                  </button>
+                ) : (
+                  <strong className="cr-name">{creation.title}</strong>
+                )}
+                <small className="cr-meta" title={creation.desc}>
+                  {creation.desc}
+                </small>
                 {(creation.type === "app" ||
                   creation.type === "service" ||
                   creation.type === "external") &&
-                  creation.url && (
-                    <span className="cr-link" title={creation.url}>
-                      {creation.url
-                        .replace(/^https?:\/\//, "")
-                        .replace(/\/$/, "")}
+                  urlLabel &&
+                  (creation.type === "service" &&
+                  isLaunchableProjectUrl(creation.url) ? (
+                    <a
+                      className="cr-link"
+                      href={creation.url ?? undefined}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={urlLabel}
+                    >
+                      {urlLabel}
+                    </a>
+                  ) : (
+                    <span className="cr-link" title={urlLabel}>
+                      {urlLabel}
                     </span>
-                  )}
+                  ))}
               </div>
               <div className="cr-actions">
+                {isAdmin &&
+                  creation.type === "service" &&
+                  isLaunchableProjectUrl(creation.url) && (
+                    <>
+                      {launchStatuses[creation.itemId]?.status === "running" ? (
+                        <>
+                          <button
+                            type="button"
+                            className="cr-act"
+                            onClick={() => {
+                              const url = launchStatuses[creation.itemId]?.url;
+                              if (url) void openProjectPreview(creation);
+                            }}
+                          >
+                            {t("creationsPage.actions.openPreview")}
+                          </button>
+                          <button
+                            type="button"
+                            className="cr-act"
+                            onClick={() =>
+                              void launchProject(creation.itemId, true)
+                            }
+                          >
+                            {t("creationsPage.actions.stopPreview")}
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className="cr-act"
+                          disabled={
+                            launchStatuses[creation.itemId]?.status ===
+                            "starting"
+                          }
+                          onClick={() => void launchProject(creation.itemId)}
+                        >
+                          {launchStatuses[creation.itemId]?.status ===
+                          "starting"
+                            ? t("creationsPage.actions.startingPreview")
+                            : t("creationsPage.actions.startPreview")}
+                        </button>
+                      )}
+                    </>
+                  )}
                 {creation.type === "platform" && (
                   <button
                     type="button"
@@ -818,7 +1000,7 @@ export default function CreationsPage() {
                     {t("creationsPage.actions.openWork")}
                   </button>
                 )}
-                {creation.type !== "agent" && creation.type !== "external" && (
+                {creation.type !== "external" && (
                   <button
                     type="button"
                     className="cr-act"
@@ -927,7 +1109,7 @@ export default function CreationsPage() {
             </div>
           );
         })}
-        {!agentsLoading && visible.length === 0 && (
+        {visible.length === 0 && (
           <p className="cr-empty">{t("creationsPage.messages.empty")}</p>
         )}
       </div>
@@ -993,6 +1175,35 @@ export default function CreationsPage() {
                     rows={3}
                   />
                 </label>
+                {dialog === "card" &&
+                  BUILT_IN_CREATIONS.some(
+                    (item) => `app:${item.id}` === editingCardId,
+                  ) && (
+                    <label>
+                      {t("creationsPage.dialog.category")}
+                      <select
+                        value={formCategory}
+                        onChange={(event) =>
+                          setFormCategory(
+                            event.target.value as CreationCategory,
+                          )
+                        }
+                      >
+                        <option value="platform">
+                          {t("creationsPage.categories.platform")}
+                        </option>
+                        <option value="applet">
+                          {t("creationsPage.categories.applet")}
+                        </option>
+                        <option value="service">
+                          {t("creationsPage.categories.service")}
+                        </option>
+                        <option value="repository">
+                          {t("creationsPage.categories.repository")}
+                        </option>
+                      </select>
+                    </label>
+                  )}
                 {dialog === "entry" &&
                   (entryKind === "service" || entryKind === "applet") && (
                     <label>
@@ -1084,26 +1295,35 @@ export default function CreationsPage() {
         </div>
       )}
 
-      {opened && (
+      {activePreview && (
         <div className="cr-overlay">
           <div className="cr-overlay-bar">
-            <button type="button" onClick={() => setOpenId(null)}>
+            <button
+              type="button"
+              onClick={() => {
+                setOpenId(null);
+                setProjectPreview(null);
+              }}
+            >
               <ArrowLeft size={15} />
               {t("creationsPage.title")}
             </button>
-            <span className="cr-overlay-title">{opened.title}</span>
+            <span className="cr-overlay-title">{activePreview.title}</span>
             <button
               type="button"
               className="cr-overlay-close"
               aria-label={t("common.close", "关闭")}
-              onClick={() => setOpenId(null)}
+              onClick={() => {
+                setOpenId(null);
+                setProjectPreview(null);
+              }}
             >
               <X size={15} />
             </button>
           </div>
           <iframe
-            src={opened.url}
-            title={`${opened.title} · 作品`}
+            src={activePreview.url}
+            title={`${activePreview.title} · 作品`}
             className="cr-overlay-frame"
             allow="clipboard-read; clipboard-write"
           />

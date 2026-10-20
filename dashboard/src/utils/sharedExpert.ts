@@ -9,6 +9,13 @@ export function isSharedExpertViewer(agent: SharedExpertAccess): boolean {
   return agent.is_shared === true && agent.is_owner === false;
 }
 
+export function canManageExpert(
+  agent: SharedExpertAccess,
+  isAdmin = false,
+): boolean {
+  return isAdmin || agent.is_owner !== false;
+}
+
 /** True when the current user may manage this expert (not a share-only viewer). */
 export function isOwnedExpert(agent: SharedExpertAccess): boolean {
   return !isSharedExpertViewer(agent);

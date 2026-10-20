@@ -134,7 +134,7 @@ class CreationRepo:
     def list_card_meta(self, owner_user_id: int) -> dict[str, dict[str, str | None]]:
         with self._db.connect() as conn:
             rows = conn.execute(
-                "SELECT card_type, card_id, name, description FROM creation_card_meta "
+                "SELECT card_type, card_id, name, description, category FROM creation_card_meta "
                 "WHERE owner_user_id = ?",
                 (owner_user_id,),
             ).fetchall()
@@ -142,6 +142,7 @@ class CreationRepo:
             f"{row['card_type']}:{row['card_id']}": {
                 "name": row["name"],
                 "description": row["description"],
+                "category": row["category"],
             }
             for row in rows
         }
@@ -154,14 +155,16 @@ class CreationRepo:
         card_id: str,
         name: str | None,
         description: str | None,
+        category: str | None,
     ) -> bool:
         with self._db.transaction() as conn:
             conn.execute(
-                "INSERT INTO creation_card_meta(owner_user_id, card_type, card_id, name, description, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(owner_user_id, card_type, card_id) "
+                "INSERT INTO creation_card_meta(owner_user_id, card_type, card_id, name, description, category, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(owner_user_id, card_type, card_id) "
                 "DO UPDATE SET name = excluded.name, description = excluded.description, "
+                "category = COALESCE(excluded.category, creation_card_meta.category), "
                 "updated_at = excluded.updated_at",
-                (owner_user_id, card_type, card_id, name, description, now_ts()),
+                (owner_user_id, card_type, card_id, name, description, category, now_ts()),
             )
         return True
 

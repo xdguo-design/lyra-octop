@@ -181,6 +181,9 @@ export function resolveExpertAvatarUrl(iconUrl?: string | null): string | null {
   if (url.startsWith("/api/agents/")) {
     return normalizeAgentScopedApiUrl(url);
   }
+  if (url.startsWith("/experts/avatars/") && !/[?&]v=2(?:&|$)/.test(url)) {
+    return `${url}${url.includes("?") ? "&" : "?"}v=2`;
+  }
   return url;
 }
 

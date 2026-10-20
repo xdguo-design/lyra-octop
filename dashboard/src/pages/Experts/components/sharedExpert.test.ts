@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canManageExpert,
   chatSkillCatalogAgentId,
   isOwnedExpert,
   isSharedExpertViewer,
@@ -7,6 +8,16 @@ import {
   ownedSoloExperts,
   ownedTeamAgents,
 } from "../../../utils/sharedExpert";
+
+describe("canManageExpert", () => {
+  it("lets administrators manage shared experts without granting ordinary viewers access", () => {
+    const shared = { is_shared: true, is_owner: false };
+    expect(canManageExpert(shared, true)).toBe(true);
+    expect(canManageExpert(shared, false)).toBe(false);
+    expect(canManageExpert({ is_owner: false }, false)).toBe(false);
+    expect(canManageExpert({ is_owner: true }, false)).toBe(true);
+  });
+});
 
 describe("isSharedExpertViewer", () => {
   it("identifies a shared expert viewed by someone other than its owner", () => {

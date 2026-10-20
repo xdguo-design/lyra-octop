@@ -6,7 +6,9 @@ const ExpertsPage = lazy(() => import("../pages/Experts"));
 const CronJobsPage = lazy(() => import("../pages/Control/CronJobs"));
 const ConnectorsPage = lazy(() => import("../pages/Agent/Connectors"));
 const SkillPackagesPage = lazy(() => import("../pages/SkillPackages"));
-const ResourceMarketplacePage = lazy(() => import("../pages/ResourceMarketplace"));
+const ResourceMarketplacePage = lazy(
+  () => import("../pages/ResourceMarketplace"),
+);
 const KnowledgeBasesPage = lazy(() => import("../pages/KnowledgeBases"));
 const BridgePage = lazy(() => import("../pages/Settings/Bridge"));
 const PersonalizationPage = lazy(

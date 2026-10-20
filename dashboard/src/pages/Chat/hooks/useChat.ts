@@ -343,6 +343,13 @@ function attachmentsFromInboundMeta(
         filename,
         mediaType: mediaType || undefined,
         workspacePath,
+        fileId: String(row.file_id || row.fileId || "") || undefined,
+        revisionId:
+          String(row.revision_id || row.revisionId || "") || undefined,
+        readStatus:
+          typeof row.read_status === "string"
+            ? (row.read_status as ChatAttachment["readStatus"])
+            : undefined,
         kind,
       } satisfies ChatAttachment;
     })

@@ -104,6 +104,31 @@ def test_loads_existing(tmp_path: Path):
     assert cfg.max_upload_mb == 100  # missing key uses default
 
 
+def test_loads_workbench_launch_profiles(tmp_path: Path):
+    profile = {
+        "repository_url": "https://github.com/xdguo-design/data-upload-product",
+        "relative_path": "data-upload-product",
+        "backend": {"command": "go", "args": ["run", "./cmd/server"]},
+        "frontend": {"command": "node", "args": ["doc/prototype/server.js"]},
+    }
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "workbench_code_root": "existing-code-root",
+                "workbench_launch_root": "trusted-launch-root",
+                "workbench_launch_profiles": [profile],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    cfg = load_config(path)
+    assert cfg.workbench_code_root == "existing-code-root"
+    assert cfg.workbench_launch_root == "trusted-launch-root"
+    assert cfg.workbench_launch_profiles == [profile]
+
+
 def test_loads_max_upload_mb(tmp_path: Path):
     cfg_path = tmp_path / "config.json"
     cfg_path.write_text(json.dumps({"max_upload_mb": 50}))

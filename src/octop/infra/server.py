@@ -32,6 +32,7 @@ from octop.infra.setup.password_file import WIZARD_FILE_NAME
 from octop.infra.setup.wizard_tokens import WizardTokenStore
 from octop.infra.users.manager import UserManager
 from octop.infra.utils.paths import PathLayout
+from octop.infra.workbench.project_service import ProjectServiceManager, parse_profiles
 
 if TYPE_CHECKING:
     from octop.infra.auth.ldap.service import LdapAuthService
@@ -254,6 +255,7 @@ class OctopServer:
         self.expert_catalog: ExpertCatalog | None = None
         self.subagent_catalog: SubagentCatalog | None = None
         self.plugin_manager: PluginManager | None = None
+        self.project_service_manager: ProjectServiceManager | None = None
         self.wizard_tokens = WizardTokenStore(ttl_seconds=300)
         self._started = False
         self._started_at: int | None = None
@@ -408,6 +410,10 @@ class OctopServer:
         assert self.services is not None
         assert self.expert_catalog is not None
         assert self.plugin_manager is not None
+        self.project_service_manager = ProjectServiceManager(
+            config.workbench_launch_root,
+            parse_profiles(config.workbench_launch_profiles),
+        )
 
         from octop.infra.utils.browser_media import (  # noqa: PLC0415
             configure_browser_idle_timeout,
@@ -566,6 +572,12 @@ class OctopServer:
             history_archive=history_archive,
             bridge_manager=bridge_mgr,
         )
+        from octop.infra.admission_demo import provision_admission_agent  # noqa: PLC0415
+
+        try:
+            await provision_admission_agent(self)
+        except Exception:
+            logger.exception("failed to provision the admission demo Agent")
         from octop.infra.knowledge.jobs import resume_pending_index_jobs  # noqa: PLC0415
 
         resume_pending_index_jobs(self.services)
@@ -611,6 +623,9 @@ class OctopServer:
         if not self._started:
             return
         try:
+            if self.project_service_manager is not None:
+                await self.project_service_manager.close()
+                self.project_service_manager = None
             from octop.infra.connectors.gateway import agently_auth
 
             await agently_auth.close()

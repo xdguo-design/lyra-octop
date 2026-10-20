@@ -15,7 +15,7 @@ import pytest
 
 import octop.infra.voice.adapters as voice_adapters
 from octop.infra.db.repos.voice_providers import VoiceProviderRow
-from octop.infra.voice.adapters import STTResult
+from octop.infra.voice.adapters import STTResult, _doubao_asr_response, _doubao_frame
 from octop.infra.voice.adapters import test_stt as probe_stt
 from octop.infra.voice.adapters import test_tts as probe_tts
 
@@ -95,6 +95,43 @@ async def test_openai_and_mimo_keep_api_key_check(
         }
         assert await probe_stt(_row(kind=kind), kind) == {"ok": True, "mode": kind}
         assert await probe_tts(_row(kind=kind), kind) == {"ok": True, "bytes": 5}
+
+
+@pytest.mark.asyncio
+async def test_doubao_probe_checks_key_and_dispatches_both_modes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(voice_adapters, "transcribe_doubao", _stt_ok)
+    monkeypatch.setattr(voice_adapters, "synthesize_doubao", _stream(b"mp3"))
+    assert await probe_stt(_row(kind="doubao", api_key=None), "doubao") == {
+        "ok": False,
+        "error": "API credentials missing",
+    }
+    assert await probe_stt(_row(kind="doubao"), "doubao") == {
+        "ok": True,
+        "mode": "doubao",
+    }
+    assert await probe_tts(_row(kind="doubao"), "doubao") == {
+        "ok": True,
+        "bytes": 3,
+    }
+
+
+def test_doubao_asr_binary_response_parser() -> None:
+    frame = _doubao_frame(
+        0x9,
+        0x2,
+        1,
+        json.dumps({"payload_msg": {"result": [{"text": "识别结果"}]}}).encode(),
+    )
+    body, done = _doubao_asr_response(frame)
+    assert body["payload_msg"]["result"][0]["text"] == "识别结果"
+    assert done
+
+
+def test_doubao_asr_rejects_malformed_binary_response() -> None:
+    with pytest.raises(RuntimeError, match="malformed response"):
+        _doubao_asr_response(b"bad")
 
 
 @pytest.mark.asyncio

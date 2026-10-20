@@ -31,20 +31,35 @@ export function canDelegate(agent: OctopAgent | null): boolean {
   );
 }
 
-/** The home conversation is the user/host transcript, not the execution log. */
+/** Keep the host transcript and execution events; omit peer chatter and hidden reasoning. */
 export function visibleConversationMessages(
   messages: ChatMessage[],
   hostAgentId: string | null,
 ): ChatMessage[] {
-  return messages.filter((message) => {
-    if (message.role === "user") return true;
-    if (message.role !== "assistant") return false;
-    if (message.toolData || message.hitlData || message.type === "tool")
-      return false;
+  return messages.flatMap((message) => {
+    if (message.role === "user") return [message];
+    if (message.role !== "assistant" && message.role !== "tool") return [];
     if (message.speakerAgentId && message.speakerAgentId !== hostAgentId) {
-      return false;
+      return [];
     }
-    return Boolean(message.content.trim());
+    if (message.type === "reasoning" || message.hitlData) return [];
+    const textBlocks = message.contentBlocks?.filter(
+      (block) => block.type === "text",
+    );
+    const visibleMessage = message.contentBlocks?.some(
+      (block) => block.type === "thinking",
+    )
+      ? {
+          ...message,
+          content: textBlocks?.map((block) => block.content).join("") ?? "",
+          contentBlocks: textBlocks,
+        }
+      : message;
+    return visibleMessage.content.trim() ||
+      visibleMessage.contentBlocks?.length ||
+      visibleMessage.toolData
+      ? [visibleMessage]
+      : [];
   });
 }
 
@@ -58,7 +73,12 @@ export function resolvePrivatePlatformUrl(
     const url = new URL(rawUrl);
     if (!["http:", "https:"].includes(url.protocol)) return null;
     if (url.username || url.password) return null;
-    if (url.hostname !== dashboardHostname) return null;
+    const loopbackHosts = new Set(["localhost", "127.0.0.1"]);
+    if (
+      url.hostname !== dashboardHostname &&
+      !(loopbackHosts.has(url.hostname) && loopbackHosts.has(dashboardHostname))
+    )
+      return null;
     // Browsers block a plain HTTP iframe under a private HTTPS dashboard.
     if (dashboardProtocol === "https:" && url.protocol !== "https:")
       return null;
@@ -67,4 +87,14 @@ export function resolvePrivatePlatformUrl(
   } catch {
     return null;
   }
+}
+
+export function supportsLocalProjectPreview(
+  hostname: string,
+  protocol: string,
+): boolean {
+  return (
+    protocol === "http:" &&
+    (hostname === "localhost" || hostname === "127.0.0.1")
+  );
 }

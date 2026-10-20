@@ -40,6 +40,15 @@ describe("resolveExpertAvatarUrl", () => {
     );
   });
 
+  it("busts the cache for bundled expert portraits", () => {
+    expect(
+      resolveExpertAvatarUrl("/experts/avatars/general-assistant.svg"),
+    ).toBe("/experts/avatars/general-assistant.svg?v=2");
+    expect(
+      resolveExpertAvatarUrl("/experts/avatars/general-assistant.svg?v=2"),
+    ).toBe("/experts/avatars/general-assistant.svg?v=2");
+  });
+
   it("returns null for empty input", () => {
     expect(resolveExpertAvatarUrl(null)).toBeNull();
     expect(resolveExpertAvatarUrl("  ")).toBeNull();

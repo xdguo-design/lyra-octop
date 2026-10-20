@@ -51,6 +51,16 @@ export interface ChatAttachment {
   filename?: string;
   mediaType?: string;
   workspacePath?: string;
+  fileId?: string;
+  revisionId?: string;
+  readStatus?:
+    | "ready"
+    | "partial"
+    | "needs_ocr"
+    | "unsupported"
+    | "failed"
+    | "too_large"
+    | "vision";
   kind: "image" | "file" | "video" | "audio";
 }
 

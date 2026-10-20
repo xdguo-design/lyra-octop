@@ -14,8 +14,10 @@ export type ThemePreference = "system" | "light" | "dark";
 export type StoredAppearance = {
   preference: ThemePreference;
   palette: ThemePalette;
-  /** Independent visual skin, migrated from existing palettes. */
-  skin?: VisualSkin;
+  /** Optional whole-interface visual skin; null keeps the base appearance. */
+  skin?: VisualSkin | null;
+  /** Distinguishes a deliberate Doodle choice from its old automatic default. */
+  skinExplicit?: boolean;
   /** Brand hex for the "custom" palette; ignored for curated palettes. */
   customColor?: string;
 };
@@ -57,6 +59,7 @@ export function readStoredAppearance(): StoredAppearance {
       preference: "system",
       palette: readLegacyPalette(),
       skin: DEFAULT_SKIN,
+      skinExplicit: false,
       customColor: DEFAULT_CUSTOM_COLOR,
     };
   }
@@ -67,6 +70,7 @@ export function readStoredAppearance(): StoredAppearance {
       preference: raw,
       palette: readLegacyPalette(),
       skin: DEFAULT_SKIN,
+      skinExplicit: false,
       customColor: DEFAULT_CUSTOM_COLOR,
     };
   }
@@ -83,8 +87,11 @@ export function readStoredAppearance(): StoredAppearance {
       );
       const customColor =
         normalizeHexColor(obj.customColor as string) ?? DEFAULT_CUSTOM_COLOR;
-      const skin = isVisualSkin(obj.skin) ? obj.skin : DEFAULT_SKIN;
-      return { preference, palette, skin, customColor };
+      const skinExplicit =
+        isVisualSkin(obj.skin) &&
+        (obj.skin !== "doodle" || obj.skinExplicit === true);
+      const skin = skinExplicit ? (obj.skin as VisualSkin) : DEFAULT_SKIN;
+      return { preference, palette, skin, skinExplicit, customColor };
     }
   } catch {
     // fall through
@@ -94,6 +101,7 @@ export function readStoredAppearance(): StoredAppearance {
     preference: "system",
     palette: readLegacyPalette(),
     skin: DEFAULT_SKIN,
+    skinExplicit: false,
     customColor: DEFAULT_CUSTOM_COLOR,
   };
 }
@@ -105,7 +113,9 @@ export function writeStoredAppearance(appearance: StoredAppearance): void {
     JSON.stringify({
       preference: appearance.preference,
       palette: appearance.palette,
-      skin: isVisualSkin(appearance.skin) ? appearance.skin : DEFAULT_SKIN,
+      skin: isVisualSkin(appearance.skin) ? appearance.skin : null,
+      skinExplicit:
+        isVisualSkin(appearance.skin) && (appearance.skinExplicit ?? true),
       customColor:
         normalizeHexColor(appearance.customColor ?? "") ?? DEFAULT_CUSTOM_COLOR,
     }),

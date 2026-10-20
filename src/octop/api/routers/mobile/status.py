@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from octop.api.deps import get_server, require_permission
+from octop.i18n import tr
 from octop.infra.mobile.adb import device_info, list_devices
 from octop.infra.mobile.agent_control import (
     get_mobile_agent_control,
@@ -72,18 +73,26 @@ async def get_mobile_status(
     summary="Probe connected Android device details via adb",
 )
 async def get_mobile_device_info(
+    request: Request,
     device: str,
     _user: User = Depends(require_permission("mobile")),
 ) -> dict[str, object]:
+    locale = resolve_request_locale(request)
     serial = device.strip()
     if not serial:
-        raise HTTPException(status_code=400, detail="device is required")
+        raise HTTPException(
+            status_code=400,
+            detail=tr("api.validation.mobile_device_required", locale),
+        )
     # Probe even if briefly missing from ``adb devices`` (USB races while streaming).
     info = await asyncio.to_thread(device_info, serial)
     if info.get("model") is None and info.get("width") is None and info.get("mem_total_mb") is None:
         connected = list_devices()
         if serial not in connected:
-            raise HTTPException(status_code=404, detail=f"adb device not connected: {serial}")
+            raise HTTPException(
+                status_code=404,
+                detail=tr("api.validation.mobile_device_not_connected", locale, device=serial),
+            )
     return info
 
 
@@ -96,16 +105,24 @@ async def get_agent_control(
 
 @router.put("/mobile/agent-control", summary="Set agent mobile-device binding")
 async def put_agent_control(
+    request: Request,
     body: MobileAgentControlBody,
     _user: User = Depends(require_permission("mobile")),
 ) -> dict[str, object]:
+    locale = resolve_request_locale(request)
     if body.enabled:
         devices = list_devices()
         serial = (body.device or "").strip()
         if not serial:
-            raise HTTPException(status_code=400, detail="device is required when enabling")
+            raise HTTPException(
+                status_code=400,
+                detail=tr("api.validation.mobile_device_required_when_enabling", locale),
+            )
         if serial not in devices:
-            raise HTTPException(status_code=400, detail=f"adb device not connected: {serial}")
+            raise HTTPException(
+                status_code=400,
+                detail=tr("api.validation.mobile_device_not_connected", locale, device=serial),
+            )
         set_mobile_agent_control(enabled=True, device=serial)
     else:
         set_mobile_agent_control(enabled=False, device=None)

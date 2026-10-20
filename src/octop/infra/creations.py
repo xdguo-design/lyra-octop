@@ -40,6 +40,90 @@ async def capture_creation_thumbnail(url: str, destination: Path) -> bool:
         return False
 
 
+async def capture_trusted_local_thumbnail(
+    url: str,
+    allowed_origins: tuple[str, ...],
+    destination: Path,
+) -> bool:
+    """Capture a managed preview while allowing only its configured loopback origins."""
+    try:
+        parsed_url = urlsplit(url)
+        allowed = set(allowed_origins)
+        if (
+            parsed_url.scheme != "http"
+            or parsed_url.hostname != "127.0.0.1"
+            or f"{parsed_url.scheme}://{parsed_url.netloc}" not in allowed
+            or not allowed
+            or any(
+                (parsed := urlsplit(origin)).scheme != "http"
+                or parsed.hostname != "127.0.0.1"
+                or not parsed.port
+                for origin in allowed
+            )
+        ):
+            raise ValueError("thumbnail capture target is not a configured loopback origin")
+        async with asyncio.timeout(_CAPTURE_TIMEOUT_SECONDS):
+            async with _CAPTURE_SEMAPHORE:
+                image = await _capture_trusted_local(url, allowed)
+        if not image or len(image) > _MAX_THUMBNAIL_BYTES:
+            raise ValueError("thumbnail is empty or too large")
+        await asyncio.to_thread(_write_thumbnail, destination, image)
+        return True
+    except Exception:
+        await asyncio.to_thread(_remove_thumbnail, destination)
+        return False
+
+
+async def _capture_trusted_local(url: str, allowed_origins: set[str]) -> bytes:
+    from playwright.async_api import async_playwright
+
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        try:
+            context = await browser.new_context(
+                viewport={"width": 1280, "height": 800},
+                service_workers="block",
+            )
+            try:
+                page = await context.new_page()
+                request_count = 0
+                transferred_bytes = 0
+
+                async def allow_managed_origin(route: Any) -> None:
+                    nonlocal request_count
+                    request_count += 1
+                    request_url = urlsplit(route.request.url)
+                    origin = f"{request_url.scheme}://{request_url.netloc}"
+                    if (
+                        request_count > 256
+                        or request_url.scheme != "http"
+                        or request_url.hostname != "127.0.0.1"
+                        or origin not in allowed_origins
+                    ):
+                        await route.abort()
+                        return
+                    await route.continue_()
+
+                async def limit_response(response: Any) -> None:
+                    nonlocal transferred_bytes
+                    length = response.headers.get("content-length")
+                    if length and length.isdigit():
+                        transferred_bytes += int(length)
+                        if transferred_bytes > _MAX_PROXY_BYTES:
+                            await response.finished()
+                            await page.close()
+
+                await page.route("**/*", allow_managed_origin)
+                page.on("response", lambda response: asyncio.create_task(limit_response(response)))
+                await page.goto(url, wait_until="domcontentloaded", timeout=12_000)
+                await page.wait_for_timeout(500)
+                return await page.screenshot(type="jpeg", quality=70, full_page=False)
+            finally:
+                await context.close()
+        finally:
+            await browser.close()
+
+
 async def _capture(url: str) -> bytes:
     from playwright.async_api import async_playwright
 

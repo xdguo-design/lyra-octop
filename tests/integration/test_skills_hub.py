@@ -136,6 +136,18 @@ async def test_hub_rankings_returns_dict(
 # --- authenticated install tests --------------------------------------------
 
 
+async def test_hub_install_invalid_name_detail_uses_request_locale(env: Any) -> None:
+    c, _srv, auth, aid = env
+    r = await c.post(
+        f"/api/agents/{aid}/skills/hub/install",
+        headers={**auth, "Accept-Language": "zh-CN"},
+        json={"skill_name": "../invalid"},
+    )
+
+    assert r.status_code == 400
+    assert r.json() == {"detail": "技能名称为必填项，且不能包含路径分隔符或以 . 开头。"}
+
+
 async def test_hub_install_unknown_skill(env: Any) -> None:
     """POST with a nonexistent skill → client/upstream error (not success)."""
     c, _srv, auth, aid = env

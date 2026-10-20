@@ -558,7 +558,10 @@ export default function SkillPackagesPage() {
     if (!slug) return;
     setFreellmBusy(true);
     try {
-      const result = await skillPackagesApi.freeLLMExportPreview(selectedId, slug);
+      const result = await skillPackagesApi.freeLLMExportPreview(
+        selectedId,
+        slug,
+      );
       setFreellmPreview(result);
     } catch (error) {
       message.error(apiErrorMessage(error, "FreeLLM Skill preview failed", t));
@@ -568,17 +571,22 @@ export default function SkillPackagesPage() {
   };
 
   const submitFreeLLM = async () => {
-    if (!selectedId || !freellmPreview || !freellmConsent || freellmBusy) return;
+    if (!selectedId || !freellmPreview || !freellmConsent || freellmBusy)
+      return;
     setFreellmBusy(true);
     try {
       const result = await skillPackagesApi.freeLLMSubmitForReview(
-        selectedId, freellmPreview.slug, freellmPreview.reviewed_sha256,
+        selectedId,
+        freellmPreview.slug,
+        freellmPreview.reviewed_sha256,
       );
       setFreellmSubmittedUrl(result.pull_request_url);
-      message.success("Skill submitted as a draft PR for FreeLLM review");
+      message.success(t("skillPackages.freeLLMSubmitted"));
     } catch (error) {
       message.error(apiErrorMessage(error, "FreeLLM submission failed", t));
-    } finally { setFreellmBusy(false); }
+    } finally {
+      setFreellmBusy(false);
+    }
   };
 
   const skills = selected?.skills ?? [];
@@ -949,7 +957,9 @@ export default function SkillPackagesPage() {
                               }}
                             >
                               <ExternalLink size={14} />
-                              {t("common.export", { defaultValue: "提交 FreeLLM" })}
+                              {t("common.export", {
+                                defaultValue: "提交 FreeLLM",
+                              })}
                             </button>
                             <button
                               type="button"
@@ -1092,17 +1102,26 @@ export default function SkillPackagesPage() {
         title="FreeLLM · Skill 双向同步 / 提交审核"
         open={freellmOpen}
         width={820}
-        onCancel={() => { if (!freellmBusy) setFreellmOpen(false); }}
+        onCancel={() => {
+          if (!freellmBusy) setFreellmOpen(false);
+        }}
         destroyOnHidden
         footer={
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-            <Button onClick={() => setFreellmOpen(false)} disabled={freellmBusy}>
+            <Button
+              onClick={() => setFreellmOpen(false)}
+              disabled={freellmBusy}
+            >
               {t("common.cancel")}
             </Button>
             <Button
               type="primary"
               loading={freellmBusy}
-              disabled={!freellmPreview || !freellmConsent || Boolean(freellmSubmittedUrl)}
+              disabled={
+                !freellmPreview ||
+                !freellmConsent ||
+                Boolean(freellmSubmittedUrl)
+              }
               onClick={() => void submitFreeLLM()}
             >
               提交到 FreeLLM dev 审核 PR
@@ -1111,7 +1130,8 @@ export default function SkillPackagesPage() {
         }
       >
         <Typography.Paragraph type="secondary">
-          请选择需要对外分享的 Skill。这里仅创建待审核的 GitHub 草稿 PR，不会自动发布到 freellm.top。
+          请选择需要对外分享的 Skill。这里仅创建待审核的 GitHub 草稿
+          PR，不会自动发布到 freellm.top。
         </Typography.Paragraph>
         <Select
           value={freellmSlug || undefined}
@@ -1119,24 +1139,52 @@ export default function SkillPackagesPage() {
           style={{ width: "100%", marginBottom: 14 }}
           disabled={freellmBusy}
           onChange={(slug) => void loadFreeLLMPreview(slug)}
-          options={skills.map((item) => ({ label: item.name, value: item.slug }))}
+          options={skills.map((item) => ({
+            label: item.name,
+            value: item.slug,
+          }))}
         />
         {freellmPreview ? (
           <>
             <Typography.Text type="secondary">
               SHA-256: {freellmPreview.reviewed_sha256}
             </Typography.Text>
-            <pre style={{ marginTop: 12, maxHeight: "38vh", overflow: "auto", whiteSpace: "pre-wrap", overflowWrap: "anywhere", background: "var(--fn-bg-secondary)", borderRadius: 8, padding: 14 }}>
+            <pre
+              style={{
+                marginTop: 12,
+                maxHeight: "38vh",
+                overflow: "auto",
+                whiteSpace: "pre-wrap",
+                overflowWrap: "anywhere",
+                background: "var(--fn-bg-secondary)",
+                borderRadius: 8,
+                padding: 14,
+              }}
+            >
               {freellmPreview.markdown}
             </pre>
-            <Checkbox checked={freellmConsent} disabled={freellmBusy || Boolean(freellmSubmittedUrl)} onChange={(e) => setFreellmConsent(e.target.checked)}>
-              我已检查许可证、隐私与敏感信息，并同意将上述完整 Skill 内容公开提交给 FreeLLM 审核。
+            <Checkbox
+              checked={freellmConsent}
+              disabled={freellmBusy || Boolean(freellmSubmittedUrl)}
+              onChange={(e) => setFreellmConsent(e.target.checked)}
+            >
+              我已检查许可证、隐私与敏感信息，并同意将上述完整 Skill
+              内容公开提交给 FreeLLM 审核。
             </Checkbox>
           </>
-        ) : freellmBusy ? <Spin /> : null}
+        ) : freellmBusy ? (
+          <Spin />
+        ) : null}
         {freellmSubmittedUrl ? (
           <Typography.Paragraph style={{ marginTop: 16 }}>
-            草稿 PR 已创建：<a href={freellmSubmittedUrl} target="_blank" rel="noopener noreferrer">{freellmSubmittedUrl}</a>
+            草稿 PR 已创建：
+            <a
+              href={freellmSubmittedUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {freellmSubmittedUrl}
+            </a>
           </Typography.Paragraph>
         ) : null}
       </Modal>

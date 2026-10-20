@@ -241,7 +241,7 @@ class AgentRepo:
         sql = "SELECT * FROM agents WHERE is_shared = 1 AND enabled = 1"
         params: list[object] = []
         if exclude_user_id is not None:
-            sql += " AND user_id != ?"
+            sql += " AND (user_id IS NULL OR user_id != ?)"
             params.append(exclude_user_id)
         sql += " ORDER BY created_at ASC, id ASC"
         with self._db.connect() as conn:

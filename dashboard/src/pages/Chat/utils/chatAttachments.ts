@@ -72,6 +72,8 @@ export function toImageContentBlock(
     ...(attachment.workspacePath
       ? { workspace_path: attachment.workspacePath }
       : {}),
+    ...(attachment.fileId ? { file_id: attachment.fileId } : {}),
+    ...(attachment.revisionId ? { revision_id: attachment.revisionId } : {}),
     ...(attachment.filename ? { filename: attachment.filename } : {}),
   };
 }
@@ -87,6 +89,8 @@ export function toFileContentBlock(
     ...(attachment.workspacePath
       ? { workspace_path: attachment.workspacePath }
       : {}),
+    ...(attachment.fileId ? { file_id: attachment.fileId } : {}),
+    ...(attachment.revisionId ? { revision_id: attachment.revisionId } : {}),
   };
 }
 

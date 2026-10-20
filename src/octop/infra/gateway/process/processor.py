@@ -21,7 +21,10 @@ from octop_harness.teams.processor import ReplyEvent
 from octop_harness.teams.util import PeerCall, PeerSession
 
 from octop.i18n.domains.stream import format_stream_error
-from octop.infra.agents.providers.reasoning import reasoning_request_parameters
+from octop.infra.agents.providers.reasoning import (
+    agent_reasoning_defaults,
+    reasoning_request_parameters,
+)
 from octop.infra.agents.settings.profile import parse_config_json
 from octop.infra.agents.teams import is_team_agent
 from octop.infra.agents.teams.team_manager import (
@@ -572,6 +575,7 @@ class GlobalProcessor:
         thread_id: str,
         model_ref: str | None,
         meta: dict[str, Any] | None,
+        agent_id: str | None = None,
     ) -> dict[str, Any]:
         if not model_ref:
             return {}
@@ -586,11 +590,16 @@ class GlobalProcessor:
         user_pref = user_prefs.get(model_ref)
         raw_mode = (meta or {}).get("reasoning_mode")
         raw_effort = (meta or {}).get("reasoning_effort")
+        agent_mode, agent_effort = agent_reasoning_defaults(
+            self._agent_manager.get_config(agent_id) if agent_id else {}
+        )
         mode = (
             str(raw_mode)
             if raw_mode in ("auto", "enabled", "disabled")
             else thread.reasoning_mode
             if thread is not None and thread.reasoning_mode
+            else agent_mode
+            if agent_mode is not None
             else user_pref.mode
             if user_pref is not None
             else None
@@ -600,6 +609,8 @@ class GlobalProcessor:
             if isinstance(raw_effort, str) and raw_effort.strip()
             else thread.reasoning_effort
             if thread is not None and thread.reasoning_effort
+            else agent_effort
+            if agent_effort is not None
             else user_pref.effort
             if user_pref is not None
             else None
@@ -1355,6 +1366,7 @@ class GlobalProcessor:
             needs_multimodal=content_blocks_need_vision(content),
         )
         reasoning_overrides = self._resolve_reasoning_overrides(
+            agent_id=agent_id,
             user_id=user_id,
             thread_id=thread_id,
             model_ref=model_ref,

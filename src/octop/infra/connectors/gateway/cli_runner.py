@@ -30,6 +30,7 @@ def run_cli(
     timeout_s: float = DEFAULT_TIMEOUT_S,
     cwd: str | None = None,
     stdin_text: str | None = None,
+    encoding: str | None = None,
 ) -> str:
     """Run argv; return stdout on success. Raise ValueError on failure."""
     if not argv:
@@ -40,6 +41,7 @@ def run_cli(
             input=stdin_text,
             capture_output=True,
             text=True,
+            encoding=encoding,
             env=dict(env) if env is not None else None,
             timeout=timeout_s,
             cwd=cwd,

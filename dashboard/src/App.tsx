@@ -15,6 +15,8 @@ import { useTranslation } from "react-i18next";
 import LoginPage from "./pages/Login";
 // Unified LYRA shell: all authenticated routes retain the same workbench navigation.
 const HomePage = lazy(() => import("./pages/Home"));
+const AdmissionDemoPage = lazy(() => import("./pages/AdmissionDemo"));
+const SpeechRecognitionPage = lazy(() => import("./pages/SpeechRecognition"));
 import RegisterPage from "./pages/Register";
 import OidcComplete from "./pages/Login/OidcComplete";
 import SetupPage from "./pages/Setup";
@@ -55,7 +57,7 @@ function ThemedApp() {
   const isMobile = useIsMobile();
   const desktopChrome = useDesktopChrome();
   const brandTokens = brandTokensFor(palette, isDark, customColor);
-  const skinTokens = skinAntdTokens(skin, isDark);
+  const skinTokens = skin ? skinAntdTokens(skin, isDark) : undefined;
   // Make antd built-ins (Popconfirm OK/Cancel, Modal default footer, Empty,
   // Pagination, DatePicker, Table… ) follow the current UI language.
   // DatePicker month/weekday labels come from dayjs — keep it in sync too.
@@ -127,20 +129,27 @@ function ThemedApp() {
             boxShadow: "0 1px 2px rgba(0, 0, 0, 0.04)",
             boxShadowSecondary: "0 8px 28px rgba(0, 0, 0, 0.1)",
           }),
-      ...skinTokens,
+      ...(skinTokens ?? {}),
     },
-    components: isDark
-      ? {
-          Modal: { headerBg: skinTokens.colorBgContainer, contentBg: skinTokens.colorBgContainer },
-          Input: { colorBgBase: skinTokens.colorBgContainer },
-          InputNumber: { colorBgBase: skinTokens.colorBgContainer },
-          Select: { colorBgBase: skinTokens.colorBgContainer, selectorBg: skinTokens.colorBgContainer },
-          DatePicker: { colorBgBase: skinTokens.colorBgContainer },
-          Segmented: { itemSelectedBg: skinTokens.colorBgElevated },
-          Card: { colorBgContainer: skinTokens.colorBgContainer },
-          Tooltip: { colorBgSpotlight: skinTokens.colorBgElevated },
-        }
-      : {},
+    components:
+      isDark && skinTokens
+        ? {
+            Modal: {
+              headerBg: skinTokens.colorBgContainer,
+              contentBg: skinTokens.colorBgContainer,
+            },
+            Input: { colorBgBase: skinTokens.colorBgContainer },
+            InputNumber: { colorBgBase: skinTokens.colorBgContainer },
+            Select: {
+              colorBgBase: skinTokens.colorBgContainer,
+              selectorBg: skinTokens.colorBgContainer,
+            },
+            DatePicker: { colorBgBase: skinTokens.colorBgContainer },
+            Segmented: { itemSelectedBg: skinTokens.colorBgElevated },
+            Card: { colorBgContainer: skinTokens.colorBgContainer },
+            Tooltip: { colorBgSpotlight: skinTokens.colorBgElevated },
+          }
+        : {},
   };
 
   return (
@@ -162,6 +171,28 @@ function ThemedApp() {
             <Route path="/login/oidc/complete" element={<OidcComplete />} />
             <Route path="/setup" element={<SetupPage />} />
             <Route path="/invite" element={<InvitePage />} />
+            <Route
+              path="/admission-demo"
+              element={
+                <AuthGuard>
+                  <Suspense fallback={<OctopSpinner />}>
+                    <VoiceOutputProvider>
+                      <AdmissionDemoPage />
+                    </VoiceOutputProvider>
+                  </Suspense>
+                </AuthGuard>
+              }
+            />
+            <Route
+              path="/speech-recognition"
+              element={
+                <AuthGuard>
+                  <Suspense fallback={<OctopSpinner />}>
+                    <SpeechRecognitionPage />
+                  </Suspense>
+                </AuthGuard>
+              }
+            />
             <Route
               path="/*"
               element={

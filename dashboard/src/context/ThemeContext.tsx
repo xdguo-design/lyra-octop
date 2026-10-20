@@ -35,8 +35,8 @@ interface ThemeContextValue {
   /** Brand color palette (orthogonal to light/dark) */
   palette: ThemePalette;
   /** The visual surface and typography preset. */
-  skin: VisualSkin;
-  setSkin: (skin: VisualSkin) => void;
+  skin: VisualSkin | null;
+  setSkin: (skin: VisualSkin | null) => void;
   /** Set brand palette */
   setPalette: (p: ThemePalette) => void;
   /** Brand hex for the "custom" palette */
@@ -80,7 +80,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [preference, setPreferenceState] = useState<ThemePreference>(() => {
     const stored = loadAppearanceOnBoot();
     document.documentElement.setAttribute("data-palette", stored.palette);
-    document.documentElement.setAttribute("data-skin", stored.skin ?? DEFAULT_SKIN);
+    if (stored.skin) {
+      document.documentElement.setAttribute("data-skin", stored.skin);
+    } else {
+      document.documentElement.removeAttribute("data-skin");
+    }
     document.documentElement.setAttribute(
       "data-theme",
       resolveMode(stored.preference),
@@ -93,8 +97,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return loadAppearanceOnBoot().palette;
   });
 
-  const [skin, setSkinState] = useState<VisualSkin>(
-    () => loadAppearanceOnBoot().skin ?? DEFAULT_SKIN,
+  const [skin, setSkinState] = useState<VisualSkin | null>(
+    () => loadAppearanceOnBoot().skin ?? null,
+  );
+
+  const [skinExplicit, setSkinExplicit] = useState(
+    () => loadAppearanceOnBoot().skinExplicit ?? false,
   );
 
   const [customColor, setCustomColorState] = useState<string>(
@@ -122,10 +130,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   // Persist preference, palette and visual skin together (mode is derived).
   useEffect(() => {
-    writeStoredAppearance({ preference, palette, skin, customColor });
+    writeStoredAppearance({
+      preference,
+      palette,
+      skin,
+      skinExplicit,
+      customColor,
+    });
     document.documentElement.setAttribute("data-palette", palette);
-    document.documentElement.setAttribute("data-skin", skin);
-  }, [preference, palette, skin, customColor]);
+    if (skin) document.documentElement.setAttribute("data-skin", skin);
+    else document.documentElement.removeAttribute("data-skin");
+  }, [preference, palette, skin, skinExplicit, customColor]);
 
   // Inject the runtime-derived CSS variables for the custom palette. The
   // style element is reused across renders; content updates on change.
@@ -165,8 +180,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setPreferenceState(p);
   }, []);
 
-  const setSkin = useCallback((value: VisualSkin) => {
+  const setSkin = useCallback((value: VisualSkin | null) => {
     setSkinState(value);
+    setSkinExplicit(value !== null);
   }, []);
 
   const setPalette = useCallback((p: ThemePalette) => {

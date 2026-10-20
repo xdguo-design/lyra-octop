@@ -114,6 +114,77 @@ async def test_package_skill_content_lifecycle(env: Any) -> None:
     assert (await client.get(f"/api/skill-packages/{package_id}/skills", headers=auth)).json() == []
 
 
+async def test_skillhub_invalid_name_detail_uses_request_locale(env: Any) -> None:
+    client, _server, auth = env
+    package_id = (
+        await client.post(
+            "/api/skill-packages",
+            headers=auth,
+            json={"name": "Validation"},
+        )
+    ).json()["id"]
+
+    response = await client.post(
+        f"/api/skill-packages/{package_id}/skills/hub/install",
+        headers={**auth, "Accept-Language": "zh-CN"},
+        json={"skill_name": "../invalid"},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "技能名称为必填项，且不能包含路径分隔符或以 . 开头。"}
+
+
+async def test_installed_skill_slugs_returns_unique_slugs_only(env: Any) -> None:
+    client, _server, auth = env
+    content = "---\nname: reader\ndescription: private body marker\n---\nsecret body marker\n"
+    for package_name, skill_names in (
+        ("First", ["pdf-reader"]),
+        ("Second", ["pdf-reader", "calendar"]),
+    ):
+        package = await client.post(
+            "/api/skill-packages", headers=auth, json={"name": package_name}
+        )
+        assert package.status_code == 200, package.text
+        for skill_name in skill_names:
+            created = await client.post(
+                f"/api/skill-packages/{package.json()['id']}/skills",
+                headers=auth,
+                json={"name": skill_name, "content": content},
+            )
+            assert created.status_code == 200, created.text
+
+    response = await client.get("/api/skill-packages/installed-slugs", headers=auth)
+
+    assert response.status_code == 200, response.text
+    assert response.json() == ["calendar", "pdf-reader"]
+    assert "private body marker" not in response.text
+    assert "secret body marker" not in response.text
+
+
+async def test_installed_skill_slugs_requires_authentication(env: Any) -> None:
+    client, _server, _auth = env
+
+    response = await client.get("/api/skill-packages/installed-slugs")
+
+    assert response.status_code == 401
+
+
+async def test_installed_skill_slugs_requires_skill_package_permission(env: Any) -> None:
+    from tests.support.auth import create_user
+
+    client, _server, admin_auth = env
+    auth = await create_user(
+        client,
+        admin_auth,
+        username="connector-only",
+        permissions=["connectors"],
+    )
+
+    response = await client.get("/api/skill-packages/installed-slugs", headers=auth)
+
+    assert response.status_code == 403
+
+
 async def test_other_user_cannot_mutate_skill_package(env_boundary: Any) -> None:
     client, _server, _admin_auth, alice_auth, bob_auth, _ctx = env_boundary
     package_id = (

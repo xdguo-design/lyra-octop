@@ -12,16 +12,24 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from octop.api.common.agent import require_agent_row
-from octop.api.deps import current_user, get_server
+from octop.api.deps import current_user, get_server, require_admin
 from octop.infra.creations import (
     capture_creation_thumbnail,
+    capture_trusted_local_thumbnail,
     creation_thumbnail_path,
     remove_creation_thumbnail,
 )
 from octop.infra.errors import ErrorCode, OctopError
 
 router = APIRouter()
-_BUILT_IN_APPS = {"planet", "manus-refund", "manus-clinicemr", "manus-freellm"}
+_BUILT_IN_APPS = {
+    "speech-recognition",
+    "admission-demo",
+    "planet",
+    "manus-refund",
+    "manus-clinicemr",
+    "manus-freellm",
+}
 
 
 class CreationFolder(BaseModel):
@@ -46,6 +54,7 @@ class CreationItem(BaseModel):
 class CardMeta(BaseModel):
     name: str | None
     description: str | None
+    category: Literal["platform", "applet", "service", "repository"] | None = None
 
 
 class CreationIndex(BaseModel):
@@ -53,6 +62,13 @@ class CreationIndex(BaseModel):
     items: list[CreationItem]
     card_folders: dict[str, str]
     card_meta: dict[str, CardMeta]
+
+
+class ProjectLaunchStatus(BaseModel):
+    status: Literal["stopped", "starting", "running", "failed"]
+    url: str | None = None
+    logs: str | None = None
+    thumbnail_url: str | None = None
 
 
 class FolderBody(BaseModel):
@@ -124,6 +140,9 @@ class CardFolderBody(BaseModel):
 class CardMetaBody(BaseModel):
     name: str | None = Field(default=None, max_length=120)
     description: str | None = Field(default=None, max_length=2000)
+    category: Literal["platform", "applet", "service", "repository"] | None = Field(
+        default=None, description="Optional user-selected category for the built-in card."
+    )
 
     @field_validator("name", "description")
     @classmethod
@@ -163,6 +182,91 @@ def _with_thumbnail(item: dict[str, Any], root: Path, owner_user_id: int) -> dic
         else None
     )
     return row
+
+
+def _launchable_item(server: Any, user: Any, item_id: str) -> dict[str, Any]:
+    row = next(
+        (
+            item
+            for item in server.services.creation_repo.list_items(user.id)
+            if item["item_id"] == item_id
+        ),
+        None,
+    )
+    manager = server.project_service_manager
+    if (
+        row is None
+        or row["kind"] != "service"
+        or not row["url"]
+        or manager is None
+        or not manager.has_profile(row["url"])
+    ):
+        raise OctopError(ErrorCode.NOT_FOUND, "project launch profile not found")
+    return cast(dict[str, Any], row)
+
+
+@router.get(
+    "/creations/items/{item_id}/launch",
+    summary="Get a trusted local project launch status",
+    response_model=ProjectLaunchStatus,
+)
+async def get_project_launch_status(
+    item_id: str,
+    user: Any = Depends(require_admin()),
+    server: Any = Depends(get_server),
+) -> ProjectLaunchStatus:
+    row = _launchable_item(server, user, item_id)
+    status = server.project_service_manager.status(row["url"])
+    return ProjectLaunchStatus(
+        **status,
+        thumbnail_url=_with_thumbnail(row, server.paths.root, user.id)["thumbnail_url"],
+    )
+
+
+@router.post(
+    "/creations/items/{item_id}/launch",
+    summary="Start a trusted local project preview",
+    response_model=ProjectLaunchStatus,
+)
+async def start_project_preview(
+    item_id: str,
+    user: Any = Depends(require_admin()),
+    server: Any = Depends(get_server),
+) -> ProjectLaunchStatus:
+    row = _launchable_item(server, user, item_id)
+    manager = server.project_service_manager
+    try:
+        status = await manager.start(row["url"])
+    except RuntimeError:
+        status = manager.status(row["url"])
+    if status["status"] == "running" and status["url"]:
+        await capture_trusted_local_thumbnail(
+            status["url"],
+            manager.thumbnail_origins(row["url"]),
+            creation_thumbnail_path(server.paths.root, user.id, item_id),
+        )
+    return ProjectLaunchStatus(
+        **status,
+        thumbnail_url=_with_thumbnail(row, server.paths.root, user.id)["thumbnail_url"],
+    )
+
+
+@router.delete(
+    "/creations/items/{item_id}/launch",
+    summary="Stop a trusted local project preview",
+    response_model=ProjectLaunchStatus,
+)
+async def stop_project_preview(
+    item_id: str,
+    user: Any = Depends(require_admin()),
+    server: Any = Depends(get_server),
+) -> ProjectLaunchStatus:
+    row = _launchable_item(server, user, item_id)
+    status = await server.project_service_manager.stop(row["url"])
+    return ProjectLaunchStatus(
+        **status,
+        thumbnail_url=_with_thumbnail(row, server.paths.root, user.id)["thumbnail_url"],
+    )
 
 
 async def _refresh_thumbnail(item: dict[str, Any], root: Path, owner_user_id: int) -> None:
@@ -372,7 +476,7 @@ async def set_card_folder(
 
 @router.put(
     "/creations/cards/{card_type}/{card_id}/meta",
-    summary="Rename or re-describe a built-in app card for this account",
+    summary="Update the name, description, or category of a built-in app card",
 )
 async def set_card_meta(
     card_type: Literal["agent", "app"],
@@ -389,5 +493,10 @@ async def set_card_meta(
         card_id=card_id,
         name=body.name,
         description=body.description,
+        category=body.category,
     )
-    return {"name": body.name, "description": body.description}
+    return {
+        "name": body.name,
+        "description": body.description,
+        "category": body.category,
+    }

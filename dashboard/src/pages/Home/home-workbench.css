@@ -1839,6 +1839,11 @@ html[data-theme="dark"] {
   padding: 2px 3px 6px;
   font-size: 12px;
 }
+.wb-platform-app-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 .wb-platform-app {
   display: flex;
   align-items: center;
@@ -1851,12 +1856,22 @@ html[data-theme="dark"] {
   background: transparent !important;
   text-align: left;
 }
+.wb-platform-stop {
+  flex: none;
+  padding: 5px 7px;
+  border: 1px solid var(--wbk-121);
+  border-radius: 7px;
+  background: var(--wbk-210);
+  color: var(--wbk-123);
+  font-size: 10px;
+}
 .wb-platform-app:hover,
 .wb-platform-app.is-active {
   border-color: var(--wbk-125) !important;
   background: var(--wbk-3) !important;
 }
 .wb-platform-app > img,
+.wb-platform-app-image,
 .wb-platform-app-icon {
   display: grid;
   flex: none;
@@ -2746,9 +2761,146 @@ html[data-theme="dark"] {
   cursor: pointer;
   text-align: left;
 }
+.wb-sidebar-footer-row {
+  display: flex;
+  align-items: center;
+  border-top: 1px dashed var(--wbk-203);
+}
+.wb-sidebar-footer {
+  width: auto;
+  flex: 1;
+  min-width: 0;
+  border-top: 0;
+}
 .wb-sidebar-footer:hover {
   background: var(--wbk-204);
   border-radius: 8px;
+}
+
+/* Account dropdown: user card with grouped actions. */
+.wb-account-dropdown .ant-dropdown-menu,
+.wb-account-dropdown .octop-dropdown-menu {
+  padding: 0;
+  background: transparent;
+  border-radius: 16px;
+  box-shadow: none;
+}
+.wb-account-menu {
+  width: 264px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 16px;
+  background: var(--wbk-239);
+  box-shadow: 0 12px 40px var(--wbk-231);
+}
+.wb-account-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--wbk-210);
+}
+.wb-account-avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--wbk-28);
+  border-radius: 12px;
+  color: var(--wbk-29);
+  background: var(--wbk-30);
+  font-weight: 700;
+  overflow: hidden;
+}
+.wb-account-avatar img,
+.wb-account-avatar svg {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  object-fit: cover;
+}
+.wb-account-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.wb-account-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.wb-account-display {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--wbk-201);
+}
+.wb-account-role {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.6;
+  background: var(--wbk-211);
+  color: var(--wbk-200);
+}
+.wb-account-handle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--wbk-208);
+}
+.wb-account-group {
+  padding: 5px 0;
+  border-radius: 12px;
+  background: var(--wbk-210);
+}
+.wb-account-group button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  color: var(--wbk-201);
+  cursor: pointer;
+  font:
+    14px "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
+}
+.wb-account-group button:hover {
+  background: var(--wbk-202);
+}
+.wb-account-group button svg {
+  flex-shrink: 0;
+  color: var(--wbk-208);
+}
+.wb-account-chevron {
+  margin-left: auto;
+  color: var(--wbk-238) !important;
+}
+.wb-account-group-danger button {
+  color: var(--wbk-235);
+}
+.wb-account-group-danger button svg {
+  color: var(--wbk-235);
+}
+.wb-account-group-danger button:hover {
+  background: var(--wbk-237);
 }
 .wb-newtask {
   background: var(--wbk-205);
@@ -3175,6 +3327,254 @@ html[data-theme="dark"] {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Apply each selected visual skin to the workbench's custom surfaces and shapes. */
+html[data-skin] .wb-root {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-layout);
+}
+html[data-skin] .wb-side {
+  background: var(--fn-bg-sidebar);
+  border-color: var(--fn-border-primary);
+}
+html[data-skin] .wb-main {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-layout);
+}
+html[data-skin] .wb-root .wb-entry-card,
+html[data-skin] .wb-root .wb-task-row,
+html[data-skin] .wb-root .wb-entry-platform {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-container);
+  border-color: var(--fn-border-primary);
+  border-radius: var(--fn-card-radius);
+}
+html[data-skin] .wb-settings-modal .octop-modal-content,
+html[data-skin] .wb-settings-modal .wb-set-shell,
+html[data-skin] .wb-settings-modal .wb-set-panel {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-layout);
+}
+html[data-skin] .wb-settings-modal .wb-set-nav {
+  background: var(--fn-bg-sidebar);
+  border-color: var(--fn-border-primary);
+}
+html[data-skin] .wb-settings-modal .wb-set-card,
+html[data-skin] .wb-settings-modal .wb-set-theme {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-container);
+  border-color: var(--fn-border-primary);
+  border-radius: var(--fn-radius-md);
+}
+html[data-skin] .wb-settings-modal .wb-set-theme.is-active,
+html[data-skin] .wb-settings-modal .wb-set-nav-item.is-active {
+  color: var(--fn-text-brand);
+  border-color: var(--fn-text-brand);
+  background: var(--fn-bg-secondary);
+}
+html[data-skin="doodle"] .wb-root {
+  font-family: var(
+    --crayon-font-hand,
+    "ZCOOL KuaiLe",
+    "PingFang SC",
+    sans-serif
+  );
+  background-image: radial-gradient(
+    rgba(59, 58, 54, 0.045) 1px,
+    transparent 1.4px
+  );
+  background-size: 24px 24px;
+}
+html[data-skin="doodle"] .wb-root .wb-entry-card,
+html[data-skin="doodle"] .wb-root .wb-task-row,
+html[data-skin="doodle"] .wb-root .wb-composer-wrap,
+html[data-skin="doodle"] .wb-settings-modal .octop-modal-content,
+html[data-skin="doodle"] .wb-settings-modal .wb-set-card {
+  border: 2px solid var(--fn-border-primary);
+  border-radius: 14px 18px 12px 20px / 18px 12px 20px 14px;
+  box-shadow: 3px 4px 0 rgba(59, 58, 54, 0.1);
+}
+html[data-skin="doodle"] .wb-settings-modal .wb-set-label {
+  border-bottom-style: dashed;
+  border-bottom-width: 2px;
+}
+html[data-skin="cloud"] .wb-root {
+  background-image: radial-gradient(
+    ellipse at 83% 8%,
+    rgba(129, 175, 244, 0.17),
+    transparent 58%
+  );
+}
+html[data-skin="cloud"] .wb-root .wb-entry-card,
+html[data-skin="cloud"] .wb-root .wb-composer-wrap,
+html[data-skin="cloud"] .wb-settings-modal .octop-modal-content {
+  box-shadow: 0 8px 26px rgba(66, 108, 160, 0.1);
+}
+html[data-skin="forest"] .wb-root .wb-entry-card,
+html[data-skin="forest"] .wb-root .wb-composer-wrap,
+html[data-skin="forest"] .wb-settings-modal .octop-modal-content {
+  box-shadow: 0 3px 12px rgba(30, 87, 61, 0.12);
+}
+html[data-skin="orbit"] .wb-root {
+  background-image: radial-gradient(
+    ellipse at 80% 10%,
+    rgba(95, 117, 222, 0.12),
+    transparent 55%
+  );
+}
+html[data-skin="journal"] .wb-root {
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 31px,
+    rgba(135, 103, 69, 0.045) 32px
+  );
+}
+html[data-skin="journal"] .wb-root h1,
+html[data-skin="journal"] .wb-root h2,
+html[data-skin="journal"] .wb-settings-modal .wb-set-panel h3 {
+  font-family: Georgia, "Songti SC", "Noto Serif SC", serif;
+  letter-spacing: 0.02em;
+}
+html[data-skin="terminal"] .wb-root h1,
+html[data-skin="terminal"] .wb-root h2,
+html[data-skin="terminal"] .wb-settings-modal .wb-set-panel h3 {
+  font-family: var(--fn-font-mono, ui-monospace, monospace);
+  letter-spacing: -0.015em;
+}
+html[data-skin="terminal"] .wb-root .wb-entry-card,
+html[data-skin="terminal"] .wb-root .wb-task-row,
+html[data-skin="terminal"] .wb-root .wb-composer-wrap,
+html[data-skin="terminal"] .wb-settings-modal .octop-modal-content,
+html[data-skin="terminal"] .wb-settings-modal .wb-set-card {
+  border-radius: 4px;
+  box-shadow: none;
+}
+html[data-skin] .wb-root .wb-main {
+  background-color: var(--fn-bg-layout);
+  background-image: linear-gradient(
+      color-mix(in srgb, var(--fn-bg-layout) 48%, transparent),
+      color-mix(in srgb, var(--fn-bg-layout) 64%, transparent)
+    ),
+    var(--wb-theme-art);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+html[data-skin] .wb-root .wb-entry-card,
+html[data-skin] .wb-root .wb-task-row,
+html[data-skin] .wb-root .wb-entry-platform,
+html[data-skin] .wb-root .wb-composer-wrap {
+  background-color: color-mix(in srgb, var(--fn-bg-container) 86%, transparent);
+  backdrop-filter: blur(9px);
+}
+
+/* The selected skin covers the complete workbench shell, not only its center. */
+html[data-skin] .wb-root {
+  background-color: var(--fn-bg-layout);
+  background-image: linear-gradient(
+      color-mix(in srgb, var(--fn-bg-layout) 48%, transparent),
+      color-mix(in srgb, var(--fn-bg-layout) 58%, transparent)
+    ),
+    var(--wb-theme-art);
+  background-position: center;
+  background-size: cover;
+}
+html[data-skin] .wb-side {
+  color: var(--fn-text-primary);
+  background-color: color-mix(in srgb, var(--fn-bg-sidebar) 64%, transparent);
+  border-color: var(--fn-border-primary);
+  backdrop-filter: blur(12px);
+}
+html[data-skin] .wb-root .wb-main {
+  background-color: transparent;
+  background-image: none;
+}
+html[data-skin] .wb-topbar {
+  color: var(--fn-text-primary);
+  background: color-mix(in srgb, var(--fn-bg-toolbar) 64%, transparent);
+  border-color: var(--fn-border-primary);
+  backdrop-filter: blur(12px);
+}
+html[data-skin] .wb-breadcrumb,
+html[data-skin] .wb-topbar-right {
+  color: var(--fn-text-secondary);
+}
+html[data-skin] .wb-breadcrumb strong {
+  color: var(--fn-text-primary);
+}
+html[data-skin] .wb-topbar-divider {
+  background: var(--fn-border-primary);
+}
+html[data-skin] .wb-mode-tabs {
+  background: color-mix(in srgb, var(--fn-bg-secondary) 76%, transparent);
+  border-color: var(--fn-border-primary);
+}
+html[data-skin] .wb-mode-tabs button {
+  color: var(--fn-text-secondary);
+}
+html[data-skin] .wb-mode-tabs button:hover,
+html[data-skin] .wb-mode-tabs button.is-selected {
+  color: var(--fn-text-primary);
+  background: color-mix(in srgb, var(--fn-bg-container) 82%, transparent);
+}
+html[data-skin] .wb-nav {
+  border-color: var(--fn-border-primary);
+}
+html[data-skin] .wb-nav-item,
+html[data-skin] .wb-task-item {
+  color: var(--fn-text-secondary) !important;
+}
+html[data-skin] .wb-nav-item:hover,
+html[data-skin] .wb-task-item:hover,
+html[data-skin] .wb-task-item.is-current {
+  color: var(--fn-text-primary) !important;
+  background: color-mix(in srgb, var(--fn-bg-secondary) 76%, transparent);
+}
+html[data-skin] .wb-nav-item.is-active {
+  color: var(--fn-text-primary) !important;
+  background: color-mix(in srgb, var(--fn-bg-tertiary) 92%, transparent);
+}
+html[data-skin] .wb-sidebar-section,
+html[data-skin] .wb-task-empty,
+html[data-skin] .wb-task-item time,
+html[data-skin] .wb-project-item small,
+html[data-skin] .wb-project-row small,
+html[data-skin] .wb-archived-toggle {
+  color: var(--fn-text-tertiary);
+}
+html[data-skin] .wb-sidebar-footer {
+  color: var(--fn-text-secondary);
+  border-color: var(--fn-border-primary);
+}
+html[data-skin] .wb-sidebar-footer:hover,
+html[data-skin] .wb-task-collapse:hover,
+html[data-skin] .wb-project-actions button:hover,
+html[data-skin] .wb-task-more:hover,
+html[data-skin] .wb-archived-toggle:hover {
+  color: var(--fn-text-primary);
+  background: color-mix(in srgb, var(--fn-bg-secondary) 76%, transparent);
+}
+html[data-skin] .wb-set-shell,
+html[data-skin] .wb-set-nav,
+html[data-skin] .wb-set-panel {
+  color: var(--fn-text-primary);
+}
+html[data-skin] .wb-theme-popup .ant-popover-inner,
+html[data-skin] .wb-theme-popup .ant-dropdown-menu,
+html[data-skin] .wb-theme-popup.ant-select-dropdown {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-container);
+  border: 1px solid var(--fn-border-primary);
+}
+html[data-skin] .wb-menu-popup button {
+  color: var(--fn-text-secondary);
+}
+html[data-skin] .wb-menu-popup button:hover {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-secondary);
+}
+
 .wb-settings-modal .octop-modal-content {
   padding: 0 !important;
   overflow: hidden;
@@ -3325,21 +3725,46 @@ html[data-theme="dark"] {
   gap: 8px;
 }
 .wb-set-gallery-card {
+  position: relative;
   display: grid;
   place-items: center;
   min-height: 64px;
   padding: 8px;
-  border: 1px solid var(--wbk-209);
+  border: 1px solid rgba(255, 255, 255, 0.48);
   border-radius: 10px;
-  background: var(--wbk-210);
-  color: var(--wbk-216);
+  background-color: var(--wbk-210);
+  background-position: center;
+  background-size: cover;
+  color: #fff;
   font-size: 11px;
+  font-weight: 600;
   line-height: 1.4;
   text-align: center;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.68);
+  cursor: pointer;
+}
+.wb-set-gallery-card span {
+  position: relative;
+}
+.wb-set-gallery-card.is-active {
+  border-color: var(--fn-color-brand, #377cf4);
+  box-shadow: 0 0 0 2px var(--fn-color-brand, #377cf4);
+}
+.wb-set-gallery-card:focus-visible {
+  outline: 2px solid var(--fn-color-brand, #377cf4);
+  outline-offset: 2px;
+}
+.wb-set-gallery-card svg {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
 }
 .wb-set-gallery-card.is-coming-soon {
   background: var(--wbk-202);
   color: var(--wbk-217);
+  cursor: default;
+  text-shadow: none;
 }
 @media (max-width: 740px) {
   .wb-set-gallery {
@@ -3600,6 +4025,9 @@ html[data-theme="dark"] {
   .wb-root.wb-side-collapsed .wb-task-list {
     display: none;
   }
+  .wb-root.wb-side-collapsed .wb-sidebar-footer-row {
+    margin-top: auto;
+  }
   .wb-root.wb-side-collapsed .wb-sidebar-footer {
     justify-content: center;
     margin-top: auto;
@@ -3665,6 +4093,166 @@ html[data-theme="dark"] {
 .wb-project-glyph {
   flex: none;
   color: var(--wbk-238);
+}
+
+/* Keep every workbench-owned surface on the selected visual skin. */
+html[data-skin] .wb-root .wb-newtask {
+  color: var(--fn-text-primary) !important;
+  background: color-mix(in srgb, var(--fn-bg-container) 90%, transparent);
+  border-color: var(--fn-border-primary);
+  box-shadow: 0 3px 10px
+    color-mix(in srgb, var(--fn-text-primary) 10%, transparent);
+}
+html[data-skin] .wb-root .wb-newtask:hover {
+  background: color-mix(in srgb, var(--fn-bg-secondary) 92%, transparent);
+}
+html[data-skin] .wb-root .wb-composer,
+html[data-skin] .wb-root .wb-starters button,
+html[data-skin] .wb-root .wb-insight-card,
+html[data-skin] .wb-root .wb-cap-card,
+html[data-skin] .wb-root .wb-system-grid > div,
+html[data-skin] .wb-root .wb-platform-tile,
+html[data-skin] .wb-root .wb-platform-actions button,
+html[data-skin] .wb-root .wb-platform-settings,
+html[data-skin] .wb-root .wb-platform-apps,
+html[data-skin] .wb-root .wb-code-browser,
+html[data-skin] .wb-root .wb-code-preview {
+  color: var(--fn-text-primary);
+  background-color: color-mix(in srgb, var(--fn-bg-container) 88%, transparent);
+  border-color: var(--fn-border-primary);
+  backdrop-filter: blur(9px);
+}
+html[data-skin] .wb-root .wb-composer {
+  background-color: color-mix(in srgb, var(--fn-bg-container) 72%, transparent);
+}
+html[data-skin] .wb-root .wb-chat-message.is-user .wb-chat-text,
+html[data-skin] .wb-root .wb-mode-tabs button.is-selected,
+html[data-skin] .wb-root .wb-set-nav-item.is-active,
+html[data-skin] .wb-root .wb-set-theme.is-active {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-secondary);
+}
+html[data-skin] .wb-root .wb-composer-model,
+html[data-skin] .wb-root .wb-composer-model-trigger,
+html[data-skin] .wb-root .wb-composer-agent,
+html[data-skin] .wb-root .wb-composer-project,
+html[data-skin] .wb-root .wb-composer-plus,
+html[data-skin] .wb-root .wb-composer-mic,
+html[data-skin] .wb-root .wb-attachment-chip,
+html[data-skin] .wb-root .wb-form-btn,
+html[data-skin] .wb-root .wb-set-theme,
+html[data-skin] .wb-root .wb-platform-stop {
+  color: var(--fn-text-primary);
+  background-color: color-mix(in srgb, var(--fn-bg-secondary) 88%, transparent);
+  border-color: var(--fn-border-primary);
+}
+html[data-skin] .wb-root input,
+html[data-skin] .wb-root select,
+html[data-skin] .wb-root textarea {
+  color: var(--fn-text-primary);
+  background-color: var(--fn-bg-container);
+  border-color: var(--fn-border-input);
+}
+html[data-skin] .wb-root .wb-composer textarea {
+  background: transparent;
+  border-color: transparent;
+}
+html[data-skin] .wb-root .wb-composer textarea::placeholder,
+html[data-skin] .wb-root .wb-composer-tip,
+html[data-skin] .wb-root .wb-composer-privacy,
+html[data-skin] .wb-root .wb-composer-caption,
+html[data-skin] .wb-root .wb-entry-card p,
+html[data-skin] .wb-root .wb-entry-meta,
+html[data-skin] .wb-root .wb-panel-caption,
+html[data-skin] .wb-root .wb-agent-footnote,
+html[data-skin] .wb-root .wb-chat-author time,
+html[data-skin] .wb-root .wb-platform-app-copy small,
+html[data-skin] .wb-root .wb-platform-app-status,
+html[data-skin] .wb-root .wb-platform-settings p,
+html[data-skin] .wb-root .wb-code-file-path {
+  color: var(--fn-text-secondary);
+}
+html[data-skin] .wb-root .wb-composer-send,
+html[data-skin] .wb-root .wb-form-btn.is-primary,
+html[data-skin] .wb-root .wb-insight-empty button {
+  color: #fff;
+  background: var(--fn-color-brand);
+  border-color: var(--fn-color-brand);
+}
+html[data-skin] .wb-root .wb-composer-send:hover:not(:disabled),
+html[data-skin] .wb-root .wb-form-btn.is-primary:hover {
+  background: var(--fn-color-brand-hover);
+  border-color: var(--fn-color-brand-hover);
+}
+html[data-skin] .wb-root .wb-code-tree-header,
+html[data-skin] .wb-root .wb-code-entry.is-selected,
+html[data-skin] .wb-root .wb-code-preview pre,
+html[data-skin] .wb-root .wb-host-selector select {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-secondary);
+  border-color: var(--fn-border-primary);
+}
+html[data-skin] .wb-root .wb-project-inline-edit input {
+  background: transparent;
+}
+html[data-skin] .wb-settings-modal .wb-set-account .wb-set-field {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-container);
+  border-color: var(--fn-border-primary);
+}
+html[data-skin] .wb-settings-modal input,
+html[data-skin] .wb-settings-modal select,
+html[data-skin] .wb-settings-modal textarea {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-container);
+  border-color: var(--fn-border-input);
+}
+html[data-skin] .wb-root .wb-chat-text,
+html[data-skin] .wb-root .wb-chat-author,
+html[data-skin] .wb-root .wb-conversation-head h1,
+html[data-skin] .wb-root .wb-platform-placeholder h2,
+html[data-skin] .wb-settings-modal .wb-set-panel h3,
+html[data-skin] .wb-settings-modal .wb-set-field-info strong {
+  color: var(--fn-text-primary);
+}
+html[data-skin] .wb-root .wb-platform-placeholder,
+html[data-skin] .wb-root .wb-platform-placeholder p,
+html[data-skin] .wb-root .wb-platform-tile small,
+html[data-skin] .wb-root .wb-insight-head small,
+html[data-skin] .wb-root .wb-insight-section-title small,
+html[data-skin] .wb-root .wb-member-state,
+html[data-skin] .wb-root .wb-team-foot,
+html[data-skin] .wb-settings-modal .wb-set-nav-title,
+html[data-skin] .wb-settings-modal .wb-set-label,
+html[data-skin] .wb-settings-modal .wb-set-field-info small,
+html[data-skin] .wb-settings-modal .wb-set-note,
+html[data-skin] .wb-settings-modal .wb-project-form-note {
+  color: var(--fn-text-secondary);
+}
+html[data-skin] .wb-root .wb-code-entry,
+html[data-skin] .wb-root .wb-platform-external,
+html[data-skin] .wb-root .wb-insight-link,
+html[data-skin] .wb-settings-modal .wb-set-nav-item {
+  color: var(--fn-text-secondary);
+}
+html[data-skin] .wb-root .wb-code-entry:hover,
+html[data-skin] .wb-root .wb-platform-external:hover,
+html[data-skin] .wb-root .wb-insight-link:hover,
+html[data-skin] .wb-settings-modal .wb-set-nav-item:hover {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-secondary);
+}
+html[data-skin] .wb-theme-popup .ant-dropdown-menu-item:hover,
+html[data-skin] .wb-theme-popup .ant-dropdown-menu-submenu-title:hover,
+html[data-skin] .wb-theme-popup .ant-dropdown-menu-item-selected,
+html[data-skin]
+  .wb-theme-popup
+  .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-secondary);
+}
+html[data-skin] .wb-theme-popup .ant-select-item {
+  color: var(--fn-text-primary);
 }
 
 /* 项目/文件夹子树内直接挂载任务行（与最近列表同一内容） */

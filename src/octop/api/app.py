@@ -159,6 +159,8 @@ def build_app(server: OctopServer) -> FastAPI:
     from octop.api.routers import (
         acp,
         admin,
+        admission_demo,
+        admission_registration,
         agent_files,
         agent_tools,
         agents,
@@ -177,6 +179,7 @@ def build_app(server: OctopServer) -> FastAPI:
         desktop,
         envs,
         experts,
+        files,
         health,
         i18n,
         internal_mcp,
@@ -236,6 +239,8 @@ def build_app(server: OctopServer) -> FastAPI:
             _RouterMount(user_roles.router, "/api/users/roles", ["users"]),
             _RouterMount(users.router, "/api/users", ["users"]),
             _RouterMount(agents.router, "/api/agents", ["agents"]),
+            _RouterMount(admission_demo.router, "/api", ["admission-demo"]),
+            _RouterMount(admission_registration.router, "/api", ["admission-registration"]),
             _RouterMount(agent_tools.router, "/api", ["agents"]),
             _RouterMount(acp.router, "/api", ["agents"]),
             _RouterMount(chat.router, "/api", ["chat"]),
@@ -245,6 +250,7 @@ def build_app(server: OctopServer) -> FastAPI:
             _RouterMount(workbench.router, "/api", ["workbench"]),
             _RouterMount(bridge.router, "/api", ["bridge"]),
             _RouterMount(knowledge_bases.router, "/api", ["knowledge"]),
+            _RouterMount(files.router, "/api", ["files"]),
             _RouterMount(internal_mcp.router, "/api", ["internal-mcp"]),
             _RouterMount(channels.router, "/api", ["channels"]),
             _RouterMount(cron.router, "/api", ["cron"]),
@@ -334,6 +340,11 @@ def build_app(server: OctopServer) -> FastAPI:
                         return _dashboard_fallback(index_file, full_path)
                     if candidate.is_file():
                         return _dashboard_response(candidate, full_path)
+                    # Embedded sub-apps (e.g. admission-registration/) ship their
+                    # own index.html; serve it for their bare directory URLs.
+                    dir_index = candidate / "index.html"
+                    if dir_index.is_file():
+                        return _dashboard_response(dir_index, f"{full_path.rstrip('/')}/index.html")
                 return _dashboard_fallback(index_file, full_path)
 
     return app

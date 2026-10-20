@@ -9,11 +9,15 @@ import {
   within,
 } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import type { OctopThread } from "../../api/modules/octopThreads";
+import { clipThreadTitle } from "../Chat/utils/threadTitle";
 
 const mocks = vi.hoisted(() => ({
   request: vi.fn(),
   list: vi.fn(),
   create: vi.fn(),
+  history: vi.fn(),
+  rename: vi.fn(),
   workbenchGet: vi.fn(),
   workbenchImport: vi.fn(),
   assignThread: vi.fn(),
@@ -21,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   sendMessage: vi.fn(),
   loadHistory: vi.fn(),
   cancelStream: vi.fn(),
+  setSkin: vi.fn(),
 }));
 
 vi.mock("../../api/request", () => ({
@@ -28,7 +33,13 @@ vi.mock("../../api/request", () => ({
   bridgeAgentHeaders: () => undefined,
 }));
 vi.mock("../../api/modules/octopThreads", () => ({
-  octopThreadsApi: { list: mocks.list, create: mocks.create },
+  CHAT_HISTORY_PAGE_SIZE: 25,
+  octopThreadsApi: {
+    list: mocks.list,
+    create: mocks.create,
+    history: mocks.history,
+    rename: mocks.rename,
+  },
 }));
 vi.mock("../../api/modules/workbench", () => ({
   workbenchApi: {
@@ -54,6 +65,14 @@ vi.mock("../../layouts/MainLayout", () => ({
       {embedded ? "统一内容区" : "旧后台内容区"}
     </div>
   ),
+}));
+vi.mock("../../context/ThemeContext", () => ({
+  useTheme: () => ({
+    preference: "system",
+    setPreference: vi.fn(),
+    skin: null,
+    setSkin: mocks.setSkin,
+  }),
 }));
 vi.mock("../Chat/hooks/useChat", () => ({
   useChat: () => ({
@@ -114,6 +133,8 @@ beforeEach(() => {
     thread_id: "thread-1",
     session_key: "session-1",
   });
+  mocks.history.mockResolvedValue({ messages: [], has_more: false });
+  mocks.rename.mockResolvedValue(undefined);
   mocks.workbenchGet.mockResolvedValue({
     projects: [],
     folders: [],
@@ -146,7 +167,96 @@ function renderHome() {
   );
 }
 
+function openSettingsFromProfileMenu() {
+  fireEvent.click(screen.getByRole("button", { name: "账户菜单" }));
+  fireEvent.click(screen.getByRole("button", { name: "设置" }));
+}
+
 describe("LYRA workbench page integration", () => {
+  it("starts the trusted project from Home, embeds it, and can stop it", async () => {
+    const itemId = "project-1";
+    mocks.request.mockImplementation((path: string, options?: RequestInit) => {
+      if (path === "/auth/me") {
+        return Promise.resolve({ id: 1, username: "admin", role: "admin" });
+      }
+      if (path === "/agents") return Promise.resolve([]);
+      if (path === "/voice/active") return Promise.resolve({});
+      if (path === "/creations") {
+        return Promise.resolve({
+          folders: [],
+          items: [
+            {
+              item_id: itemId,
+              kind: "service",
+              name: "数据转换平台",
+              description: "",
+              url: "https://github.com/xdguo-design/data-upload-product",
+              folder_id: null,
+              created_at: 1,
+              updated_at: 1,
+              thumbnail_url: "/api/creations/items/project-1/thumbnail",
+            },
+          ],
+          card_folders: {},
+          card_meta: {},
+        });
+      }
+      if (
+        path.endsWith(`/creations/items/${itemId}/launch`) &&
+        options?.method === "POST"
+      ) {
+        return Promise.resolve({
+          status: "running",
+          url: "http://127.0.0.1:8090/",
+          logs: null,
+          thumbnail_url: "/api/creations/items/project-1/thumbnail",
+        });
+      }
+      if (
+        path.endsWith(`/creations/items/${itemId}/launch`) &&
+        !options?.method
+      ) {
+        return Promise.resolve({
+          status: "stopped",
+          url: null,
+          logs: null,
+          thumbnail_url: null,
+        });
+      }
+      if (
+        path.endsWith(`/creations/items/${itemId}/launch`) &&
+        options?.method === "DELETE"
+      ) {
+        return Promise.resolve({
+          status: "stopped",
+          url: null,
+          logs: null,
+          thumbnail_url: null,
+        });
+      }
+      return Promise.reject(new Error("Unexpected request: " + path));
+    });
+    renderHome();
+    fireEvent.click(screen.getByRole("button", { name: /内置平台/ }));
+    const project = await screen.findByRole("button", { name: /数据转换平台/ });
+    fireEvent.click(project);
+    await waitFor(() => {
+      const frame = screen.getByTitle("数据转换平台") as HTMLIFrameElement;
+      expect(frame.src).toBe("http://127.0.0.1:8090/");
+    });
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "workbench.home.platforms.stop",
+      }),
+    );
+    await waitFor(() =>
+      expect(mocks.request).toHaveBeenCalledWith(
+        `/creations/items/${itemId}/launch`,
+        { method: "DELETE" },
+      ),
+    );
+  });
+
   it("keeps the home composer without welcome content", async () => {
     renderHome();
     expect(screen.getByRole("navigation", { name: "主导航" })).toBeTruthy();
@@ -166,6 +276,20 @@ describe("LYRA workbench page integration", () => {
     expect(
       screen.queryByRole("complementary", { name: "主 Agent 和内置平台" }),
     ).toBeNull();
+  });
+
+  it("applies the matching global skin when a theme card is selected", async () => {
+    renderHome();
+    openSettingsFromProfileMenu();
+    const themeCard = await waitFor(() => {
+      const card = document.querySelector<HTMLButtonElement>(
+        ".wb-set-gallery-card:not(.is-coming-soon)",
+      );
+      expect(card).toBeTruthy();
+      return card!;
+    });
+    fireEvent.click(themeCard);
+    expect(mocks.setSkin).toHaveBeenCalledWith("cloud");
   });
 
   it("keeps first message in the workbench and sends only to the team host", async () => {
@@ -191,6 +315,104 @@ describe("LYRA workbench page integration", () => {
     expect(
       screen.getByRole("textbox", { name: "给主 Agent 发消息" }),
     ).toBeTruthy();
+  });
+
+  it("keeps the first-question title when the initial thread list resolves late", async () => {
+    let resolveThreadList!: (rows: OctopThread[]) => void;
+    mocks.list.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveThreadList = resolve;
+        }),
+    );
+    renderHome();
+    await waitFor(() => expect(mocks.list).toHaveBeenCalled());
+    const field = screen.getByRole("textbox", { name: "给主 Agent 发消息" });
+    await waitFor(() =>
+      expect((field as HTMLTextAreaElement).disabled).toBe(false),
+    );
+
+    const prompt = "请帮我整理这个项目的功能模块并总结开发计划".repeat(2);
+    fireEvent.change(field, { target: { value: prompt } });
+    fireEvent.keyDown(field, { key: "Enter", code: "Enter", charCode: 13 });
+    await waitFor(() => expect(mocks.sendMessage).toHaveBeenCalled());
+    const expectedTitle = clipThreadTitle(prompt);
+    await screen.findByText(expectedTitle);
+
+    resolveThreadList([
+      {
+        thread_id: "thread-1",
+        session_key: "session-1",
+        channel_type: "dashboard",
+        title: null,
+        last_active: 1,
+        created_at: 1,
+      },
+    ]);
+    await waitFor(() => expect(screen.getByText(expectedTitle)).toBeTruthy());
+    expect(screen.queryByText("新的对话")).toBeNull();
+  });
+
+  it("recovers a blank title from the first question across history pages", async () => {
+    mocks.list.mockResolvedValueOnce([
+      {
+        thread_id: "thread-old",
+        session_key: "session-old",
+        channel_type: "dashboard",
+        title: null,
+        last_active: 2,
+        created_at: 1,
+      },
+    ]);
+    mocks.history
+      .mockResolvedValueOnce({
+        messages: [{ role: "user", content: "最近的问题" }],
+        has_more: true,
+        limit: 25,
+      })
+      .mockResolvedValueOnce({
+        messages: [
+          { role: "user", content: "最早的问题：梳理项目背景" },
+          { role: "assistant", content: "收到" },
+        ],
+        has_more: false,
+        limit: 25,
+      });
+
+    renderHome();
+    const row = await screen.findByRole("button", { name: /新的对话/ });
+    fireEvent.click(row);
+
+    await waitFor(() =>
+      expect(mocks.loadHistory).toHaveBeenCalledWith("thread-old"),
+    );
+    await waitFor(() => expect(mocks.history).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(mocks.rename).toHaveBeenCalledWith(
+        "team-primary",
+        "thread-old",
+        "最早的问题：梳理项目背景",
+      ),
+    );
+    expect(mocks.history).toHaveBeenNthCalledWith(
+      1,
+      "team-primary",
+      "thread-old",
+      {
+        limit: 25,
+        offset: 0,
+      },
+    );
+    expect(mocks.history).toHaveBeenNthCalledWith(
+      2,
+      "team-primary",
+      "thread-old",
+      {
+        limit: 25,
+        offset: 25,
+      },
+    );
+    await screen.findByText("最早的问题：梳理项目背景");
   });
 
   it("creates a new task inside the selected project", async () => {
@@ -354,7 +576,7 @@ describe("LYRA workbench page integration", () => {
   });
   it("opens settings as a modal rather than a sidebar subtree", () => {
     renderHome();
-    fireEvent.click(screen.getByRole("button", { name: "打开设置" }));
+    openSettingsFromProfileMenu();
     const dialog = screen.getByRole("dialog");
     // 功能类入口只住在侧栏「更多」；设置弹窗只留账户与系统。
     expect(
@@ -419,7 +641,7 @@ describe("LYRA workbench page integration", () => {
 
   it("keeps LYRA shell after entering a settings page and returns through new task", () => {
     renderHome();
-    fireEvent.click(screen.getByRole("button", { name: "打开设置" }));
+    openSettingsFromProfileMenu();
     const dialog = screen.getByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: /个性与记忆/ }));
     expect(screen.getByRole("region", { name: "功能模块" })).toBeTruthy();

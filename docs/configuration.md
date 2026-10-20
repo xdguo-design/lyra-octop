@@ -53,6 +53,26 @@ The root can be overridden with `OCTOP_HOME` (absolute path). Most
 sub-paths are exposed as properties on `PathLayout` in
 `octop.infra.utils.paths`.
 
+## Email registration
+
+Public self-registration requires an administrator-configured SMTP relay and
+an independent 32-byte random secret. Set these on the Octop server process
+(or in the global `~/.octop/env` file), never in an agent workspace `.env`:
+
+```dotenv
+OCTOP_SMTP_HOST=smtp.example.com
+OCTOP_SMTP_PORT=587
+OCTOP_SMTP_USERNAME=octop@example.com
+OCTOP_SMTP_PASSWORD=app-password
+OCTOP_SMTP_FROM=octop@example.com
+OCTOP_EMAIL_CODE_SECRET=<64 hexadecimal characters>
+```
+
+Generate the code secret with `python -c "import secrets; print(secrets.token_hex(32))"`.
+SMTP uses STARTTLS and each blocking socket operation has a 10-second timeout.
+If SMTP or the code secret is missing, malformed, or unavailable, registration
+codes cannot be sent. Verified accounts still require administrator approval.
+
 ## `config.json`
 
 Generated with defaults on first run; merged with environment overrides

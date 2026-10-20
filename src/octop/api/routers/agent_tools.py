@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from octop.api.common.agent import assert_agent_owner as _assert_agent_owner
 from octop.api.deps import current_user, get_server
+from octop.i18n import tr
 from octop.i18n.domains.tools import tool_display_name
 from octop.infra.agents.plugins.plugin_tool_defaults import merge_plugins_tool_settings
 from octop.infra.agents.settings.tool_catalog import (
@@ -169,6 +170,7 @@ async def get_tool_settings(
     server: OctopServer = Depends(get_server),
     user: Any = Depends(current_user),
 ) -> ToolSettingsResponse:
+    locale = resolve_request_locale(request)
     assert server.app_runtime is not None
     row = server.app_runtime.agent_registry.get_row(agent_id)
     if row is None:
@@ -224,6 +226,7 @@ async def put_tool_settings(
     server: OctopServer = Depends(get_server),
     user: Any = Depends(current_user),
 ) -> ToolSettingsResponse:
+    locale = resolve_request_locale(request)
     assert server.app_runtime is not None
     row = server.app_runtime.agent_registry.get_row(agent_id)
     if row is None:
@@ -233,7 +236,7 @@ async def put_tool_settings(
     if is_team_agent(row):
         raise HTTPException(
             status_code=400,
-            detail="team host tools are fixed to member dispatch",
+            detail=tr("api.validation.team_host_tools_fixed", locale),
         )
 
     registry = server.app_runtime.agent_registry
@@ -260,6 +263,7 @@ async def patch_tool_setting(
     server: OctopServer = Depends(get_server),
     user: Any = Depends(current_user),
 ) -> ToolSettingsResponse:
+    locale = resolve_request_locale(request)
     assert server.app_runtime is not None
     row = server.app_runtime.agent_registry.get_row(agent_id)
     if row is None:
@@ -268,19 +272,22 @@ async def patch_tool_setting(
 
     name = tool_name.strip()
     if not name:
-        raise HTTPException(status_code=400, detail="tool name is required")
+        raise HTTPException(
+            status_code=400,
+            detail=tr("api.validation.tool_name_required", locale),
+        )
 
     registry = server.app_runtime.agent_registry
     if is_team_agent(row):
         raise HTTPException(
             status_code=400,
-            detail="team host tools are fixed to member dispatch",
+            detail=tr("api.validation.team_host_tools_fixed", locale),
         )
     if body.source == "builtin":
         if name in CRITICAL_TOOLS:
             raise HTTPException(
                 status_code=400,
-                detail=f"tool {name!r} cannot be disabled",
+                detail=tr("api.validation.critical_tool_cannot_be_disabled", locale, tool=name),
             )
         cfg = registry.get_config(agent_id)
         disabled = set(normalize_tools_disabled(cfg.get("tools_disabled")))
@@ -294,7 +301,7 @@ async def patch_tool_setting(
         if not plugin_id:
             raise HTTPException(
                 status_code=400,
-                detail="plugin_id is required for plugin tools",
+                detail=tr("api.validation.plugin_id_required", locale),
             )
         cfg = registry.get_config(agent_id)
         merged = merge_plugins_tool_settings(
@@ -322,6 +329,16 @@ class ConnectorReadinessItem(BaseModel):
     provider_verified: bool = False
 
 
+ConnectorReadinessStatus = Literal[
+    "not_configured",
+    "not_selected",
+    "authorization_required",
+    "mode_blocked",
+    "not_loaded",
+    "registered",
+]
+
+
 class ConnectorReadinessResponse(BaseModel):
     mode: Literal["ask", "plan", "craft"]
     connectors: list[ConnectorReadinessItem]
@@ -343,6 +360,7 @@ def describe_connector_readiness(
     for name in dict.fromkeys(selected):
         record = by_name.get(name)
         matches = sorted(tool for tool in loaded_tools if tool.startswith(name + "_"))
+        status: ConnectorReadinessStatus
         if record is None:
             status = "not_configured"
         elif mode in ("ask", "plan"):

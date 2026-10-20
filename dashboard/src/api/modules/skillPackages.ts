@@ -17,6 +17,9 @@ export const skillPackagesApi = {
   listWritable: () =>
     request<SkillPackage[]>("/skill-packages?writable_only=true"),
 
+  listInstalledSlugs: () =>
+    request<string[]>("/skill-packages/installed-slugs"),
+
   listMounted: (agentId: string) =>
     request<{ package_ids: string[] }>(`/agents/${agentId}/skill-packages`),
 
@@ -141,7 +144,9 @@ export const skillPackagesApi = {
       reviewed_sha256: string;
       published: false;
     }>(
-      `/skill-packages/${encodeURIComponent(packageId)}/skills/${encodeURIComponent(slug)}/freellm/export`,
+      `/skill-packages/${encodeURIComponent(
+        packageId,
+      )}/skills/${encodeURIComponent(slug)}/freellm/export`,
     ),
 
   freeLLMSubmitForReview: (packageId: string, slug: string, digest: string) =>
@@ -151,7 +156,9 @@ export const skillPackagesApi = {
       pull_request_url: string;
       digest: string;
     }>(
-      `/skill-packages/${encodeURIComponent(packageId)}/skills/${encodeURIComponent(slug)}/freellm/submit`,
+      `/skill-packages/${encodeURIComponent(
+        packageId,
+      )}/skills/${encodeURIComponent(slug)}/freellm/submit`,
       {
         method: "POST",
         body: JSON.stringify({ reviewed_sha256: digest, confirm_public: true }),

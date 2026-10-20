@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const theme = vi.hoisted(() => ({
   preference: "system" as "system" | "light" | "dark",
   palette: "rose",
-  skin: "doodle",
+  skin: null as string | null,
   customColor: "#4b74fa",
   isDark: false,
   setPalette: vi.fn(),
@@ -25,6 +25,13 @@ vi.mock("react-i18next", () => ({
         "account.skin.orbit": "星轨蓝调",
         "account.skin.journal": "纸墨书房",
         "account.skin.terminal": "终端矩阵",
+        "account.skin.clearSky": "晴空",
+        "account.skin.cloudSea": "云海",
+        "account.skin.greatWall": "长城",
+        "account.skin.mogaoCaves": "莫高窟",
+        "account.skin.changbaiMountain": "长白山",
+        "account.skin.woodland": "树林",
+        "account.skin.bambooForest": "竹林",
       };
       return skinNames[key] ?? fallback ?? key;
     },
@@ -39,9 +46,13 @@ vi.mock("antd", () => ({
   }>) => (
     <div>
       {children}
-      <button type="button" aria-label="pick-custom"
+      <button
+        type="button"
+        aria-label="pick-custom"
         onClick={() => onChangeComplete({ toHexString: () => "#123456" })}
-      >pick</button>
+      >
+        pick
+      </button>
     </div>
   ),
 }));
@@ -51,22 +62,39 @@ import ThemeGallery from "./ThemeGallery";
 describe("ThemeGallery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    theme.skin = "doodle";
+    theme.skin = null;
     theme.palette = "rose";
     theme.preference = "system";
     theme.isDark = false;
   });
 
-  it("lists all six real skins and exposes exactly one active skin", () => {
+  it("lists all thirteen real skins and exposes none as active by default", () => {
     render(<ThemeGallery />);
     const group = screen.getByRole("group", { name: "全部主题" });
     const buttons = Array.from(group.querySelectorAll("button"));
-    expect(buttons).toHaveLength(6);
-    for (const name of ["手绘纸感", "云海玻璃", "松林呼吸", "星轨蓝调", "纸墨书房", "终端矩阵"]) {
+    expect(buttons).toHaveLength(13);
+    for (const name of [
+      "手绘纸感",
+      "云海玻璃",
+      "松林呼吸",
+      "星轨蓝调",
+      "纸墨书房",
+      "终端矩阵",
+      "晴空",
+      "云海",
+      "长城",
+      "莫高窟",
+      "长白山",
+      "树林",
+      "竹林",
+    ]) {
       expect(screen.getByRole("button", { name })).toBeInTheDocument();
     }
-    expect(screen.getByRole("button", { name: "手绘纸感" })).toHaveAttribute("aria-pressed", "true");
-    expect(buttons.filter((button) => button.getAttribute("aria-pressed") === "true")).toHaveLength(1);
+    expect(
+      buttons.filter(
+        (button) => button.getAttribute("aria-pressed") === "true",
+      ),
+    ).toHaveLength(0);
   });
 
   it("switches a complete skin without changing palette or mode", () => {
@@ -79,10 +107,23 @@ describe("ThemeGallery", () => {
 
   it("retains all eight brand palettes and custom hex", () => {
     render(<ThemeGallery />);
-    for (const key of ["rose", "tech", "indigo", "teal", "violet", "emerald", "amber", "slate"]) {
-      expect(screen.getByRole("button", { name: `header.palette.${key}` })).toBeInTheDocument();
+    for (const key of [
+      "rose",
+      "tech",
+      "indigo",
+      "teal",
+      "violet",
+      "emerald",
+      "amber",
+      "slate",
+    ]) {
+      expect(
+        screen.getByRole("button", { name: `header.palette.${key}` }),
+      ).toBeInTheDocument();
     }
-    fireEvent.click(screen.getByRole("button", { name: "header.palette.teal" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "header.palette.teal" }),
+    );
     expect(theme.setPalette).toHaveBeenCalledWith("teal");
     fireEvent.click(screen.getByRole("button", { name: "pick-custom" }));
     expect(theme.setCustomColor).toHaveBeenCalledWith("#123456");
@@ -96,10 +137,11 @@ describe("ThemeGallery", () => {
   });
 
   it("restores skin, brand palette and system mode together", () => {
+    theme.palette = "tech";
     render(<ThemeGallery />);
     fireEvent.click(screen.getByRole("button", { name: "恢复默认主题" }));
-    expect(theme.setSkin).toHaveBeenCalledWith("doodle");
-    expect(theme.setPalette).toHaveBeenCalledWith("rose");
+    expect(theme.setSkin).toHaveBeenCalledWith(null);
+    expect(theme.setPalette).toHaveBeenCalledWith("tech");
     expect(theme.setPreference).toHaveBeenCalledWith("system");
   });
 });

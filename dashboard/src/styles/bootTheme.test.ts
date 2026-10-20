@@ -89,16 +89,40 @@ describe("index.html boot theme", () => {
   });
 
   it("sets the selected skin before first paint", () => {
-    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ preference: "dark", palette: "teal", skin: "forest" }));
+    localStorage.setItem(
+      THEME_STORAGE_KEY,
+      JSON.stringify({ preference: "dark", palette: "teal", skin: "forest" }),
+    );
     eval(bootThemeScript());
     expect(document.documentElement.getAttribute("data-skin")).toBe("forest");
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
   });
 
-  it("uses the old visual skin for legacy saved themes", () => {
+  it("leaves the base appearance active when no skin was selected", () => {
     localStorage.setItem(THEME_STORAGE_KEY, "light");
     eval(bootThemeScript());
+    expect(document.documentElement.hasAttribute("data-skin")).toBe(false);
+  });
+
+  it("migrates the old automatic Doodle default to the base appearance", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ skin: "doodle" }));
+    eval(bootThemeScript());
+    expect(document.documentElement.hasAttribute("data-skin")).toBe(false);
+  });
+
+  it("preserves an explicitly selected Doodle skin", () => {
+    localStorage.setItem(
+      THEME_STORAGE_KEY,
+      JSON.stringify({ skin: "doodle", skinExplicit: true }),
+    );
+    eval(bootThemeScript());
     expect(document.documentElement.getAttribute("data-skin")).toBe("doodle");
+  });
+
+  it("preserves other selected skins before the app loads", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ skin: "forest" }));
+    eval(bootThemeScript());
+    expect(document.documentElement.getAttribute("data-skin")).toBe("forest");
   });
 
   it("migrates a legacy plain theme string", () => {

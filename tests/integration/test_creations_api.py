@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from tests.support.auth import create_user
 
 
@@ -77,7 +79,12 @@ async def test_creation_data_is_account_scoped_and_service_urls_are_validated(
     assert entry.status_code == 201
     other_auth = await create_user(client, admin_auth, username="other")
     other_index = (await client.get("/api/creations", headers=other_auth)).json()
-    assert other_index == {"folders": [], "items": [], "card_folders": {}}
+    assert other_index == {
+        "folders": [],
+        "items": [],
+        "card_folders": {},
+        "card_meta": {},
+    }
     assert (
         await client.patch(
             f"/api/creations/folders/{folder['folder_id']}",
@@ -107,3 +114,85 @@ async def test_creation_data_is_account_scoped_and_service_urls_are_validated(
             },
         )
     ).status_code == 422
+
+
+async def test_trusted_project_launch_requires_admin_and_owned_profile(
+    env: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, server, admin_auth = env
+    repo_url = "https://github.com/xdguo-design/data-upload-product"
+    item = (
+        await client.post(
+            "/api/creations/items",
+            headers=admin_auth,
+            json={"kind": "service", "name": "数据转换平台", "url": repo_url},
+        )
+    ).json()
+
+    class ManagerStub:
+        running = {"status": "running", "url": "http://127.0.0.1:49152", "logs": None}
+
+        def has_profile(self, url: str) -> bool:
+            return url == repo_url
+
+        def status(self, url: str) -> dict[str, str | None]:
+            return self.running
+
+        def thumbnail_origins(self, _url: str) -> tuple[str, ...]:
+            return ("http://127.0.0.1:49152", "http://127.0.0.1:49153")
+
+        async def start(self, _url: str) -> dict[str, str | None]:
+            return self.running
+
+        async def stop(self, _url: str) -> dict[str, str | None]:
+            self.running = {"status": "stopped", "url": None, "logs": None}
+            return self.running
+
+        async def close(self) -> None:
+            return None
+
+    manager = ManagerStub()
+    server.project_service_manager = manager
+
+    async def capture(_url: str, _origins: tuple[str, ...], _destination: Any) -> bool:
+        return False
+
+    monkeypatch.setattr("octop.api.routers.creations.capture_trusted_local_thumbnail", capture)
+
+    assert (
+        await client.get(f"/api/creations/items/{item['item_id']}/launch", headers=admin_auth)
+    ).json()["status"] == "running"
+    assert (
+        await client.post(f"/api/creations/items/{item['item_id']}/launch", headers=admin_auth)
+    ).json()["url"] == "http://127.0.0.1:49152"
+    assert (
+        await client.delete(f"/api/creations/items/{item['item_id']}/launch", headers=admin_auth)
+    ).json()["status"] == "stopped"
+
+    user_auth = await create_user(client, admin_auth, username="launch-user")
+    assert (
+        await client.post(f"/api/creations/items/{item['item_id']}/launch", headers=user_auth)
+    ).status_code == 403
+
+    other_item = (
+        await client.post(
+            "/api/creations/items",
+            headers=user_auth,
+            json={"kind": "service", "name": "私有项目", "url": repo_url},
+        )
+    ).json()
+    assert (
+        await client.post(f"/api/creations/items/{other_item['item_id']}/launch", headers=user_auth)
+    ).status_code == 403
+
+    unknown = (
+        await client.post(
+            "/api/creations/items",
+            headers=admin_auth,
+            json={"kind": "service", "name": "其他仓库", "url": "https://github.com/example/other"},
+        )
+    ).json()
+    assert (
+        await client.post(f"/api/creations/items/{unknown['item_id']}/launch", headers=admin_auth)
+    ).status_code == 404

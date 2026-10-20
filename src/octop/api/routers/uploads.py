@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
+import logging
 import mimetypes
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -19,8 +23,10 @@ from octop.api.deps import current_user, get_server
 from octop.config import DEFAULT_MAX_UPLOAD_MB, upload_mb_to_bytes
 from octop.infra.gateway.media.attachment_hints import sniff_image_media_type
 from octop.infra.gateway.media.inbound_store import INBOUND_EXTENSION_MEDIA_TYPES
+from octop.infra.utils.ulid import new_ulid
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _resolve_media_type(filename: str, content_type: str | None, data: bytes = b"") -> str:
@@ -39,7 +45,13 @@ def _resolve_media_type(filename: str, content_type: str | None, data: bytes = b
     return "application/octet-stream"
 
 
-def _attachment_payload(agent_id: str, stored: StoredAttachment) -> dict[str, str]:
+def _attachment_payload(
+    agent_id: str,
+    stored: StoredAttachment,
+    *,
+    file_id: str,
+    revision_id: str,
+) -> dict[str, str]:
     path = stored.data_path
     preview_url = dashboard_inbound_preview_url(
         agent_id,
@@ -53,6 +65,8 @@ def _attachment_payload(agent_id: str, stored: StoredAttachment) -> dict[str, st
         "access_url": preview_url,
         "filename": stored.filename,
         "media_type": stored.media_type,
+        "file_id": file_id,
+        "revision_id": revision_id,
     }
 
 
@@ -80,4 +94,29 @@ async def upload_attachment(
         data=data,
         max_bytes=max_bytes,
     )
-    return _attachment_payload(agent_id, stored)
+    if server.services is None:
+        raise RuntimeError("file metadata service is unavailable")
+    file_id, revision_id = new_ulid(), new_ulid()
+    try:
+        await asyncio.get_running_loop().run_in_executor(
+            None,
+            partial(
+                server.services.chat_file_repo.create_uploaded,
+                file_id=file_id,
+                revision_id=revision_id,
+                user_id=int(user.id),
+                agent_id=agent_id,
+                display_name=filename,
+                workspace_path=stored.data_path,
+                sha256=hashlib.sha256(data).hexdigest(),
+                media_type=stored.media_type,
+                byte_size=stored.size,
+            ),
+        )
+    except Exception:
+        try:
+            await asyncio.get_running_loop().run_in_executor(None, ws.delete, stored.data_path)
+        except Exception:
+            logger.exception("failed to clean up upload after metadata persistence failure")
+        raise
+    return _attachment_payload(agent_id, stored, file_id=file_id, revision_id=revision_id)

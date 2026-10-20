@@ -28,6 +28,8 @@ describe("buildUserMessageContent", () => {
         filename: "clip.mp4",
         mediaType: "video/mp4",
         workspacePath: "inbound/clip.mp4",
+        fileId: "file-clip",
+        revisionId: "rev-clip",
         kind: "video",
       },
       {
@@ -45,6 +47,8 @@ describe("buildUserMessageContent", () => {
         filename: "clip.mp4",
         media_type: "video/mp4",
         workspace_path: "inbound/clip.mp4",
+        file_id: "file-clip",
+        revision_id: "rev-clip",
       },
       {
         type: "file",

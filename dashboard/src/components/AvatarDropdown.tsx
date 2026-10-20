@@ -16,6 +16,7 @@ import {
   LogOut,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Settings,
   Palette,
   CircleHelp,
@@ -342,100 +343,155 @@ export default function AvatarDropdown({
     />
   );
 
+  const headerAvatar = (
+    <ProfileAvatar
+      key={`header:${user?.avatar_icon ?? ""}:${user?.avatar_url ?? ""}`}
+      url={user?.avatar_url}
+      icon={user?.avatar_icon}
+      kind="user"
+      className={styles.menuAvatar}
+    />
+  );
+
   const menuContent = (
     <div className={styles.menu}>
       <div className={styles.menuHeader}>
-        <div className={styles.menuHeaderTop}>
-          <span className={styles.menuDisplayName}>{displayName}</span>
-          <Tag
-            color={role === "admin" ? "blue" : "default"}
-            className={styles.roleTag}
-          >
-            {roleLabel}
-          </Tag>
+        {headerAvatar}
+        <div className={styles.menuHeaderText}>
+          <div className={styles.menuHeaderTop}>
+            <span className={styles.menuDisplayName}>{displayName}</span>
+            <Tag
+              color={role === "admin" ? "blue" : "default"}
+              className={styles.roleTag}
+            >
+              {roleLabel}
+            </Tag>
+          </div>
+          {user?.username && (
+            <span className={styles.menuHandle}>@{user.username}</span>
+          )}
         </div>
-        {user?.username && (
-          <span className={styles.menuHandle}>@{user.username}</span>
+      </div>
+
+      <div className={styles.menuGroup}>
+        <div className={styles.menuItemRow}>
+          <div className={styles.menuItemLabel}>
+            <Palette size={16} strokeWidth={1.8} />
+            <span>{t("account.appearance")}</span>
+          </div>
+          <ThemeSwitcher compact />
+        </div>
+
+        {onCustomizeNav ? (
+          <button
+            type="button"
+            className={styles.menuItem}
+            onClick={openCustomizeNav}
+          >
+            <span className={styles.menuItemLabel}>
+              <SlidersHorizontal size={16} strokeWidth={1.8} />
+              <span>{t("nav.customize")}</span>
+            </span>
+            <span className={styles.menuItemExtra}>
+              <ChevronRight size={14} strokeWidth={1.8} />
+            </span>
+          </button>
+        ) : null}
+
+        <button
+          type="button"
+          className={styles.menuItem}
+          onClick={openSettings}
+        >
+          <span className={styles.menuItemLabel}>
+            <Settings size={16} strokeWidth={1.8} />
+            <span>{t("account.settings")}</span>
+          </span>
+          <span className={styles.menuItemExtra}>
+            <ChevronRight size={14} strokeWidth={1.8} />
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className={styles.menuItem}
+          onClick={openPassword}
+        >
+          <span className={styles.menuItemLabel}>
+            <KeyRound size={16} strokeWidth={1.8} />
+            <span>{t("account.changePassword")}</span>
+          </span>
+          <span className={styles.menuItemExtra}>
+            <ChevronRight size={14} strokeWidth={1.8} />
+          </span>
+        </button>
+      </div>
+
+      <div className={styles.menuGroup}>
+        <a
+          className={styles.menuItem}
+          href={HELP_FEEDBACK_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => setMenuOpen(false)}
+        >
+          <span className={styles.menuItemLabel}>
+            <CircleHelp size={16} strokeWidth={1.8} />
+            <span>{t("account.helpFeedback")}</span>
+          </span>
+          <span className={styles.menuItemExtra}>
+            <ChevronRight size={14} strokeWidth={1.8} />
+          </span>
+        </a>
+
+        <a
+          className={styles.menuItem}
+          href={GITHUB_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => setMenuOpen(false)}
+        >
+          <span className={styles.menuItemLabel}>
+            <Github size={16} strokeWidth={1.8} />
+            <span>{t("account.projectUrl")}</span>
+          </span>
+          <span className={styles.menuItemExtra}>
+            <ChevronRight size={14} strokeWidth={1.8} />
+          </span>
+        </a>
+
+        {userCan(user, "update") && (
+          <button
+            type="button"
+            className={styles.menuItem}
+            onClick={() => {
+              setMenuOpen(false);
+              navigate("/admin/advanced?tab=updates");
+            }}
+          >
+            <span className={styles.menuItemLabel}>
+              <RefreshCw size={16} strokeWidth={1.8} />
+              <span>{t("account.checkUpdates")}</span>
+            </span>
+            <span className={styles.menuItemExtra}>
+              <ChevronRight size={14} strokeWidth={1.8} />
+            </span>
+          </button>
         )}
       </div>
 
-      <Divider className={styles.menuDivider} />
-
-      <div className={styles.menuItemRow}>
-        <div className={styles.menuItemLabel}>
-          <Palette size={16} strokeWidth={1.8} />
-          <span>{t("account.appearance")}</span>
-        </div>
-        <ThemeSwitcher compact />
+      <div className={styles.menuGroup}>
+        <button
+          type="button"
+          className={`${styles.menuItem} ${styles.menuItemDanger}`}
+          onClick={() => void handleLogout()}
+        >
+          <span className={styles.menuItemLabel}>
+            <LogOut size={16} strokeWidth={1.8} />
+            <span>{t("auth.logout")}</span>
+          </span>
+        </button>
       </div>
-
-      <a
-        className={styles.menuItem}
-        href={HELP_FEEDBACK_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={() => setMenuOpen(false)}
-      >
-        <CircleHelp size={16} strokeWidth={1.8} />
-        <span>{t("account.helpFeedback")}</span>
-      </a>
-
-      <a
-        className={styles.menuItem}
-        href={GITHUB_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={() => setMenuOpen(false)}
-      >
-        <Github size={16} strokeWidth={1.8} />
-        <span>{t("account.projectUrl")}</span>
-      </a>
-
-      {onCustomizeNav ? (
-        <button
-          type="button"
-          className={styles.menuItem}
-          onClick={openCustomizeNav}
-        >
-          <SlidersHorizontal size={16} strokeWidth={1.8} />
-          <span>{t("nav.customize")}</span>
-        </button>
-      ) : null}
-
-      <button type="button" className={styles.menuItem} onClick={openSettings}>
-        <Settings size={16} strokeWidth={1.8} />
-        <span>{t("account.settings")}</span>
-      </button>
-
-      <button type="button" className={styles.menuItem} onClick={openPassword}>
-        <KeyRound size={16} strokeWidth={1.8} />
-        <span>{t("account.changePassword")}</span>
-      </button>
-
-      {userCan(user, "update") && (
-        <button
-          type="button"
-          className={styles.menuItem}
-          onClick={() => {
-            setMenuOpen(false);
-            navigate("/admin/advanced?tab=updates");
-          }}
-        >
-          <RefreshCw size={16} strokeWidth={1.8} />
-          <span>{t("account.checkUpdates")}</span>
-        </button>
-      )}
-
-      <Divider className={styles.menuDivider} />
-
-      <button
-        type="button"
-        className={`${styles.menuItem} ${styles.menuItemDanger}`}
-        onClick={() => void handleLogout()}
-      >
-        <LogOut size={16} strokeWidth={1.8} />
-        <span>{t("auth.logout")}</span>
-      </button>
     </div>
   );
 

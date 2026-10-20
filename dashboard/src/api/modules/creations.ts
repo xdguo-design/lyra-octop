@@ -22,6 +22,7 @@ export interface CreationItem {
 export interface CreationCardMeta {
   name: string | null;
   description: string | null;
+  category: "platform" | "applet" | "service" | "repository" | null;
 }
 
 export interface CreationsIndex {
@@ -39,8 +40,29 @@ export interface CreationItemInput {
   folder_id: string | null;
 }
 
+export interface ProjectLaunchStatus {
+  status: "stopped" | "starting" | "running" | "failed";
+  url: string | null;
+  logs: string | null;
+  thumbnail_url: string | null;
+}
+
 export const creationsApi = {
   list: () => request<CreationsIndex>("/creations"),
+  launchStatus: (itemId: string) =>
+    request<ProjectLaunchStatus>(
+      `/creations/items/${encodeURIComponent(itemId)}/launch`,
+    ),
+  startProject: (itemId: string) =>
+    request<ProjectLaunchStatus>(
+      `/creations/items/${encodeURIComponent(itemId)}/launch`,
+      { method: "POST" },
+    ),
+  stopProject: (itemId: string) =>
+    request<ProjectLaunchStatus>(
+      `/creations/items/${encodeURIComponent(itemId)}/launch`,
+      { method: "DELETE" },
+    ),
   createFolder: (name: string) =>
     request<CreationFolder>("/creations/folders", {
       method: "POST",
@@ -84,9 +106,13 @@ export const creationsApi = {
   setCardMeta: (
     cardType: "agent" | "app",
     cardId: string,
-    meta: { name: string | null; description: string | null },
+    meta: {
+      name: string | null;
+      description: string | null;
+      category: "platform" | "applet" | "service" | "repository" | null;
+    },
   ) =>
-    request<{ name: string | null; description: string | null }>(
+    request<CreationCardMeta>(
       `/creations/cards/${cardType}/${encodeURIComponent(cardId)}/meta`,
       { method: "PUT", body: JSON.stringify(meta) },
     ),

@@ -1,0 +1,32 @@
+{
+  "name": "admission-registration-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "format": "prettier --write \"src/**/*.{js,vue,css}\" \"tests/**/*.js\" \"*.js\" \"*.json\" --single-quote --no-semi --trailing-comma es5 --print-width 100",
+    "format:check": "prettier --check \"src/**/*.{js,vue,css}\" \"tests/**/*.js\" \"*.js\" \"*.json\" --single-quote --no-semi --trailing-comma es5 --print-width 100",
+    "build": "vite build",
+    "build:dashboard": "vite build --base=/admission-registration/ --outDir ../../../src/octop/dashboard/admission-registration",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@vitejs/plugin-vue2": "2.3.3",
+    "ajv": "8.17.1",
+    "element-ui": "2.15.14",
+    "vite": "6.4.1",
+    "vue": "2.7.16"
+  },
+  "devDependencies": {
+    "@vue/test-utils": "1.3.6",
+    "jsdom": "26.1.0",
+    "prettier": "3.0.0",
+    "typescript": "5.8.3",
+    "vite-plugin-checker": "0.9.3",
+    "vitest": "3.2.4",
+    "vue-tsc": "2.2.12"
+  }
+}

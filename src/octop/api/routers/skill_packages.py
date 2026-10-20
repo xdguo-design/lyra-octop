@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel, Field
 
 from octop.api.deps import get_server, require_permission
+from octop.i18n import tr
 from octop.infra.agents.experts.skillhub_market import (
     SkillHubMarketError,
     SkillHubMarketErrorKind,
@@ -272,6 +273,27 @@ async def list_skill_packages(
     ]
 
 
+def _installed_skill_slugs(store: SkillPackageStore) -> list[str]:
+    return sorted(
+        {
+            str(skill["slug"])
+            for package in store.repo.list_all()
+            for skill in store.list_skill_summaries(package.id)
+        }
+    )
+
+
+@router.get(
+    "/installed-slugs",
+    summary="List skill slugs available in accessible packages",
+)
+async def list_installed_skill_slugs(
+    server: OctopServer = Depends(get_server),
+    _user: User = Depends(require_permission("skill_packages")),
+) -> list[str]:
+    return await asyncio.to_thread(_installed_skill_slugs, _store(server))
+
+
 @router.get("/hub/search", summary="Search SkillHub for installing into packages")
 async def package_hub_search(
     q: str = "",
@@ -396,7 +418,9 @@ async def freellm_preview(
     try:
         return await preview_freellm_skill(skill_id)
     except (FreeLLMSyncError, OSError) as exc:
-        raise OctopError(ErrorCode.SKILL_IMPORT_FAILED, "FreeLLM skill preview unavailable") from exc
+        raise OctopError(
+            ErrorCode.SKILL_IMPORT_FAILED, "FreeLLM skill preview unavailable"
+        ) from exc
 
 
 @router.post(
@@ -845,7 +869,7 @@ async def hub_install_package_skill(
     except SkillPackageError:
         raise HTTPException(
             status_code=400,
-            detail="skill_name is required and must not contain path separators or start with .",
+            detail=tr("api.validation.skill_name_invalid", locale),
         ) from None
 
     display_name = (body.display_name or "").strip()
@@ -861,13 +885,25 @@ async def hub_install_package_skill(
         else {}
     )
     if len(display_name) > 200:
-        raise HTTPException(status_code=400, detail="display_name is too long")
+        raise HTTPException(
+            status_code=400,
+            detail=tr("api.validation.skill_display_name_too_long", locale),
+        )
     if any(len(value) > 200 for value in label.values()):
-        raise HTTPException(status_code=400, detail="localized skill label is too long")
+        raise HTTPException(
+            status_code=400,
+            detail=tr("api.validation.skill_label_too_long", locale),
+        )
     if any(len(value) > 1024 for value in summary.values()):
-        raise HTTPException(status_code=400, detail="localized skill summary is too long")
+        raise HTTPException(
+            status_code=400,
+            detail=tr("api.validation.skill_summary_too_long", locale),
+        )
     if len(icon_url) > 2048 or (icon_url and not valid_skillhub_icon_url(icon_url)):
-        raise HTTPException(status_code=400, detail="icon_url must be an HTTP(S) URL")
+        raise HTTPException(
+            status_code=400,
+            detail=tr("api.validation.skill_icon_url_invalid", locale),
+        )
 
     target = _PackageInstallTarget(store=store, package_id=package_id, server=server)
     transport = "http"

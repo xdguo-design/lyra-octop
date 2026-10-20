@@ -5,6 +5,7 @@ import {
   canDelegate,
   resolvePrivatePlatformUrl,
   selectPrimaryAgent,
+  supportsLocalProjectPreview,
   visibleConversationMessages,
 } from "./workbench-model";
 
@@ -26,6 +27,14 @@ const msg = (patch: Partial<ChatMessage>): ChatMessage =>
   }) as ChatMessage;
 
 describe("private workbench", () => {
+  it("allows local project previews only from loopback HTTP dashboards", () => {
+    expect(supportsLocalProjectPreview("127.0.0.1", "http:")).toBe(true);
+    expect(supportsLocalProjectPreview("localhost", "http:")).toBe(true);
+    expect(supportsLocalProjectPreview("localhost", "https:")).toBe(false);
+    expect(supportsLocalProjectPreview("octop.local", "http:")).toBe(false);
+    expect(supportsLocalProjectPreview("192.168.1.10", "http:")).toBe(false);
+  });
+
   it("routes all messages to a running team coordinator instead of a worker", () => {
     const worker = agent({ agent_id: "worker" });
     const stoppedTeam = agent({
@@ -84,8 +93,32 @@ describe("private workbench", () => {
       }),
     ];
     expect(visibleConversationMessages(items, "host").map((m) => m.id)).toEqual(
-      ["1", "4"],
+      ["1", "3", "4"],
     );
+  });
+
+  it("preserves streaming process events and answer fragments for turn rendering", () => {
+    const items = [
+      msg({ id: "user-1", role: "user", content: "帮我检查一下" }),
+      msg({ id: "reply-1", content: "我先检查当前工作区：" }),
+      msg({ id: "tool-1", role: "tool", content: "命令输出" }),
+      msg({
+        id: "reply-2",
+        content: "找到了原因。",
+        status: "streaming",
+      }),
+      msg({ id: "user-2", role: "user", content: "继续修复" }),
+      msg({ id: "reply-3", content: "开始处理。" }),
+    ];
+
+    expect(visibleConversationMessages(items, "host")).toMatchObject([
+      { id: "user-1", content: "帮我检查一下" },
+      { id: "reply-1", content: "我先检查当前工作区：" },
+      { id: "tool-1", content: "命令输出" },
+      { id: "reply-2", content: "找到了原因。", status: "streaming" },
+      { id: "user-2", content: "继续修复" },
+      { id: "reply-3", content: "开始处理。" },
+    ]);
   });
 
   it("rejects script URLs, credentials and public or remote-hosted platforms", () => {
@@ -115,5 +148,14 @@ describe("private workbench", () => {
         "https:",
       ),
     ).toBe("https://nas.local:8130/");
+  });
+
+  it("permits the managed project to cross between localhost loopback names", () => {
+    expect(
+      resolvePrivatePlatformUrl("http://127.0.0.1:8090/", "localhost"),
+    ).toBe("http://127.0.0.1:8090/");
+    expect(
+      resolvePrivatePlatformUrl("http://192.168.1.10:8090/", "localhost"),
+    ).toBeNull();
   });
 });

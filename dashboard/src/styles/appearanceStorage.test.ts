@@ -22,6 +22,7 @@ describe("appearanceStorage", () => {
     expect(readStoredAppearance().preference).toBe("system");
     expect(readStoredAppearance().palette).toBe(DEFAULT_PALETTE);
     expect(readStoredAppearance().skin).toBe(DEFAULT_SKIN);
+    expect(readStoredAppearance().skinExplicit).toBe(false);
   });
 
   it("migrates legacy plain theme string + palette key", () => {
@@ -87,7 +88,8 @@ describe("appearanceStorage", () => {
       preference: "light",
       palette: "custom",
       customColor: "#00aa55",
-      skin: DEFAULT_SKIN,
+      skin: null,
+      skinExplicit: false,
     });
   });
 
@@ -103,20 +105,48 @@ describe("appearanceStorage", () => {
       preference: "dark",
       palette: "amber",
       customColor: DEFAULT_CUSTOM_COLOR.toLowerCase(),
-      skin: DEFAULT_SKIN,
+      skin: null,
+      skinExplicit: false,
     });
   });
 
   it("round-trips a selected skin without changing the existing palette", () => {
-    writeStoredAppearance({ preference: "dark", palette: "tech", skin: "orbit" });
+    writeStoredAppearance({
+      preference: "dark",
+      palette: "tech",
+      skin: "orbit",
+    });
     const saved = readStoredAppearance();
     expect(saved.skin).toBe("orbit");
     expect(saved.palette).toBe("tech");
     expect(saved.preference).toBe("dark");
   });
 
+  it("migrates an old automatic Doodle default but preserves an explicit selection", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ skin: "doodle" }));
+    expect(loadAppearanceOnBoot().skin).toBeNull();
+    expect(
+      JSON.parse(localStorage.getItem(THEME_STORAGE_KEY)!).skin,
+    ).toBeNull();
+
+    writeStoredAppearance({
+      preference: "system",
+      palette: "tech",
+      skin: "doodle",
+      skinExplicit: true,
+    });
+    expect(readStoredAppearance().skin).toBe("doodle");
+  });
+
   it("handles unknown skins without crashing or applying unsupported CSS", () => {
-    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ skin: "unlisted", palette: "rose", preference: "light" }));
+    localStorage.setItem(
+      THEME_STORAGE_KEY,
+      JSON.stringify({
+        skin: "unlisted",
+        palette: "rose",
+        preference: "light",
+      }),
+    );
     expect(readStoredAppearance().skin).toBe(DEFAULT_SKIN);
   });
 

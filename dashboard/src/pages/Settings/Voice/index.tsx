@@ -26,6 +26,17 @@ import styles from "./index.module.less";
 
 const { Text } = Typography;
 
+const DOUBAO_DEFAULT_VOICE_ID = "zh_female_wenjingmaomao_uranus_bigtts";
+const DOUBAO_CUSTOM_VOICE = "__custom_voice_id__";
+const DOUBAO_TTS_VOICE_IDS = new Set([
+  DOUBAO_DEFAULT_VOICE_ID,
+  "zh_female_wenroumama_uranus_bigtts",
+  "zh_female_wenroushunv_uranus_bigtts",
+  "zh_female_qingchezizi_uranus_bigtts",
+  "zh_male_wenrouxiaoge_uranus_bigtts",
+  "zh_male_jieshuoxiaoming_uranus_bigtts",
+]);
+
 function voiceLogoForKind(kind: string): string {
   return getProviderLogo(kind) ?? customProviderLogo;
 }
@@ -52,6 +63,8 @@ export function VoiceSettingsPanel() {
     "payg",
   );
   const [mimoVoiceId, setMimoVoiceId] = useState("冰糖");
+  const [doubaoVoiceId, setDoubaoVoiceId] = useState("");
+  const [doubaoVoiceCustom, setDoubaoVoiceCustom] = useState(false);
   const [saving, setSaving] = useState(false);
   const [probing, setProbing] = useState(false);
 
@@ -108,7 +121,7 @@ export function VoiceSettingsPanel() {
   const openConfigure = (preset: VoicePreset) => {
     const existing = findConfigured(preset);
     setConfigure({ preset, existing });
-    setApiKey(existing?.api_key ?? "");
+    setApiKey("");
     const extra = existing?.extra ?? {};
     setSecretId(String(extra.secret_id ?? ""));
     setSecretKey(String(extra.secret_key ?? ""));
@@ -116,6 +129,11 @@ export function VoiceSettingsPanel() {
     setAppId(String(extra.app_id ?? ""));
     setMimoEndpoint(extra.endpoint_type === "tokenplan" ? "tokenplan" : "payg");
     setMimoVoiceId(String(extra.voice_id ?? "冰糖"));
+    const voiceId = String(extra.voice_id ?? "");
+    setDoubaoVoiceId(voiceId || DOUBAO_DEFAULT_VOICE_ID);
+    setDoubaoVoiceCustom(
+      Boolean(voiceId && !DOUBAO_TTS_VOICE_IDS.has(voiceId)),
+    );
   };
 
   const buildProviderPayload = (): VoiceProviderInput | null => {
@@ -142,6 +160,12 @@ export function VoiceSettingsPanel() {
         endpoint_type: mimoEndpoint,
         voice_id: preset.capability === "tts" ? mimoVoiceId : undefined,
       };
+    } else if (preset.kind === "doubao") {
+      extra = {
+        stt_resource_id: "volc.seedasr.sauc.duration",
+        tts_resource_id: "seed-tts-2.0",
+        voice_id: doubaoVoiceId.trim() || undefined,
+      };
     } else {
       extra = { model: preset.kind === "openai" ? "whisper-1" : undefined };
     }
@@ -155,7 +179,7 @@ export function VoiceSettingsPanel() {
           ? secretId && secretKey
             ? `${secretId}:${secretKey}`
             : null
-          : apiKey || null,
+          : apiKey.trim() || undefined,
       extra_json: JSON.stringify(extra),
     };
   };
@@ -165,8 +189,17 @@ export function VoiceSettingsPanel() {
     const complete =
       configure.preset.kind === "tencent"
         ? Boolean(secretId.trim() && secretKey.trim())
-        : Boolean(apiKey.trim());
+        : Boolean(apiKey.trim() || configure?.existing?.api_key_configured);
     if (!complete) message.warning(t("voice.credentialsRequired"));
+    if (
+      complete &&
+      configure?.preset.kind === "doubao" &&
+      doubaoVoiceCustom &&
+      !doubaoVoiceId.trim()
+    ) {
+      message.warning(t("voice.doubaoCustomVoiceRequired"));
+      return false;
+    }
     if (complete && realtimeStt && !appId.trim()) {
       message.warning(t("voice.realtimeAppIdRequired"));
       return false;
@@ -184,7 +217,10 @@ export function VoiceSettingsPanel() {
     setProbing(true);
     try {
       for (const mode of modes) {
-        const result = await voiceApi.testConfiguration({ ...payload, mode });
+        const result =
+          configure.existing?.api_key_configured && !apiKey.trim()
+            ? await voiceApi.testProvider(configure.existing.id, mode)
+            : await voiceApi.testConfiguration({ ...payload, mode });
         if (!result.ok) {
           message.error(result.error || t("voice.probeFailed"));
           return;
@@ -529,6 +565,78 @@ export function VoiceSettingsPanel() {
                   />
                 </Form.Item>
               )}
+            </>
+          )}
+          {configure?.preset.kind === "doubao" && (
+            <>
+              <div className={styles.drawerHint}>{t("voice.doubaoHint")}</div>
+              <Form.Item
+                label="API Key"
+                required={!configure.existing?.api_key_configured}
+              >
+                <Input.Password
+                  placeholder={
+                    configure.existing?.api_key_configured
+                      ? t("voice.keyConfiguredPlaceholder")
+                      : "API Key"
+                  }
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                />
+              </Form.Item>
+              <Form.Item label={t("voice.doubaoVoice")}>
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  value={
+                    doubaoVoiceCustom ? DOUBAO_CUSTOM_VOICE : doubaoVoiceId
+                  }
+                  options={[
+                    {
+                      label: t("voice.doubaoVoiceDefault"),
+                      value: DOUBAO_DEFAULT_VOICE_ID,
+                    },
+                    {
+                      label: t("voice.doubaoVoiceWenrouMama"),
+                      value: "zh_female_wenroumama_uranus_bigtts",
+                    },
+                    {
+                      label: t("voice.doubaoVoiceWenrouShunv"),
+                      value: "zh_female_wenroushunv_uranus_bigtts",
+                    },
+                    {
+                      label: t("voice.doubaoVoiceQingcheZizi"),
+                      value: "zh_female_qingchezizi_uranus_bigtts",
+                    },
+                    {
+                      label: t("voice.doubaoVoiceWenrouXiaoge"),
+                      value: "zh_male_wenrouxiaoge_uranus_bigtts",
+                    },
+                    {
+                      label: t("voice.doubaoVoiceJieshuoXiaoming"),
+                      value: "zh_male_jieshuoxiaoming_uranus_bigtts",
+                    },
+                    {
+                      label: t("voice.doubaoVoiceCustomOption"),
+                      value: DOUBAO_CUSTOM_VOICE,
+                    },
+                  ]}
+                  onChange={(value: string) => {
+                    const isCustom = value === DOUBAO_CUSTOM_VOICE;
+                    setDoubaoVoiceCustom(isCustom);
+                    if (!isCustom) setDoubaoVoiceId(value);
+                    else setDoubaoVoiceId("");
+                  }}
+                />
+                {doubaoVoiceCustom && (
+                  <Input
+                    style={{ marginTop: 8 }}
+                    placeholder={t("voice.doubaoCustomVoicePlaceholder")}
+                    value={doubaoVoiceId}
+                    onChange={(e) => setDoubaoVoiceId(e.target.value)}
+                  />
+                )}
+              </Form.Item>
             </>
           )}
         </Form>
