@@ -971,6 +971,12 @@
             "memory_extract_trigger_mode_invalid": "记忆提取触发模式必须为 idle 或 interval。"
         }
     },
+    "admission_proxy": {
+        "request_too_large": "登记请求过大，请减少本次输入内容。",
+        "timeout": "登记服务响应超时，请稍后重试。",
+        "unavailable": "登记服务暂不可用，请检查独立 Demo 后端。",
+        "invalid_response": "登记服务返回异常，请检查独立 Demo 后端。"
+    },
     "ldap": {
         "test": {
             "ok": "已连接 LDAP 目录服务",

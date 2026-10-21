@@ -40,6 +40,38 @@ _TEXT_SOURCES = {
 _AMBIGUOUS = ("或", "或者", "还是", "可能", "也许", "不确定", "or ")
 _NATIVE_REGION_LABELS = ("籍贯", "出生地")
 _RESIDENT_REGION_LABELS = ("现住地址", "现住址", "居住地址", "居住地", "现居住地")
+_ENUM_OPTIONS = {
+    "marriage": ("未婚", "已婚", "离异", "丧偶"),
+    "occupation": ("职工", "农民", "退休", "无业", "学生", "其他"),
+    "relationship": (
+        "配偶",
+        "子女",
+        "父母",
+        "祖父母/外祖父母",
+        "孙辈/外孙辈",
+        "兄弟姐妹",
+        "其他亲属",
+        "非亲属",
+    ),
+}
+_ENUM_LABELS = {
+    "marriage": ("婚姻状况",),
+    "occupation": ("职业",),
+    "relationship": ("与患者关系", "联系人关系"),
+}
+_ENUM_ALIASES = {"relationship": {"女儿": "子女", "儿子": "子女"}}
+_UNCERTAIN_FIELD_TARGETS = {
+    "contact_phone": "phone",
+    "native_region": "nativeRegion",
+    "resident_region": "residentRegion",
+    "address": "addressDetail",
+    "employer_name": "employerName",
+    "employer_address": "employerAddress",
+    "marriage": "marriage",
+    "occupation": "occupation",
+    "emergency_contact": "emergencyContact",
+    "relationship": "relationship",
+}
 
 
 class StoreCapacityError(Exception):
@@ -118,19 +150,43 @@ def _friendly_message(key: str, validator: str) -> str:
 
 def accepted_candidates(text: str, extracted: Any, page: int = 1) -> dict[str, Any]:
     """Map model output to form fields for the current page, keeping only safe values."""
-    if not isinstance(extracted, dict) or any(term in text for term in _AMBIGUOUS):
-        return {}
+    return candidate_result(text, extracted, page)[0]
+
+
+def candidate_result(
+    text: str, extracted: Any, page: int = 1, uncertain_fields: list[str] | None = None
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """Return accepted fields and field-specific reasons for understood but invalid values."""
+    if not isinstance(extracted, dict):
+        return {}, {}
+    errors = _enum_conflicts(text, page)
+    if uncertain_fields is None and any(term in text for term in _AMBIGUOUS):
+        return {}, errors
     if page == 0:
         values = _page2_values(text, extracted)
         values.pop("addressDetail", None)
         values.update(_page1_values(text, extracted))
     else:
         values = _page1_values(text, extracted) if page == 1 else _page2_values(text, extracted)
-    return {
-        key: value
-        for key, value in values.items()
-        if not validate_fields({**_base_fields(), key: value}).get(key)
-    }
+    if uncertain_fields is not None:
+        uncertain_targets = {
+            _UNCERTAIN_FIELD_TARGETS[key]
+            for key in uncertain_fields
+            if key in _UNCERTAIN_FIELD_TARGETS
+        }
+        values = {key: value for key, value in values.items() if key not in uncertain_targets}
+    accepted: dict[str, Any] = {}
+    for key, value in values.items():
+        error = validate_fields({**_base_fields(), key: value}).get(key)
+        if key in errors:
+            continue
+        if key == "phone" and len(_PHONE.findall(text)) > 1:
+            errors[key] = "一次请提供一个11位手机号码"
+        elif error:
+            errors[key] = error
+        else:
+            accepted[key] = value
+    return accepted, errors
 
 
 def _page1_values(text: str, extracted: dict[str, Any]) -> dict[str, Any]:
@@ -142,6 +198,16 @@ def _page1_values(text: str, extracted: dict[str, Any]) -> dict[str, Any]:
         labeled_phones = list(_LABELED_PHONE.finditer(text))
         if len(labeled_phones) == 1:
             values["phone"] = labeled_phones[0].group(1)
+        else:
+            match = next(_PHONE.finditer(text))
+            # 模型可能按 PII 惯例把手机号打码（如 ****8813）导致子串校验失败；
+            # 原话恰好只有一个 11 位号码时无需模型指认，联系人口径的号码除外。
+            if "联系人" not in text[max(0, match.start() - 8) : match.start()]:
+                values["phone"] = match.group(0)
+    else:
+        labeled_phone = _labeled_phone_input(text)
+        if labeled_phone is not None:
+            values["phone"] = labeled_phone
     native_text = _substring(extracted.get("native_region"), text)
     native_codes = _region_codes(native_text)
     if not native_codes:
@@ -197,10 +263,48 @@ def _page2_values(text: str, extracted: dict[str, Any]) -> dict[str, Any]:
             values[target] = value
     for key in ("marriage", "occupation", "relationship"):
         # 枚举键允许模型归一化（如“女儿”→“子女”），不做原文子串检查。
-        value = extracted.get(key)
+        explicit_value = _labeled_enum_value(text, key)
+        value = explicit_value or extracted.get(key)
+        if explicit_value:
+            value = _ENUM_ALIASES.get(key, {}).get(explicit_value, explicit_value)
         if isinstance(value, str) and 0 < len(value.strip()) <= 20:
             values[key] = value.strip()
     return values
+
+
+def _labeled_phone_input(text: str) -> str | None:
+    match = re.search(r"联系电话|联系手机|手机号|手机号码|电话号码|电话|手机", text)
+    if not match or "联系人" in text[max(0, match.start() - 8) : match.start()]:
+        return None
+    segment = re.split(r"[，,。；;！？!?]", text[match.end() :], maxsplit=1)[0]
+    number = re.search(r"\d[\d -]{0,18}\d|\d", segment)
+    return re.sub(r"[ -]", "", number.group(0)) if number else None
+
+
+def _labeled_enum_value(text: str, key: str) -> str | None:
+    for label in _ENUM_LABELS[key]:
+        start = text.find(label)
+        if start >= 0:
+            segment = re.split(r"[，,。；;！？!?]", text[start + len(label) :], maxsplit=1)[0]
+            return re.sub(r"^[\s:：是为改成改为叫做]+", "", segment).strip() or None
+    return None
+
+
+def _enum_conflicts(text: str, page: int) -> dict[str, str]:
+    if page not in (0, 2):
+        return {}
+    errors = {}
+    for key, options in _ENUM_OPTIONS.items():
+        value = _labeled_enum_value(text, key) or ""
+        remaining = value
+        selected = []
+        for option in sorted(options, key=len, reverse=True):
+            if option in remaining:
+                selected.append(option)
+                remaining = remaining.replace(option, "")
+        if len(selected) > 1:
+            errors[key] = "本次描述包含多个选项，请明确选择一项"
+    return errors
 
 
 def _substring(value: Any, text: str) -> str | None:
@@ -227,9 +331,29 @@ def _region_prefix(text: str) -> tuple[int, list[str]] | None:
     previous = ""
     matched_length = 0
     while len(codes) < 3:
-        node = next((item for item in nodes if rest.startswith(item["label"])), None)
-        if node is None:
-            # 直辖市口语常省略与省同名的市级（“北京市朝阳区”），跳过该级占位。
+        match = _region_node_prefix(rest, nodes)
+        if match is None:
+            if not codes:
+                matches = set()
+                for province in REGIONS:
+                    for city in province.get("children", []):
+                        city_match = _region_node_prefix(text, [city])
+                        if city_match is None:
+                            continue
+                        for district in city.get("children", []):
+                            district_match = _region_node_prefix(text[city_match[1] :], [district])
+                            if district_match is not None:
+                                matches.add(
+                                    (
+                                        city_match[1] + district_match[1],
+                                        province["code"],
+                                        city["code"],
+                                        district["code"],
+                                    )
+                                )
+                if len(matches) == 1:
+                    length, *path = next(iter(matches))
+                    return length, path
             filler = next(
                 (
                     item
@@ -243,14 +367,34 @@ def _region_prefix(text: str) -> tuple[int, list[str]] | None:
             codes.append(str(filler["code"]))
             nodes = filler.get("children", []) or []
             continue
+        node, length = match
         codes.append(str(node["code"]))
         previous = node["label"]
-        rest = rest[len(node["label"]) :]
-        matched_length += len(node["label"])
+        rest = rest[length:]
+        matched_length += length
         nodes = node.get("children", []) or []
         if not nodes:
             return matched_length, codes
     return matched_length, codes
+
+
+def _region_node_prefix(
+    text: str, nodes: list[dict[str, Any]]
+) -> tuple[dict[str, Any], int] | None:
+    full = [(node, len(node["label"])) for node in nodes if text.startswith(node["label"])]
+    if full:
+        return full[0] if len(full) == 1 else None
+    shortened = [
+        (node, size)
+        for node in nodes
+        for size in range(2, len(node["label"]))
+        if text.startswith(node["label"][:size])
+    ]
+    if not shortened:
+        return None
+    longest = max(size for _, size in shortened)
+    candidates = [item for item in shortened if item[1] == longest]
+    return candidates[0] if len(candidates) == 1 else None
 
 
 def _base_fields() -> dict[str, Any]:

@@ -971,6 +971,12 @@
             "memory_extract_trigger_mode_invalid": "Extraction trigger mode must be idle or interval."
         }
     },
+    "admission_proxy": {
+        "request_too_large": "Registration request is too large. Please shorten this input.",
+        "timeout": "The registration service timed out. Please try again later.",
+        "unavailable": "The registration service is unavailable. Please check the independent Demo backend.",
+        "invalid_response": "The registration service returned an unexpected response. Please check the independent Demo backend."
+    },
     "ldap": {
         "test": {
             "ok": "Connected to the LDAP directory",

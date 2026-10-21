@@ -7,6 +7,7 @@ from octop.infra.admission_registration_demo import (
     REGIONS,
     DemoStore,
     accepted_candidates,
+    candidate_result,
     regions_for,
     validate_fields,
 )
@@ -36,6 +37,35 @@ def test_contract_rejects_unlisted_fields_and_ai_candidates_need_transcript_evid
 
 def test_labeled_single_phone_is_recovered_when_agent_omits_it() -> None:
     assert accepted_candidates("我的电话是13800138000", {}) == {"phone": "13800138000"}
+
+
+def test_ai_candidates_explain_invalid_phone_and_unsupported_occupation() -> None:
+    assert candidate_result("联系电话1234567890", {}, page=0) == (
+        {},
+        {"phone": "请输入有效的11位手机号码"},
+    )
+    assert candidate_result("职业护士", {"occupation": "学生"}, page=0) == (
+        {},
+        {"occupation": "请选择职业"},
+    )
+
+
+def test_ai_candidates_report_conflicting_enum_values_and_keep_supported_aliases() -> None:
+    assert candidate_result("婚姻状况未婚又已婚", {"marriage": "已婚"}, page=0) == (
+        {},
+        {"marriage": "本次描述包含多个选项，请明确选择一项"},
+    )
+    assert accepted_candidates("与患者关系女儿", {"relationship": "子女"}, page=0) == {
+        "relationship": "子女",
+    }
+
+
+def test_bare_single_phone_is_recovered_when_agent_masks_or_omits_it() -> None:
+    # 推理模型可能按 PII 惯例把手机号打码（如 ****8813）后返回。
+    assert accepted_candidates("13412348813。", {"contact_phone": "****8813"}) == {
+        "phone": "13412348813"
+    }
+    assert accepted_candidates("13412348813。", {}) == {"phone": "13412348813"}
 
 
 def test_phone_fallback_rejects_masked_ambiguous_and_other_person_numbers() -> None:
@@ -88,6 +118,16 @@ def test_ai_recovers_labeled_regions_when_model_puts_them_in_address() -> None:
         "nativeRegion": ["210000", "210100", "210103"],
         "residentRegion": ["210000", "210100", "210103"],
     }
+
+
+def test_ai_recovers_labeled_region_without_province_name() -> None:
+    assert accepted_candidates("我的籍贯沈阳市沈河区", {}) == {
+        "nativeRegion": ["210000", "210100", "210103"],
+    }
+
+
+def test_ai_does_not_guess_a_region_without_a_unique_city_path() -> None:
+    assert accepted_candidates("我的籍贯长安区", {}) == {}
 
 
 def test_region_tree_covers_mainland_hong_kong_and_macau_with_unique_codes() -> None:

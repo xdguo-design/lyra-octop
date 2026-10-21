@@ -16,12 +16,12 @@ from octop.infra.admission_demo import (
     AdmissionContextTooLongError,
     AdmissionModelRateLimitError,
     AdmissionModelUnavailableError,
-    extract_active_registration_fields,
+    extract_active_registration_result_with_model,
 )
 from octop.infra.admission_registration_demo import (
     FIELD_SCHEMA,
     StoreCapacityError,
-    accepted_candidates,
+    candidate_result,
     demo_store,
     regions_for,
     validate_fields,
@@ -60,9 +60,11 @@ class SubmissionResultBody(StrictModel):
 
 class AiBody(StrictModel):
     text: str = Field(min_length=1, max_length=2000)
-    page: int = Field(ge=1, le=2)
+    page: int = Field(ge=0, le=2)
     identityToken: str = Field(min_length=1, max_length=64)
     sessionId: str = Field(min_length=8, max_length=128)
+    # 新版前端携带 turnId 关联本轮对话；原生路径按会话上下文抽取，仅接收不使用。
+    turnId: str | None = Field(default=None, min_length=8, max_length=128)
 
 
 class HealthResponse(StrictModel):
@@ -185,6 +187,19 @@ class SubmissionResponse(StrictModel):
 
 class AiCandidatesResponse(StrictModel):
     fields: dict[str, Any]
+    clarification: str | None = Field(
+        default=None, max_length=240, description="模型主动提出的澄清追问；无追问时省略"
+    )
+    clarificationChoices: list[str] | None = Field(
+        default=None, max_length=4, description="可点击或可语音复述的澄清单选项"
+    )
+    uncertainFields: list[str] | None = Field(
+        default=None, description="模型标记为不确定、未纳入本次候选的字段（skill 键）"
+    )
+    errors: dict[str, str] = Field(
+        default_factory=dict, description="按字段返回未采纳候选的具体原因"
+    )
+    modelName: str = Field(description="本次抽取实际使用的模型展示名；未配置展示名时返回模型 ID")
 
 
 def _validate_or_422(fields: dict[str, Any]) -> None:
@@ -615,6 +630,7 @@ async def submission_result(
 @router.post(
     "/admission-registration/v1/ai/candidates",
     response_model=AiCandidatesResponse,
+    response_model_exclude_none=True,
     summary="Extract mock admission candidates with the active Octop model",
     description=(
         "Uses the active model and the verified patient's selected application, confirmed facts, "
@@ -651,7 +667,13 @@ async def ai_candidates(
         ],
     }
     try:
-        extracted = await extract_active_registration_fields(
+        (
+            extracted,
+            model_name,
+            clarification,
+            uncertain_fields,
+            clarification_choices,
+        ) = await extract_active_registration_result_with_model(
             server, body.text, page=0, context=context, user_id=user.id
         )
     except AdmissionModelRateLimitError as exc:
@@ -679,4 +701,15 @@ async def ai_candidates(
                 "message": "当前智能填写服务暂不可用，请保留转写并手动补充。",
             },
         ) from exc
-    return {"fields": accepted_candidates(body.text, extracted, 0)}
+    fields, errors = candidate_result(body.text, extracted, 0, uncertain_fields=uncertain_fields)
+    result: dict[str, object] = {
+        "fields": fields,
+        "errors": errors,
+        "modelName": model_name,
+    }
+    if clarification:
+        result["clarification"] = clarification
+        result["clarificationChoices"] = clarification_choices
+    if uncertain_fields is not None:
+        result["uncertainFields"] = uncertain_fields
+    return result

@@ -13,7 +13,7 @@ from octop.infra.admission_demo import (
     AdmissionModelUnavailableError,
     classify_active_admission_intent,
     classify_active_candidate_confirmation,
-    extract_active_registration_fields,
+    extract_active_registration_result_with_model,
 )
 
 router = APIRouter()
@@ -26,6 +26,16 @@ class AdmissionExtractionBody(BaseModel):
 
 class AdmissionExtractionResponse(BaseModel):
     fields: dict[str, str]
+    modelName: str = Field(description="本次抽取实际使用的模型展示名；未配置展示名时返回模型 ID")
+    clarification: str | None = Field(
+        default=None, max_length=240, description="模型针对含糊字段向患者提出的澄清问题"
+    )
+    clarificationChoices: list[str] = Field(
+        default_factory=list, max_length=4, description="可点击或可语音复述的澄清单选项"
+    )
+    uncertainFields: list[str] | None = Field(
+        default=None, description="模型判断需要患者澄清的字段键"
+    )
 
 
 class AdmissionIntentBody(BaseModel):
@@ -87,7 +97,13 @@ async def extract_admission_fields(
     server: Any = Depends(get_server),
 ) -> AdmissionExtractionResponse:
     try:
-        fields = await extract_active_registration_fields(
+        (
+            fields,
+            model_name,
+            clarification,
+            uncertain_fields,
+            clarification_choices,
+        ) = await extract_active_registration_result_with_model(
             server, body.text, body.page, user_id=user.id
         )
     except AdmissionModelRateLimitError as exc:
@@ -106,7 +122,13 @@ async def extract_admission_fields(
                 "message": "当前智能填写服务暂不可用，请保留转写并手动补充。",
             },
         ) from exc
-    return AdmissionExtractionResponse(fields=fields)
+    return AdmissionExtractionResponse(
+        fields=fields,
+        modelName=model_name,
+        clarification=clarification,
+        clarificationChoices=clarification_choices,
+        uncertainFields=uncertain_fields,
+    )
 
 
 @router.post(

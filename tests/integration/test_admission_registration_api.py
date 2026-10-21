@@ -424,7 +424,11 @@ async def test_ai_candidates_use_active_model_and_accept_only_grounded_phone(
     )
 
     assert response.status_code == 200, response.text
-    assert response.json() == {"fields": {"phone": "13800138000"}}
+    assert response.json() == {
+        "fields": {"phone": "13800138000"},
+        "errors": {},
+        "modelName": "demo-model",
+    }
     request = call_agent.await_args.args[1]
     assert request["model"] == "demo-provider/demo-model"
     assert request["skills"] == []
@@ -465,10 +469,107 @@ async def test_ai_candidates_recover_a_labeled_phone_omitted_by_agent(
     )
 
     assert response.status_code == 200, response.text
-    assert response.json() == {"fields": {"phone": "13800138000"}}
+    assert response.json() == {
+        "fields": {"phone": "13800138000"},
+        "errors": {},
+        "modelName": "demo-model",
+    }
     request = call_agent.await_args.args[1]
     assert request["source"] == "admission_demo"
     assert request["skills"] == []
+
+
+async def test_ai_candidates_serialize_model_clarification_without_500(
+    env: Any, monkeypatch: Any
+) -> None:
+    client, server, auth = env
+    verified = await client.post(
+        "/api/admission-registration/v1/identity/verify",
+        headers=auth,
+        json={"method": "id_card"},
+    )
+    token = verified.json()["identityToken"]
+    session_id = await _select_admission_session(client, auth, token)
+    call_agent = AsyncMock(
+        return_value={
+            "messages": [
+                AIMessage(
+                    content=json.dumps(
+                        {
+                            "fields": {"contact_phone": "13800138000"},
+                            "uncertain_fields": ["contact_phone"],
+                            "clarification": "请您完整说出11位手机号码，刚才听到的号码不完整。",
+                            "clarification_choices": ["重新提供手机号", "跳过"],
+                        }
+                    )
+                )
+            ]
+        }
+    )
+    monkeypatch.setattr("octop.infra.admission_demo._ensure_admission_agent", AsyncMock())
+    monkeypatch.setattr(server.app_runtime.agent_registry, "call", call_agent)
+    server.app_runtime.agent_registry.harness_manager.shared_factory = Mock()
+    _use_test_admission_model(server, monkeypatch)
+
+    response = await client.post(
+        "/api/admission-registration/v1/ai/candidates",
+        headers=auth,
+        json={
+            "text": "联系电话是13800138000",
+            "page": 0,
+            "identityToken": token,
+            "sessionId": session_id,
+            "turnId": "turn-clarify-0001",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "fields": {},
+        "errors": {},
+        "modelName": "demo-model",
+        "clarification": "请您完整说出11位手机号码，刚才听到的号码不完整。",
+        "clarificationChoices": ["重新提供手机号", "跳过"],
+        "uncertainFields": ["contact_phone"],
+    }
+
+
+async def test_ai_candidates_return_specific_reasons_for_rejected_fields(
+    env: Any, monkeypatch: Any
+) -> None:
+    client, server, auth = env
+    verified = await client.post(
+        "/api/admission-registration/v1/identity/verify",
+        headers=auth,
+        json={"method": "id_card"},
+    )
+    token = verified.json()["identityToken"]
+    session_id = await _select_admission_session(client, auth, token)
+    call_agent = AsyncMock(
+        return_value={"messages": [AIMessage(content=json.dumps({"occupation": "学生"}))]}
+    )
+    monkeypatch.setattr("octop.infra.admission_demo._ensure_admission_agent", AsyncMock())
+    monkeypatch.setattr(server.app_runtime.agent_registry, "call", call_agent)
+    server.app_runtime.agent_registry.harness_manager.shared_factory = Mock()
+    _use_test_admission_model(server, monkeypatch)
+
+    response = await client.post(
+        "/api/admission-registration/v1/ai/candidates",
+        headers=auth,
+        json={
+            "text": "职业护士",
+            "page": 2,
+            "identityToken": token,
+            "sessionId": session_id,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "fields": {},
+        "errors": {"occupation": "请选择职业"},
+        "modelName": "demo-model",
+    }
 
 
 async def test_ai_candidates_split_labeled_regions_from_a_multi_field_utterance(
@@ -518,7 +619,9 @@ async def test_ai_candidates_split_labeled_regions_from_a_multi_field_utterance(
             "phone": "13800138000",
             "nativeRegion": ["210000", "210100", "210103"],
             "residentRegion": ["210000", "210100", "210103"],
-        }
+        },
+        "errors": {},
+        "modelName": "demo-model",
     }
 
 

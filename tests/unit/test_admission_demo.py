@@ -13,10 +13,12 @@ from octop.infra.admission_demo import (
     _classify_intent_output,
     _ensure_admission_agent,
     _extract_fields_output,
+    _model_display_name,
     _parse_json_object,
     classify_active_admission_intent,
     classify_active_candidate_confirmation,
     extract_active_registration_fields,
+    extract_active_registration_fields_with_model,
     provision_admission_agent,
 )
 
@@ -108,6 +110,21 @@ async def test_active_intent_calls_only_router_skill(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("text", ["住院登记", "入院登记。", " 住院登记！ "])
+async def test_bare_admission_name_starts_the_demo_without_model(text: str, monkeypatch) -> None:
+    call = AsyncMock()
+    monkeypatch.setattr("octop.infra.admission_demo._call_admission_skill", call)
+
+    result = await classify_active_admission_intent(SimpleNamespace(), text)
+
+    assert result == (
+        "begin_admission",
+        "您好，我可以协助您办理入院登记。请先通过身份证、社保卡或电子医保凭证确认身份。",
+    )
+    call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_candidate_confirmation_uses_patient_info_skill(monkeypatch) -> None:
     call = AsyncMock(return_value='{"decision":"keep_current"}')
     monkeypatch.setattr("octop.infra.admission_demo._call_admission_skill", call)
@@ -134,12 +151,15 @@ async def test_candidate_confirmation_uses_patient_info_skill(monkeypatch) -> No
 @pytest.mark.asyncio
 async def test_extraction_uses_patient_info_skill_and_page_scope(monkeypatch) -> None:
     server = SimpleNamespace()
-    call = AsyncMock(return_value='{"occupation":"学生","address":"忽略"}')
-    monkeypatch.setattr("octop.infra.admission_demo._call_admission_skill", call)
+    call = AsyncMock(return_value=('{"occupation":"学生","address":"忽略"}', "Qwen Display"))
+    monkeypatch.setattr("octop.infra.admission_demo._call_admission_skill_with_model", call)
 
-    result = await extract_active_registration_fields(server, "我在上学", page=2)
+    result, model_name = await extract_active_registration_fields_with_model(
+        server, "我在上学", page=2
+    )
 
     assert result == {"occupation": "学生"}
+    assert model_name == "Qwen Display"
     call.assert_awaited_once_with(
         server,
         skill="admission-patient-info",
@@ -148,15 +168,34 @@ async def test_extraction_uses_patient_info_skill_and_page_scope(monkeypatch) ->
     )
 
 
+def test_model_display_name_prefers_configured_name_and_falls_back_to_model_id() -> None:
+    provider = SimpleNamespace(
+        name="example",
+        get_models=lambda: [{"id": "qwen-3", "name": "Qwen Display"}, {"id": "gpt-4o"}],
+    )
+    providers = SimpleNamespace(iter_usable_rows=lambda: [provider])
+
+    assert _model_display_name(providers, "example/qwen-3") == "Qwen Display"
+    assert _model_display_name(providers, "example/gpt-4o") == "gpt-4o"
+    assert _model_display_name(providers, "missing/model-x") == "model-x"
+
+
 @pytest.mark.asyncio
-async def test_rejects_oversized_context_before_calling_agent(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    "text,context",
+    [
+        ("口述", {"recent_turns": ["甲" * 20000]}),
+        ("甲" * 2000, None),
+    ],
+)
+async def test_rejects_oversized_model_input_before_calling_agent(
+    monkeypatch, text, context
+) -> None:
     call = AsyncMock()
-    monkeypatch.setattr("octop.infra.admission_demo._call_admission_skill", call)
+    monkeypatch.setattr("octop.infra.admission_demo._call_admission_skill_with_model", call)
 
     with pytest.raises(AdmissionContextTooLongError):
-        await extract_active_registration_fields(
-            SimpleNamespace(), "口述", context={"recent_turns": ["甲" * 20000]}
-        )
+        await extract_active_registration_fields(SimpleNamespace(), text, context=context)
 
     call.assert_not_awaited()
 
@@ -200,6 +239,7 @@ async def test_agent_call_uses_bound_model_and_selected_thinking(
     )
     request = registry.call.await_args.args[1]
     assert request["skills"] == []
+    assert request["mcp_servers"] == []
     disabled = registry.sync_tools_disabled.call_args.args[1]
     assert {"write_todos", "read_file", "ls"} <= disabled
     assert request["messages"][0]["role"] == "system"
@@ -213,6 +253,91 @@ async def test_agent_call_uses_bound_model_and_selected_thinking(
             "chat_template_kwargs": {"enable_thinking": enabled}
         }
     assert json.loads(request["messages"][1]["content"]) == {"text": "你好"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "page,attached,utterance,expected",
+    [
+        (1, True, "现住址在朝阳区", ["china_address_resolver"]),
+        (1, True, "联系电话是13800138000", []),
+        (2, True, "现住址在朝阳区", []),
+        (1, False, "现住址在朝阳区", []),
+    ],
+)
+async def test_address_mcp_is_only_requested_for_address_extraction(
+    monkeypatch, page, attached, utterance, expected
+) -> None:
+    from octop.infra.admission_demo import _call_admission_skill
+
+    registry = SimpleNamespace(
+        call=AsyncMock(return_value={"messages": [AIMessage(content="{}")]}),
+        sync_tools_disabled=Mock(),
+        default_mcp_servers=Mock(return_value=["china_address_resolver"] if attached else []),
+        validate_mcp_servers=Mock(return_value=["china_address_resolver"]),
+        get_row=lambda _id: SimpleNamespace(default_model="provider/model"),
+        get_config=lambda _id: {},
+        providers=SimpleNamespace(
+            is_model_ref_usable=lambda _ref: True,
+            get_model_reasoning_capability=lambda _ref: None,
+        ),
+    )
+    server = SimpleNamespace(
+        app_runtime=SimpleNamespace(agent_registry=registry),
+    )
+    monkeypatch.setattr("octop.infra.admission_demo._ensure_admission_agent", AsyncMock())
+
+    await _call_admission_skill(
+        server,
+        skill="admission-patient-info",
+        payload={"mode": "extract", "page": page, "current_utterance": utterance},
+        user_id=1,
+    )
+
+    assert registry.call.await_args.args[1]["mcp_servers"] == expected
+    if expected:
+        registry.validate_mcp_servers.assert_called_once_with(1, ["china_address_resolver"])
+    else:
+        registry.validate_mcp_servers.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_address_mcp_load_failure_retries_without_mcp(monkeypatch) -> None:
+    from octop.infra.admission_demo import _call_admission_skill
+    from octop.infra.errors import ErrorCode, OctopError
+
+    registry = SimpleNamespace(
+        call=AsyncMock(
+            side_effect=[
+                OctopError(ErrorCode.CONNECTOR_MCP_LOAD_FAILED, "MCP unavailable"),
+                {"messages": [AIMessage(content="{}")]},
+            ]
+        ),
+        sync_tools_disabled=Mock(),
+        default_mcp_servers=Mock(return_value=["china_address_resolver"]),
+        validate_mcp_servers=Mock(return_value=["china_address_resolver"]),
+        get_row=lambda _id: SimpleNamespace(default_model="provider/model"),
+        get_config=lambda _id: {},
+        providers=SimpleNamespace(
+            is_model_ref_usable=lambda _ref: True,
+            get_model_reasoning_capability=lambda _ref: None,
+        ),
+    )
+    monkeypatch.setattr("octop.infra.admission_demo._ensure_admission_agent", AsyncMock())
+
+    assert (
+        await _call_admission_skill(
+            SimpleNamespace(app_runtime=SimpleNamespace(agent_registry=registry)),
+            skill="admission-patient-info",
+            payload={"mode": "extract", "page": 1, "current_utterance": "现住址在朝阳区"},
+            user_id=1,
+        )
+        == "{}"
+    )
+    first, retry = (call.args[1] for call in registry.call.await_args_list)
+    assert first["mcp_servers"] == ["china_address_resolver"]
+    assert retry["mcp_servers"] == []
+    assert first["messages"] == retry["messages"]
 
 
 @pytest.mark.asyncio
@@ -255,6 +380,8 @@ async def test_creates_visible_expert_with_privacy_and_tool_limits() -> None:
         get_config=lambda _agent_id: {},
         get_agent=lambda _agent_id: "live-agent",
         create=AsyncMock(side_effect=create),
+        default_mcp_servers=lambda _agent_id: ["china_address_resolver"],
+        persist_mcp_servers=Mock(),
     )
     server = SimpleNamespace(app_runtime=SimpleNamespace(agent_registry=registry))
 
@@ -266,6 +393,8 @@ async def test_creates_visible_expert_with_privacy_and_tool_limits() -> None:
     assert spec.user_id is None
     assert spec.is_shared is True
     assert spec.icon_url == "/experts/avatars/admission-assistant.png"
+    assert spec.mcp_servers == ["china_address_resolver"]
+    registry.persist_mcp_servers.assert_not_called()
     assert spec.config["admission_demo_agent"] is True
     assert spec.config["observability"]["langfuse"] is False
     assert spec.config["checkpointer"] is False
@@ -301,12 +430,17 @@ async def test_backfills_admission_avatar_without_overwriting_custom_avatar(icon
     registry = SimpleNamespace(
         get_row=lambda _agent_id: row,
         get_config=lambda _agent_id: {"admission_demo_agent": True},
+        default_mcp_servers=lambda _agent_id: [],
+        persist_mcp_servers=Mock(),
         set_icon_url=Mock(return_value=row),
     )
     server = SimpleNamespace(app_runtime=SimpleNamespace(agent_registry=registry))
 
     await provision_admission_agent(server)
 
+    registry.persist_mcp_servers.assert_called_once_with(
+        "octop-admission-demo", ["china_address_resolver"]
+    )
     if icon_url is None:
         registry.set_icon_url.assert_called_once_with(
             "octop-admission-demo", "/experts/avatars/admission-assistant.png"
@@ -321,7 +455,16 @@ async def test_pins_initial_active_model_without_changing_an_existing_binding(bo
     row = SimpleNamespace(user_id=None, is_shared=1, icon_url="/avatar.png", default_model=bound)
     registry = SimpleNamespace(
         get_row=lambda _id: row,
-        get_config=lambda _id: {"admission_demo_agent": True},
+        get_config=lambda _id: {
+            "admission_demo_agent": True,
+            "max_iters": 12,
+            "max_input_length": 20000,
+            "temperature": 0.2,
+            "max_tokens": 512,
+            "reasoning": {"mode": "disabled"},
+        },
+        default_mcp_servers=lambda _id: ["china_address_resolver"],
+        persist_mcp_servers=Mock(),
         update=AsyncMock(return_value=row),
     )
     server = SimpleNamespace(
