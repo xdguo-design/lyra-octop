@@ -109,6 +109,9 @@ async def test_admission_ai_uses_the_bound_expert_model_and_effort(env: Any, mon
     assert response.json() == {
         "fields": {"emergency_contact": "王晓梅", "relationship": "女儿"},
         "modelName": "Demo Display Name",
+        "clarification": None,
+        "clarificationChoices": [],
+        "uncertainFields": None,
     }
     assert call.await_args.args[1]["skills"] == []
     assert call.await_args.args[1]["messages"][0]["role"] == "system"

@@ -1,0 +1,8 @@
+.env
+backend/data/
+backend/.venv/
+backend/__pycache__/
+backend/.pytest_cache/
+backend/.ruff_cache/
+backend/build/
+backend/dist/

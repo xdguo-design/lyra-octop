@@ -40,6 +40,20 @@ def test_reasoning_capability_accepts_token_plan_thinking_option() -> None:
     assert capability["default_mode"] == "enabled"
 
 
+def test_bigmodel_glm_reasoning_is_detected_without_saved_metadata() -> None:
+    capability = reasoning_capability(
+        {"id": "glm-5.3-flash"},
+        base_url="https://open.bigmodel.cn/api/coding/paas/v4",
+    )
+    assert capability is not None
+    assert capability["adapter"] == "thinking"
+    assert capability["toggle"] is True
+    assert capability["default_mode"] == "auto"
+    assert reasoning_request_parameters(capability, mode="disabled", effort=None) == {
+        "extra_body": {"thinking": {"type": "disabled"}}
+    }
+
+
 def test_known_token_plan_model_is_detected_without_saved_metadata() -> None:
     capability = reasoning_capability({"id": "kimi-k2.5"})
     assert capability is not None

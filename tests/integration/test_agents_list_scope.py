@@ -37,7 +37,28 @@ async def test_list_agents_default_scope_is_mine_only(env) -> None:
     rows = r.json()
     ids = {row["agent_id"] for row in rows}
     assert guest_agent_id not in ids
-    assert all(row.get("user_id") is not None for row in rows)
+    assert all(row.get("user_id") is not None or row["is_shared"] for row in rows)
+
+
+async def test_list_includes_only_enabled_explicitly_shared_system_agents(env) -> None:
+    c, srv, admin_auth = env
+    user_auth = await create_user(c, admin_auth, username="system_shared_viewer")
+    repo = srv.services.agent_repo
+    for agent_id in ("system-shared", "system-private", "system-disabled"):
+        repo.create(agent_id=agent_id, user_id=None, name=agent_id)
+    repo.set_shared("system-shared", True)
+    repo.set_shared("system-disabled", True)
+    repo.set_enabled("system-disabled", False)
+
+    response = await c.get("/api/agents", headers=user_auth)
+
+    assert response.status_code == 200, response.text
+    rows = {row["agent_id"]: row for row in response.json()}
+    assert "system-shared" in rows
+    assert rows["system-shared"]["is_shared"] is True
+    assert rows["system-shared"]["is_owner"] is False
+    assert "system-private" not in rows
+    assert "system-disabled" not in rows
 
 
 async def test_admin_scope_all_lists_every_user(env) -> None:

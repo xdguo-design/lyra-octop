@@ -137,3 +137,6 @@ demos/*/e2e/artifacts/
 
 # Local DOM probe pages (one-off debugging aids, not for upstream)
 demos/*/frontend/probe_dom*.html
+
+# Root-level one-off capture screenshots (not for upstream)
+/biz_t1_*.png
