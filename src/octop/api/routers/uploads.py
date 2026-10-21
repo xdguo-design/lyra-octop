@@ -67,6 +67,8 @@ def _attachment_payload(
         "media_type": stored.media_type,
         "file_id": file_id,
         "revision_id": revision_id,
+        "size": str(stored.size),
+        "read_status": "stored",
     }
 
 

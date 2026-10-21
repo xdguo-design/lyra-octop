@@ -209,6 +209,56 @@ class ChatFileRepo:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def search_segments(
+        self, revision_id: str, query: str, *, limit: int = 20
+    ) -> list[dict[str, object]]:
+        """Bounded case-insensitive substring search over one revision's segments."""
+        needle = query.strip()
+        if not needle:
+            return []
+        escaped = needle.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT ordinal, locator_json, text, char_count FROM chat_file_segments "
+                "WHERE revision_id = ? AND lower(text) LIKE ? ESCAPE '\\' "
+                "ORDER BY ordinal LIMIT ?",
+                (revision_id, pattern.lower(), max(1, min(limit, 100))),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def get_owned_file(self, file_id: str, *, user_id: int, agent_id: str) -> ChatFileRow | None:
+        with self._db.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM chat_files WHERE file_id = ? AND user_id = ? AND agent_id = ? "
+                "AND deleted_at IS NULL",
+                (file_id, user_id, agent_id),
+            ).fetchone()
+        return ChatFileRow.from_row(row) if row else None
+
+    def list_for_thread(
+        self, *, user_id: int, agent_id: str, thread_id: str, limit: int = 50, offset: int = 0
+    ) -> list[ChatFileRow]:
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM chat_files WHERE user_id = ? AND agent_id = ? AND thread_id = ? "
+                "AND deleted_at IS NULL ORDER BY updated_at DESC, created_at DESC "
+                "LIMIT ? OFFSET ?",
+                (user_id, agent_id, thread_id, max(1, min(limit, 50)), max(0, offset)),
+            ).fetchall()
+        return [ChatFileRow.from_row(row) for row in rows]
+
+    def list_revisions(
+        self, file_id: str, *, limit: int = 50, offset: int = 0
+    ) -> list[ChatFileRevisionRow]:
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM chat_file_revisions WHERE file_id = ? "
+                "ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
+                (file_id, max(1, min(limit, 50)), max(0, offset)),
+            ).fetchall()
+        return [ChatFileRevisionRow.from_row(row) for row in rows]
+
     def bind_thread(
         self,
         file_id: str,
