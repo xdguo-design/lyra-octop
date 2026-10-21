@@ -270,6 +270,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     });
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const {
+      items: uploadItems,
       attachments,
       uploading,
       dragOver,
@@ -279,6 +280,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       handleFolderSelect,
       handleFileChange,
       removeAttachment,
+      removeUpload,
+      retryUpload,
       clearAttachments,
       restoreAttachments,
       handlePaste,
@@ -822,6 +825,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           <ChatInputPreviewBar
             attachments={attachments}
             uploading={uploading}
+            uploadItems={uploadItems}
+            onRemoveUpload={removeUpload}
+            onRetryUpload={retryUpload}
             selectedConnectors={selectedConnectors}
             selectedModel={selectedModel}
             availableConnectors={availableConnectors}

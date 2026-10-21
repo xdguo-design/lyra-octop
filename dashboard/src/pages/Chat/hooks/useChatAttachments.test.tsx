@@ -105,6 +105,131 @@ describe("useChatAttachments drop", () => {
     expect(message.error).toHaveBeenCalled();
   });
 
+  it("caps concurrent uploads at three", async () => {
+    const releases: Array<() => void> = [];
+    vi.mocked(uploadFile).mockImplementation((_agentId, file) => {
+      return new Promise((resolve) => {
+        releases.push(() =>
+          resolve({
+            path: `inbound/${file.name}`,
+            workspace_path: `inbound/${file.name}`,
+            filename: file.name,
+            media_type: file.type || "application/octet-stream",
+            url: "",
+            access_url: `/files/${file.name}`,
+          }),
+        );
+      });
+    });
+    const { result } = renderHook(() => useChatAttachments("agent-1"));
+    const five = ["a", "b", "c", "d", "e"].map(
+      (name) => new File([name], `${name}.txt`, { type: "text/plain" }),
+    );
+
+    await act(async () => {
+      void result.current.processFiles(five);
+      await Promise.resolve();
+    });
+
+    expect(uploadFile).toHaveBeenCalledTimes(3);
+    expect(
+      result.current.items.filter((item) => item.status === "uploading"),
+    ).toHaveLength(3);
+
+    await act(async () => {
+      releases.slice(0, 3).forEach((release) => release());
+    });
+    await waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(5));
+
+    await act(async () => {
+      releases.slice(3).forEach((release) => release());
+    });
+    await waitFor(() =>
+      expect(result.current.attachments.map((item) => item.filename)).toEqual([
+        "a.txt",
+        "b.txt",
+        "c.txt",
+        "d.txt",
+        "e.txt",
+      ]),
+    );
+  });
+
+  it("does not re-add an upload removed while in flight", async () => {
+    let release: (() => void) | undefined;
+    vi.mocked(uploadFile).mockImplementation((_agentId, file) => {
+      return new Promise((resolve) => {
+        release = () =>
+          resolve({
+            path: `inbound/${file.name}`,
+            workspace_path: `inbound/${file.name}`,
+            filename: file.name,
+            media_type: file.type || "application/octet-stream",
+            url: "",
+            access_url: `/files/${file.name}`,
+          });
+      });
+    });
+    const { result } = renderHook(() => useChatAttachments("agent-1"));
+    const file = new File(["a"], "a.txt", { type: "text/plain" });
+
+    await act(async () => {
+      void result.current.processFiles([file]);
+      await Promise.resolve();
+    });
+    expect(uploadFile).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      result.current.removeUpload(result.current.items[0].key);
+    });
+    expect(result.current.items).toEqual([]);
+
+    await act(async () => {
+      release?.();
+    });
+    expect(result.current.items).toEqual([]);
+    expect(result.current.attachments).toEqual([]);
+  });
+
+  it("drops attachments when the agent changes", async () => {
+    const { result, rerender } = renderHook(
+      ({ agentId }: { agentId: string }) => useChatAttachments(agentId),
+      { initialProps: { agentId: "agent-1" } },
+    );
+    const file = new File(["a"], "a.txt", { type: "text/plain" });
+
+    await act(async () => {
+      await result.current.processFiles([file]);
+    });
+    await waitFor(() => expect(result.current.attachments).toHaveLength(1));
+
+    rerender({ agentId: "agent-2" });
+    expect(result.current.items).toEqual([]);
+    expect(result.current.attachments).toEqual([]);
+  });
+
+  it("retries a failed upload", async () => {
+    vi.mocked(uploadFile).mockRejectedValueOnce(new Error("boom"));
+    const { result } = renderHook(() => useChatAttachments("agent-1"));
+    const file = new File(["a"], "a.txt", { type: "text/plain" });
+
+    await act(async () => {
+      await result.current.processFiles([file]);
+    });
+    await waitFor(() => expect(result.current.items[0].status).toBe("failed"));
+    expect(result.current.attachments).toEqual([]);
+
+    await act(async () => {
+      result.current.retryUpload(result.current.items[0].key);
+    });
+    await waitFor(() =>
+      expect(result.current.attachments.map((item) => item.filename)).toEqual([
+        "a.txt",
+      ]),
+    );
+    expect(result.current.items[0].status).toBe("done");
+  });
+
   it("keeps the drop highlight while the pointer is still inside the composer", () => {
     const { result } = renderHook(() => useChatAttachments("agent-1"));
     const shell = document.createElement("div");
