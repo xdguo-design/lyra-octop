@@ -18,6 +18,7 @@ def _bind_test_admission_model(server: Any) -> None:
             [
                 {
                     "id": "demo-model",
+                    "name": "Demo Display Name",
                     "reasoning_config": {
                         "adapter": "openai_reasoning_effort",
                         "efforts": ["low", "high"],
@@ -48,10 +49,13 @@ async def test_admission_ai_endpoint_requires_login(env: Any) -> None:
     assert response.json()["error"]["code"] == "AUTH_FAILED"
 
 
-async def test_admission_expert_is_visible_in_the_platform_agent_list(env: Any) -> None:
+async def test_admission_expert_is_provisioned_as_a_shared_system_agent(env: Any) -> None:
     client, _server, auth = env
 
-    response = await client.get("/api/agents", headers=auth)
+    # The demo Agent is a shared system agent (user_id NULL): addressable by id
+    # and listed for admins under scope=all, but deliberately kept out of every
+    # user's default "mine + explicitly shared" list (see the list_agents contract).
+    response = await client.get("/api/agents?scope=all", headers=auth)
 
     assert response.status_code == 200, response.text
     admission_agent = next(
@@ -102,7 +106,10 @@ async def test_admission_ai_uses_the_bound_expert_model_and_effort(env: Any, mon
     )
 
     assert response.status_code == 200, response.text
-    assert response.json() == {"fields": {"emergency_contact": "王晓梅", "relationship": "女儿"}}
+    assert response.json() == {
+        "fields": {"emergency_contact": "王晓梅", "relationship": "女儿"},
+        "modelName": "Demo Display Name",
+    }
     assert call.await_args.args[1]["skills"] == []
     assert call.await_args.args[1]["messages"][0]["role"] == "system"
     assert "admission-patient-info" in call.await_args.args[1]["messages"][0]["content"]
@@ -239,7 +246,7 @@ async def test_candidate_confirmation_endpoint_rejects_invalid_context(env: Any)
         ("帮我做报告解读", "unsupported", "抱歉，本演示仅支持模拟入院登记，暂不支持这项服务。"),
     ],
 )
-async def test_admission_intent_endpoint_uses_bound_model_and_fixed_response(
+async def test_admission_intent_endpoint_uses_fixed_response_for_model_and_short_phrase(
     env: Any, text: str, model_intent: str, expected_reply: str, monkeypatch
 ) -> None:
     client, server, auth = env
@@ -264,9 +271,12 @@ async def test_admission_intent_endpoint_uses_bound_model_and_fixed_response(
 
     assert response.status_code == 200, response.text
     assert response.json() == {"intent": model_intent, "reply": expected_reply}
-    assert call.await_args.args[1]["skills"] == []
-    assert call.await_args.args[1]["messages"][0]["role"] == "system"
-    assert "admission-router" in call.await_args.args[1]["messages"][0]["content"]
+    if text == "住院登记":
+        call.assert_not_awaited()
+    else:
+        assert call.await_args.args[1]["skills"] == []
+        assert call.await_args.args[1]["messages"][0]["role"] == "system"
+        assert "admission-router" in call.await_args.args[1]["messages"][0]["content"]
 
 
 async def test_admission_intent_endpoint_rejects_other_pages_and_oversized_text(env: Any) -> None:
