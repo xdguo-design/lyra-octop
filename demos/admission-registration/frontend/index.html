@@ -5,9 +5,48 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#eef5ff" />
     <title>智能入院登记 · 原型</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        /* 舞台四周留白底色：与页面近白底明显区分的柔和蓝 */
+        background: #dbe8fb;
+      }
+      .stage-viewport {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .stage-frame {
+        display: block;
+        flex: none;
+        width: min(620px, 100vw);
+        height: 100dvh;
+        border: 0;
+        background: #fff;
+      }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
+    <div class="stage-viewport">
+      <iframe
+        id="stage-frame"
+        class="stage-frame"
+        title="智能入院登记"
+        allow="microphone; autoplay"
+      ></iframe>
+    </div>
+    <script>
+      const testInputEnabled = new URLSearchParams(window.location.search).get("test-input") === "1"
+      const appUrl = new URL("app.html", window.location.href)
+      // 内层 HTML 可能仍缓存旧资源地址，每次打开重新获取，带哈希的静态资源继续复用缓存。
+      appUrl.searchParams.set("v", Date.now().toString())
+      if (testInputEnabled) appUrl.searchParams.set("test-input", "1")
+      document.getElementById("stage-frame").src = appUrl.href
+    </script>
   </body>
 </html>

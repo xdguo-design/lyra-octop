@@ -16,7 +16,7 @@ export default {
     value: { type: String, default: '' },
     // 触发键盘的按钮。真实浏览器里“打开键盘的那次点击”会继续冒泡到 document，
     // 若不把按钮算作内部区域，这次点击会立刻把刚打开的键盘关掉。
-    anchor: { type: Object, default: null },
+    anchor: { type: [Object, Element], default: null },
   },
   data() {
     return { keys: KEYS }

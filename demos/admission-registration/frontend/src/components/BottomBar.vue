@@ -4,28 +4,36 @@
       class="bar-circle"
       type="button"
       :disabled="disabled"
-      aria-label="上一步"
+      aria-label="返回上一步"
       @click="$emit('back')"
     >
-      <i class="el-icon-back"></i>
+      <i class="el-icon-back" aria-hidden="true"></i>
     </button>
     <button
       class="bar-circle"
       type="button"
       :disabled="disabled"
-      aria-label="新会话"
-      @click="$emit(page === 'home' ? 'home' : 'logout')"
+      aria-label="返回首页"
+      @click="$emit('home')"
     >
-      <i class="el-icon-house"></i>
+      <i class="el-icon-house" aria-hidden="true"></i>
     </button>
-    <div v-if="showUserBar" class="user-bar">
-      <span class="user-avatar"><i class="el-icon-user"></i></span>
-      <strong class="user-name">{{ patient.name }}</strong>
-      <span v-if="patient.phone" class="user-phone">{{ patient.phone }}</span>
-      <button class="user-change" type="button" :disabled="disabled" @click="$emit('change')">
-        <i class="el-icon-edit"></i>变更
-      </button>
-      <button class="user-logout" type="button" :disabled="disabled" @click="$emit('logout')">
+    <div class="bar-user">
+      <i class="el-icon-user-solid bar-user__icon" aria-hidden="true"></i>
+      <span class="bar-user__identity">
+        <strong>{{ patientName ? maskName(patientName) : '未核验身份' }}</strong>
+        <span v-if="phone">{{ maskPhone(phone) }}</span>
+      </span>
+      <span v-if="page !== 'result'" class="home-countdown"
+        ><span class="home-countdown__label">倒计时 </span>{{ countdown }} 秒</span
+      >
+      <button
+        class="bar-exit"
+        type="button"
+        :disabled="disabled"
+        aria-label="退出办理"
+        @click="$emit('logout')"
+      >
         退出登录
       </button>
     </div>
@@ -33,18 +41,17 @@
 </template>
 
 <script>
+import { maskName, maskPhone } from '../utils/mask.js'
+
 export default {
   name: 'BottomBar',
   props: {
     disabled: { type: Boolean, default: false },
-    patient: { type: Object, required: true },
     page: { type: String, required: true },
+    countdown: { type: Number, default: 380 },
+    patientName: { type: String, default: '' },
+    phone: { type: String, default: '' },
   },
-  computed: {
-    showUserBar() {
-      // 初始首页与身份核验阶段不展示账号个人信息。
-      return ['applications', 'form', 'review', 'result'].includes(this.page)
-    },
-  },
+  methods: { maskName, maskPhone },
 }
 </script>

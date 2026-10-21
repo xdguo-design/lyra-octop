@@ -1,12 +1,12 @@
 # 07 · 联调交接：接口与参数
 
-版本 v2.0 / 2026-10-20。本文顶部描述当前 Vue 工作流；Octop 路由的完整 request/response schema 以本机 `/api/docs` 为准。下方旧版独立 FastAPI 接口表仍服务兼容合同测试，不是当前 Vue 办理会话的数据源。
+版本 v2.1 / 2026-10-21。本文顶部描述当前 Vue 工作流；Octop 路由的完整 request/response schema 以本机 `/api/docs` 为准。下方旧版独立 FastAPI 接口表仍服务兼容合同测试，不是当前 Vue 办理会话的数据源。
 
 ## 当前 Vue 工作流（权威）
 
-- `/api/admission-registration/v1/*` 由登录后的 Octop API 处理：身份核验、本人申请单查询/选择、session/turn 读取保存、review、提交及结果查询。会话归属从登录用户、演示患者和申请单三者校验；最长24小时到期，成功重新核验时提前删除该患者旧会话。
-- `/api/admission-demo/*` 使用 Octop 当前活动模型。字段提取携带当前会话、当前 utterance、申请单/已确认事实摘要和最近4轮；服务端按模型 tokenizer 限制在6000 token以内。超限、429、超时/网络错误分别返回，禁止自动重试风暴。
-- `/api/voice/*` 沿用 Octop 语音服务。Vite 把三类 `/api` 路径转到 `OCTOP_API_ORIGIN`（默认 `http://127.0.0.1:8200`）；部署构建必须与 Octop 同源，不能把办理 API 转给旧独立服务。
+- `/api/admission-registration/v1/*` 由登录后的 Octop API 处理身份核验、本人申请单查询/选择、session 读取、review、提交及结果查询。保存 turn 经独立 Demo 后端门禁后转发到 Octop；按会话记录最多20轮，超限返回 `429 ADMISSION_TURN_LIMIT`。会话归属从登录用户、演示患者和申请单三者校验；最长24小时到期，成功重新核验时提前删除该患者旧会话。
+- `/admission-registration-api/v1/ai/candidates` 与 `/admission-registration-api/v1/sessions/{id}/turns` 由独立 Demo FastAPI 处理。首次问题请求同时提取两页字段；后续只提取当前页。上下文顺序为结构化事实、压缩历史、最近5轮、最新患者回答。Demo 后端处理地址拆分、枚举/字段校验、轮次限制和 turn 转发；它只把组装后的请求送到 Octop Agent/Skill/模型推理。
+- `/api/admission-demo/extract` 是 Octop 的 Agent 推理入口，不承担登记会话、轮次或表单业务规则。`/api/voice/*` 沿用 Octop 语音服务。Vite 将 `/admission-registration-api` 转到 Demo 服务（默认 `http://127.0.0.1:8765`），其余平台 `/api` 路径转到 `OCTOP_API_ORIGIN`（默认 `http://127.0.0.1:8200`）。Octop 为内嵌 `/creations` 提供上述两个POST接口的同源转发；其进程环境变量 `ADMISSION_API_ORIGIN` 可指定可信 Demo 后端地址，不增加业务编排。生产入口须保留相同路由分工。
 - `frontend/src/api/admission.js` 是 Vue API 请求合同；OpenAPI summary/schema 可在 `/api/docs` 检查。身份核验临时 token 为进程态，服务重启后需重新核验；重新核验会清空同一用户该演示患者的旧 DB 会话，不恢复旧对话。
 - Mock 医院申请单和提交结果不代表真实 HIS；录音不落盘，通话文本只保留到会话到期。
 
@@ -156,7 +156,7 @@ JSON 请求通常发送 `Content-Type: application/json`。语音上传是 `mult
 | `page` | int | 是 | 1 或 2；限定当页可回填字段 |
 | `identityToken` | string | 是 | 核验返回的短期 mock 令牌；过期/未知返回 `401` |
 
-响应：`{"fields":{...}}`，值可为字符串或省市区代码数组。按页白名单回填：第 1 页 `phone`、`nativeRegion`、`residentRegion`（三级代码数组）、`addressDetail`；第 2 页 `employerName`、`employerAddress`、`marriage`、`occupation`、`emergencyContact`、`relationship`。文本字段必须是原话子串；枚举字段必须命中表单枚举，由模型负责把“女儿”归一化为“子女”。籍贯/现住址原文需能在模拟地区库逐级匹配成三级代码；现住地址匹配失败时原文并入 `addressDetail`，籍贯匹配失败直接丢弃。含歧义词（可能/或者等）或一句话出现多个手机号时整体拒绝。模型正常响应但未抽取到有效字段时 `fields` 为空对象。模型不可用或调用超时返回 Octop 503 `AI_MODEL_UNAVAILABLE`，独立服务代理会返回 502/504；不能把服务故障当作空候选。AI 返回不是已提交/已确认资料。401 表示无登录态或身份会话失效；若上游续签 token，代理响应会转发 `X-Octop-Access-Token`。
+响应包含 `fields`，可选包含 `clarification`（模型直接向患者提出的澄清问题）、`clarificationChoices`（最多 4 个可点击或可语音复述的互斥选项）和 `uncertainFields`（需要患者确认的字段键）；值可为字符串或省市区代码数组。按页白名单回填：第 1 页 `phone`、`nativeRegion`、`residentRegion`（三级代码数组）、`addressDetail`；第 2 页 `employerName`、`employerAddress`、`marriage`、`occupation`、`emergencyContact`、`relationship`。字段不清时由模型针对具体歧义提问，同时保留其他明确字段；有限且有依据的地址候选会带上具体答案供单选或语音复述，没有安全选项时继续开放追问；`uncertainFields` 中字段不回填。文本字段必须是原话子串；枚举字段必须命中表单枚举，由模型负责把“女儿”归一化为“子女”。籍贯/现住址原文需能在模拟地区库逐级匹配成三级代码；现住地址匹配失败时原文并入 `addressDetail`，籍贯匹配失败直接丢弃。模型旧版结果没有不确定字段元数据时，含歧义词仍按旧策略整体拒绝。模型正常响应但未抽取到有效字段时 `fields` 为空对象。模型不可用或调用超时返回 Octop 503 `AI_MODEL_UNAVAILABLE`，独立服务代理会返回 502/504；不能把服务故障当作空候选。AI 返回不是已提交/已确认资料。401 表示无登录态或身份会话失效；若上游续签 token，代理响应会转发 `X-Octop-Access-Token`。
 
 ## 3. Octop 平台语音与 AI 接口
 
@@ -201,7 +201,7 @@ Demo 只发送 `{"text":"当前步骤提示语"}`。响应为音频流，Content
 
 请求：`{"text":"患者当前这一轮明确说出的内容","page":1}`；`text` 为1–2000字符，`page` 为 1 或 2（可缺省，默认 1）。
 
-响应：`{"fields":{...}}`，按页返回白名单键。第 1 页：`contact_phone`、`native_region`（籍贯省市区原文）、`resident_region`（现住省市区原文）、`address`（现住详细地址原文）；第 2 页：`employer_name`、`employer_address`、`marriage`、`occupation`、`emergency_contact`、`relationship`（后三个枚举键由模型提示词归一化到表单枚举）。平台只做键位与长度过滤，原文证据与枚举合法性由 Demo 代理校验。平台模型未配置/失败时也可能返回 `{"fields":{}}`，HTTP 200 不代表识别到了字段。
+响应：`{"fields":{...},"uncertainFields":[...],"clarification":"...","clarificationChoices":[...]}`。`fields` 按页返回白名单键。第 1 页：`contact_phone`、`native_region`（籍贯省市区原文）、`resident_region`（现住省市区原文）、`address`（现住详细地址原文）；第 2 页：`employer_name`、`employer_address`、`marriage`、`occupation`、`emergency_contact`、`relationship`（后三个枚举键由模型提示词归一化到表单枚举）。模型判断含糊时，`uncertainFields` 标记需患者确认的字段，`clarification` 提供一条直接向患者提出的澄清问题，有限地址候选可同时出现在 `clarificationChoices` 供单选或语音复述；清楚字段仍可正常回填。平台只做键位与长度过滤，原文证据、未确定字段和枚举合法性由 Demo 代理校验。新旧平台响应均无问题字段时，`clarification`/`uncertainFields` 可以省略。模型未配置/失败时可能返回空 `fields`，HTTP 200 不代表识别到了字段。
 
 ## 4. 状态码与前端处理
 

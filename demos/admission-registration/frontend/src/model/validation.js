@@ -1,9 +1,9 @@
 import Ajv2020 from 'ajv/dist/2020.js'
 import schema from '../../../contracts/admission-fields.schema.json'
-import regions from '../../../contracts/regions.mock.json'
 
 const ajv = new Ajv2020({ allErrors: true, strict: false })
 const validateContract = ajv.compile(schema)
+let regions = []
 const labels = {
   name: '请输入姓名',
   idNumber: '身份证信息缺失，请重新核验',
@@ -22,11 +22,64 @@ const labels = {
 function hasRegionPath(nodes, codes) {
   let children = nodes
   for (const code of codes) {
-    const node = children.find((item) => item.code === code)
+    const node = children.find((item) => (item.code || item.value) === code)
     if (!node) return false
     children = node.children || []
   }
   return [2, 3].includes(codes.length) && children.length === 0
+}
+
+export function setRegions(value) {
+  regions = Array.isArray(value) ? value : []
+}
+
+export function findRegionMismatch(text) {
+  const cities = regions.flatMap((province) =>
+    (province.children || []).map((city) => ({ ...city, parent: province }))
+  )
+  const areas = cities.flatMap((city) => {
+    const descendants = (node) =>
+      (node.children || []).flatMap((area) => [{ ...area, parentCity: city }, ...descendants(area)])
+    return descendants(city)
+  })
+  const mentions = (nodes, start, end) =>
+    nodes
+      .flatMap((node) => {
+        const found = []
+        for (let index = text.indexOf(node.label, start); index >= 0 && index < end; ) {
+          found.push({ node, index })
+          index = text.indexOf(node.label, index + node.label.length)
+        }
+        return found
+      })
+      .sort(
+        (left, right) =>
+          left.index - right.index || right.node.label.length - left.node.label.length
+      )
+
+  for (const { node: province, index } of mentions(regions, 0, text.length)) {
+    const provinceEnd = index + province.label.length
+    const nextProvince = mentions(regions, provinceEnd, text.length)[0]?.index ?? text.length
+    const cityMention = mentions(cities, provinceEnd, nextProvince)[0]
+    if (!cityMention) continue
+    const { node: city, index: cityAt } = cityMention
+    if ((city.parent.code || city.parent.value) !== (province.code || province.value))
+      return { parent: province, child: city, actualParent: city.parent }
+
+    const cityEnd = cityAt + city.label.length
+    const districtMention = mentions(areas, cityEnd, nextProvince)[0]
+    if (
+      districtMention &&
+      (districtMention.node.parentCity.code || districtMention.node.parentCity.value) !==
+        (city.code || city.value)
+    )
+      return {
+        parent: city,
+        child: districtMention.node,
+        actualParent: districtMention.node.parentCity,
+      }
+  }
+  return null
 }
 
 export function validateFields(fields, keys = Object.keys(schema.properties)) {

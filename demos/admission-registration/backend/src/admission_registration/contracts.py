@@ -14,7 +14,7 @@ REGIONS = json.loads((ROOT / "contracts" / "regions.mock.json").read_text(encodi
 _VALIDATOR = Draft202012Validator(FIELD_SCHEMA)
 
 
-def validate_fields(fields: Any) -> dict[str, str]:
+def validate_fields(fields: Any, regions: list[dict[str, Any]] = REGIONS) -> dict[str, str]:
     errors: dict[str, str] = {}
     if not isinstance(fields, dict):
         return {"_": "登记信息格式不正确"}
@@ -32,7 +32,7 @@ def validate_fields(fields: Any) -> dict[str, str]:
                     errors[key] = "此项格式不正确"
     for key in ("nativeRegion", "residentRegion"):
         value = fields.get(key)
-        if isinstance(value, list) and value and not _region_path_exists(REGIONS, value):
+        if isinstance(value, list) and value and not _region_path_exists(regions, value):
             errors[key] = "请选择有效的省、市、区组合"
     return errors
 

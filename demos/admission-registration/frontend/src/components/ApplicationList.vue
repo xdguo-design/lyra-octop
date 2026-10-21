@@ -20,13 +20,13 @@
       :class="{ 'application-card--selected': item.id === selectedId }"
       :aria-label="`入院申请单 ${item.id}`"
     >
-      <div class="application-card-top">
+      <div class="application-details">
         <div>
           <span>申请单号</span><strong>{{ item.id }}</strong>
         </div>
-        <span class="application-status">{{ item.status }}</span>
-      </div>
-      <div class="application-details">
+        <div>
+          <span>状态</span><span class="application-status">{{ item.status }}</span>
+        </div>
         <div>
           <span>患者</span><strong>{{ item.patientName }}</strong>
         </div>
@@ -52,15 +52,8 @@
           <span>开单时间</span><strong>{{ item.orderedAt || '未提供' }}</strong>
         </div>
       </div>
-      <el-button
-        v-if="item.status === '有效'"
-        class="application-select"
-        :type="item.id === selectedId ? 'primary' : 'default'"
-        @click="$emit('select', item.id)"
-        >{{ item.id === selectedId ? '已选择此申请单' : '选择此申请单' }}</el-button
-      >
     </article>
-    <div class="application-actions">
+    <div v-if="!aiConversation" class="application-actions">
       <el-button @click="$emit('back')">返回身份核验</el-button>
       <el-button
         class="primary-action application-continue"
@@ -83,6 +76,7 @@ export default {
     loading: { type: Boolean, default: false },
     selecting: { type: Boolean, default: false },
     error: { type: String, default: '' },
+    aiConversation: { type: Boolean, default: false },
   },
 }
 </script>
