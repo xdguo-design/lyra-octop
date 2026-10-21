@@ -4,6 +4,9 @@ build/
 !desktop/src/build/**
 dist/
 
+# Cloud deploy staging (local only, holds the built wheel + runtime data)
+.cloud-deploy/
+
 # OS
 .DS_Store
 .DS_Store?
@@ -118,3 +121,19 @@ scripts/lh_image_install_octop_tencentos.sh
 # Local test/browser-profile scratch and pip download cache (not for upstream)
 .testdata/
 pip/
+
+# Local assistant/tooling scratch (not for upstream)
+.workbuddy/
+.playwright-mcp/
+*.genie
+
+# Local GUI test screenshots and one-off debugging captures (not for upstream)
+gui-test-screenshots/
+demos/*/e2e/artifacts/
+/octop-live.png
+/rail-collapsed-*.png
+/captcha.png
+/conv-after-mic-click.png
+
+# Local DOM probe pages (one-off debugging aids, not for upstream)
+demos/*/frontend/probe_dom*.html

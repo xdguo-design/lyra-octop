@@ -25,6 +25,7 @@ export const PERM = {
   storage: ["storage_backends"],
   plugins: ["plugins"],
   securityPage: ["security", "admin_console"],
+  auditLog: ["admin_console"],
   advancedPage: ["update", "envs", "tls", "observability", "backup", "captcha"],
   experts: ["experts"],
   tasks: ["tasks"],
@@ -49,6 +50,7 @@ export const NAV_PERMISSIONS = {
   "admin-storage": PERM.storage,
   "admin-plugins": PERM.plugins,
   "admin-security": PERM.securityPage,
+  "admin-audit-log": PERM.auditLog,
   "admin-advanced": PERM.advancedPage,
 } as const satisfies Record<string, PermissionKeys>;
 
@@ -150,6 +152,9 @@ export function pathPermissionKeys(pathname: string): PermissionKeys | null {
     pathname.startsWith("/plugins/")
   ) {
     return PERM.plugins;
+  }
+  if (pathname.startsWith("/admin/audit-log")) {
+    return PERM.auditLog;
   }
   if (
     pathname.startsWith("/admin/security") ||

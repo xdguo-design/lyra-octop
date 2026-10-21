@@ -33,12 +33,19 @@ interface AuditRow {
   action: string;
   target: string | null;
   payload: string | null;
+  project_id: string | null;
+}
+
+interface AuditProject {
+  project_id: string;
+  name: string;
 }
 
 interface FilterValues {
   actor?: string;
   action?: string;
-  since?: string;
+  range?: [import("dayjs").Dayjs, import("dayjs").Dayjs];
+  project_id?: string;
   limit?: number;
 }
 
@@ -75,6 +82,15 @@ const ACTION_OPTIONS = [
   "user.password_changed",
   "user.password_reset",
   "user.set_role",
+  "workbench.project.create",
+  "workbench.project.update",
+  "workbench.project.delete",
+  "workbench.folder.create",
+  "workbench.folder.update",
+  "workbench.folder.delete",
+  "workbench.thread.assign",
+  "workbench.project.share",
+  "workbench.project.unshare",
 ];
 
 function formatTs(ts: number, timeZone: string): string {
@@ -86,6 +102,7 @@ export default function AuditLogPanel() {
   const isMobile = useIsMobile();
   const timeZone = useServerTimezone();
   const [rows, setRows] = useState<AuditRow[]>([]);
+  const [projects, setProjects] = useState<AuditProject[]>([]);
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm<FilterValues>();
 
@@ -94,12 +111,12 @@ export default function AuditLogPanel() {
       setLoading(true);
       try {
         const qs = new URLSearchParams();
+        if (values.project_id) qs.set("project_id", values.project_id);
         if (values.actor) qs.set("actor", values.actor);
         if (values.action) qs.set("action", values.action);
-        if (values.since) {
-          const parsed = Date.parse(values.since);
-          if (!Number.isNaN(parsed))
-            qs.set("since", String(Math.floor(parsed / 1000)));
+        if (values.range?.[0] && values.range[1]) {
+          qs.set("since", String(Math.floor(values.range[0].valueOf() / 1000)));
+          qs.set("until", String(Math.floor(values.range[1].valueOf() / 1000)));
         }
         qs.set("limit", String(values.limit ?? 100));
         const data = await request<AuditRow[]>(`/admin/audit-log?${qs}`);
@@ -118,6 +135,12 @@ export default function AuditLogPanel() {
   useEffect(() => {
     void fetchAudit();
   }, [fetchAudit]);
+
+  useEffect(() => {
+    void request<AuditProject[]>("/admin/audit-log/projects")
+      .then(setProjects)
+      .catch(() => setProjects([]));
+  }, []);
 
   const formatAction = useCallback(
     (action: string) => t(`adminAudit.actions.${action}`, action),
@@ -158,6 +181,19 @@ export default function AuditLogPanel() {
           onFinish={fetchAudit}
           initialValues={{ limit: 100 }}
         >
+          <Form.Item label={t("adminAudit.project")} name="project_id">
+            <Select
+              allowClear
+              showSearch
+              placeholder={t("adminAudit.projectPlaceholder")}
+              options={projects.map((project) => ({
+                value: project.project_id,
+                label: project.name,
+              }))}
+              optionFilterProp="label"
+              className={styles.filterSelectWide}
+            />
+          </Form.Item>
           <Form.Item label={t("adminAudit.actor")} name="actor">
             <Select
               allowClear
@@ -182,12 +218,8 @@ export default function AuditLogPanel() {
               className={styles.filterSelectWide}
             />
           </Form.Item>
-          <Form.Item
-            label={t("adminAudit.since")}
-            name="since"
-            getValueFromEvent={(_, s) => s}
-          >
-            <DatePicker showTime format="YYYY-MM-DDTHH:mm:ss" />
+          <Form.Item label={t("adminAudit.timeRange")} name="range">
+            <DatePicker.RangePicker showTime format="YYYY-MM-DD HH:mm:ss" />
           </Form.Item>
           <Form.Item label={t("adminAudit.limit")} name="limit">
             <Select
@@ -245,6 +277,18 @@ export default function AuditLogPanel() {
                   </span>
                 </div>
               )}
+              {row.project_id && (
+                <div className={styles.itemField}>
+                  <span className={styles.itemFieldLabel}>
+                    {t("adminAudit.project")}
+                  </span>
+                  <span className={styles.itemFieldValue}>
+                    {projects.find(
+                      (project) => project.project_id === row.project_id,
+                    )?.name ?? row.project_id}
+                  </span>
+                </div>
+              )}
               {row.payload && !AGENT_ACTIONS.has(row.action) && (
                 <div className={styles.itemField}>
                   <span className={styles.itemFieldLabel}>
@@ -288,6 +332,16 @@ export default function AuditLogPanel() {
               dataIndex: "action",
               width: 220,
               render: (action: string) => <Tag>{formatAction(action)}</Tag>,
+            },
+            {
+              title: t("adminAudit.project"),
+              dataIndex: "project_id",
+              width: 180,
+              render: (id: string | null) =>
+                id
+                  ? projects.find((project) => project.project_id === id)
+                      ?.name ?? id
+                  : null,
             },
             {
               title: t("adminAudit.colTarget"),

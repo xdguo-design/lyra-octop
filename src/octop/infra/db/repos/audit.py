@@ -19,6 +19,7 @@ class AuditRow:
     action: str
     target: str | None
     payload: str | None
+    project_id: str | None
 
     @classmethod
     def from_row(cls, r: DbRow) -> AuditRow:
@@ -29,6 +30,7 @@ class AuditRow:
             action=r["action"],
             target=r["target"],
             payload=r["payload"],
+            project_id=r["project_id"],
         )
 
 
@@ -43,11 +45,13 @@ class AuditRepo:
         action: str,
         target: str | None = None,
         payload: str | None = None,
+        project_id: str | None = None,
     ) -> None:
         with self._db.transaction() as conn:
             conn.execute(
-                "INSERT INTO audit_log(ts, actor, action, target, payload) VALUES (?, ?, ?, ?, ?)",
-                (now_ts(), actor, action, target, payload or None),
+                "INSERT INTO audit_log(ts, actor, action, target, payload, project_id) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (now_ts(), actor, action, target, payload or None, project_id),
             )
 
     def system_event(
@@ -84,6 +88,8 @@ class AuditRepo:
         since: int | None = None,
         actor: str | None = None,
         action: str | None = None,
+        project_id: str | None = None,
+        until: int | None = None,
         limit: int = 100,
     ) -> list[AuditRow]:
         conditions: list[str] = []
@@ -97,6 +103,12 @@ class AuditRepo:
         if action is not None:
             conditions.append("action = ?")
             params.append(action)
+        if project_id is not None:
+            conditions.append("project_id = ?")
+            params.append(project_id)
+        if until is not None:
+            conditions.append("ts <= ?")
+            params.append(until)
         sql = "SELECT * FROM audit_log"
         if conditions:
             sql += " WHERE " + " AND ".join(conditions)
@@ -105,6 +117,15 @@ class AuditRepo:
         with self._db.connect() as conn:
             rows = conn.execute(sql, params).fetchall()
         return map_rows(rows, AuditRow)
+
+    def list_projects(self) -> list[dict[str, str]]:
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT a.project_id, COALESCE(p.name, a.project_id) AS name "
+                "FROM audit_log a LEFT JOIN workbench_projects p ON p.project_id = a.project_id "
+                "WHERE a.project_id IS NOT NULL ORDER BY name"
+            ).fetchall()
+        return [{"project_id": row["project_id"], "name": row["name"]} for row in rows]
 
     def delete_before(self, cutoff_ts: int) -> int:
         """Delete audit rows older than ``cutoff_ts``. Returns deleted count."""

@@ -69,6 +69,7 @@ export const SIDEBAR_NAV_KEYS = [
   "admin-storage",
   "admin-plugins",
   "admin-security",
+  "admin-audit-log",
   "admin-advanced",
 ] as const;
 
@@ -123,6 +124,7 @@ export const SIDEBAR_GROUPED_NAV_KEYS = [
   "admin-storage",
   "admin-plugins",
   "admin-security",
+  "admin-audit-log",
   "admin-advanced",
   "agent-config",
 ] as const;
@@ -310,6 +312,14 @@ export function buildNavSections(
       path: "/admin/security",
       icon: <Shield size={iconSize} strokeWidth={iconStroke} />,
       labelKey: "nav.security",
+    });
+  }
+  if (navAllowed(user, "admin-audit-log")) {
+    adminItems.push({
+      key: "admin-audit-log",
+      path: "/admin/audit-log",
+      icon: <Activity size={iconSize} strokeWidth={iconStroke} />,
+      labelKey: "nav.auditLog",
     });
   }
   if (navAllowed(user, "admin-advanced")) {
