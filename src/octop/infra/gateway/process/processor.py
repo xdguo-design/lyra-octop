@@ -151,6 +151,7 @@ class GlobalProcessor:
         knowledge_repo: Any | None = None,
         settings_repo: Any | None = None,
         provider_repo: Any | None = None,
+        workbench_repo: Any | None = None,
         dispatcher: SlashDispatcher,
         usage_repo: Any | None = None,
         thread_message_repo: Any | None = None,
@@ -174,6 +175,7 @@ class GlobalProcessor:
             if knowledge_repo is not None and settings_repo is not None
             else None
         )
+        self._workbench_repo = workbench_repo
         self._dispatcher = dispatcher
         self._usage_repo = usage_repo
         self._thread_message_repo = thread_message_repo
@@ -826,6 +828,7 @@ class GlobalProcessor:
             explicit_ids=None,
             locale=locale,
             agent_id=agent_id,
+            thread_id=thread_id,
         )
         request = self._stamp_turn_conversation_mode(
             request,
@@ -1441,6 +1444,7 @@ class GlobalProcessor:
             else None,
             locale=locale,
             agent_id=agent_id,
+            thread_id=thread_id,
         )
 
         if mcp_servers:
@@ -1567,6 +1571,7 @@ class GlobalProcessor:
         explicit_ids: list[str] | None,
         locale: str,
         agent_id: str | None = None,
+        thread_id: str | None = None,
     ) -> None:
         """Expose selected knowledge-base ids for the search_knowledge tool."""
         if self._knowledge_services is None:
@@ -1577,12 +1582,20 @@ class GlobalProcessor:
             else self._knowledge_services.knowledge_repo.list_visible(user_id)
         )
         extra_ids = self._agent_manager.default_knowledge_base_ids(agent_id) if agent_id else None
+        project_ids = (
+            self._workbench_repo.knowledge_base_ids_for_thread(
+                owner_user_id=user_id, thread_id=thread_id
+            )
+            if self._workbench_repo is not None and thread_id
+            else None
+        )
         stamp_turn_knowledge_config(
             request,
             visible_bases=bases,
             explicit_ids=explicit_ids,
             owner_user_id=user_id,
             extra_ids=extra_ids,
+            required_ids=project_ids,
             is_admin=is_admin,
             locale=locale,
         )

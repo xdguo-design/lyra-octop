@@ -14,21 +14,26 @@ def merge_knowledge_base_ids(
     *,
     owner_user_id: int,
     extra_ids: Sequence[str] | None = None,
+    required_ids: Sequence[str] | None = None,
 ) -> list[str]:
     """Use the actor's own default-open bases when a turn omits a list.
 
     ``default_open`` is per-owner preference: shared bases marked default-open
     are auto-injected only for the creating user, not for other viewers.
     ``extra_ids`` (expert composer picks) are unioned in when still visible.
+    ``required_ids`` (project bindings) are always unioned in when visible.
     """
-    if explicit_ids is not None:
-        return list(explicit_ids)
-    selected: list[str] = []
+    selected: list[str] = list(dict.fromkeys(explicit_ids or []))
     visible_ids = {base.id for base in visible_bases}
-    for base in visible_bases:
-        if base.default_open and int(base.owner_user_id) == int(owner_user_id):
-            selected.append(base.id)
-    for kb_id in extra_ids or []:
+    if explicit_ids is None:
+        for base in visible_bases:
+            if base.default_open and int(base.owner_user_id) == int(owner_user_id):
+                selected.append(base.id)
+        for kb_id in extra_ids or []:
+            text = str(kb_id).strip()
+            if text and text in visible_ids and text not in selected:
+                selected.append(text)
+    for kb_id in required_ids or []:
         text = str(kb_id).strip()
         if text and text in visible_ids and text not in selected:
             selected.append(text)
@@ -42,6 +47,7 @@ def stamp_turn_knowledge_config(
     explicit_ids: list[str] | None,
     owner_user_id: int,
     extra_ids: Sequence[str] | None = None,
+    required_ids: Sequence[str] | None = None,
     is_admin: bool = False,
     locale: str,
 ) -> list[str]:
@@ -53,6 +59,7 @@ def stamp_turn_knowledge_config(
         explicit_ids,
         owner_user_id=owner_user_id,
         extra_ids=extra_ids,
+        required_ids=required_ids,
     )
     configurable = dict(request.get("configurable") or {})
     configurable["knowledge_base_ids"] = selected_ids

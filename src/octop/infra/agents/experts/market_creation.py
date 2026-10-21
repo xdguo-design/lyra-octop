@@ -62,6 +62,8 @@ class SkillHubMarketAgentCreateOptions:
     max_tokens: int | None = None
     enable_trajectory: bool = True
     conversation_mode: str | None = None
+    reasoning_mode: str | None = None
+    reasoning_effort: str | None = None
     workspace_patch: Any = None
     composer_copies: tuple[tuple[str, Any], ...] = ()
     composer_report: Any = None
@@ -299,6 +301,11 @@ async def create_agent_from_skillhub_skillset(
     apply_enable_trajectory(config_extra, options.enable_trajectory)
     if options.conversation_mode:
         config_extra["conversation_mode"] = options.conversation_mode
+    if options.reasoning_mode is not None:
+        config_extra["reasoning"] = {
+            "mode": options.reasoning_mode,
+            "effort": options.reasoning_effort,
+        }
 
     locale = resolve_user_locale(
         user_repo=server.services.user_repo,

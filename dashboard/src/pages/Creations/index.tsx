@@ -226,6 +226,22 @@ export default function CreationsPage() {
   }, [refreshCreations, t]);
 
   useEffect(() => {
+    if (openId !== "admission-registration") return;
+    const closePreview = (event: MessageEvent) => {
+      if (
+        event.origin !== window.location.origin ||
+        event.data?.type !== "octop:close-creation-preview"
+      ) {
+        return;
+      }
+      setOpenId(null);
+      setProjectPreview(null);
+    };
+    window.addEventListener("message", closePreview);
+    return () => window.removeEventListener("message", closePreview);
+  }, [openId]);
+
+  useEffect(() => {
     if (!isAdmin) return;
     let alive = true;
     const targets = items.filter(

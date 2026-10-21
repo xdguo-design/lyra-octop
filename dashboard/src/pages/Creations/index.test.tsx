@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -131,7 +132,14 @@ describe("CreationsPage", () => {
     expect(preview.getAttribute("src")).toBe(
       "/admission-registration/index.html",
     );
-    fireEvent.click(screen.getByRole("button", { name: "创作" }));
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          origin: window.location.origin,
+          data: { type: "octop:close-creation-preview" },
+        }),
+      );
+    });
     expect(screen.queryByTitle("智能入院登记 · 作品")).toBeNull();
   });
 

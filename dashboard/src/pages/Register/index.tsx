@@ -356,6 +356,19 @@ export default function RegisterPage() {
               unsupportedLabel={t("login.unsupportedCaptcha")}
               onReadyChange={setCaptchaReady}
             />
+            {!captchaReady && (
+              <div
+                role="status"
+                style={{
+                  width: "100%",
+                  marginTop: -12,
+                  fontSize: 12,
+                  color: "var(--fn-text-tertiary)",
+                }}
+              >
+                {t("register.captchaRequired")}
+              </div>
+            )}
 
             <Button
               type="primary"

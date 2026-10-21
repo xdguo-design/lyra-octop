@@ -73,15 +73,16 @@ def reasoning_capability(
     thinking_option = options.get("thinking") if isinstance(options, dict) else None
     model_id = str(model.get("id") or "").strip().lower()
     known_token_plan_model = model_id in TOKEN_PLAN_REASONING_MODELS
-    modelscope_qwen = "modelscope.cn" in (base_url or "").lower() and model_id.startswith(
-        "qwen/qwen3.5-"
-    )
+    url = (base_url or "").lower()
+    modelscope_qwen = "modelscope.cn" in url and model_id.startswith("qwen/qwen3.5-")
+    bigmodel_glm = "bigmodel.cn" in url and model_id.startswith(("glm-4.7", "glm-5"))
     if not isinstance(raw, dict):
         if (
             not legacy
             and not isinstance(thinking_option, dict)
             and not known_token_plan_model
             and not modelscope_qwen
+            and not bigmodel_glm
         ):
             return None
         raw = {

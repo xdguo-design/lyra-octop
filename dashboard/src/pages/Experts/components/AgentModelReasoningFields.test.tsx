@@ -18,6 +18,17 @@ const capability: ReasoningCapability = {
 };
 
 describe("expert model reasoning", () => {
+  it("offers a disabled mode when the model supports toggling reasoning", async () => {
+    render(
+      <Form initialValues={{ reasoning_mode: "enabled" }}>
+        <AgentModelReasoningFields capability={capability} />
+      </Form>,
+    );
+    fireEvent.mouseDown(screen.getByLabelText("chat.reasoningMode"));
+    expect(
+      await screen.findByText("chat.reasoningDisabled"),
+    ).toBeInTheDocument();
+  });
   it("offers the model's supported effort values and stores the selection", async () => {
     let values: Record<string, unknown> = {};
     render(

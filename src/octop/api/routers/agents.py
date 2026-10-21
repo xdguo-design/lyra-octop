@@ -212,13 +212,13 @@ async def list_agents(
     server: Any = Depends(get_server),
     scope: Literal["mine", "all"] = Query(
         "mine",
-        description="mine: agents owned by the current user; all: every agent (admin only)",
+        description="mine: owned or explicitly shared agents; all: every agent (admin only)",
     ),
 ) -> list[dict[str, Any]]:
     """List agents for the dashboard.
 
     Default ``scope=mine`` returns agents owned by the authenticated user plus
-    agents other users have explicitly shared.
+    agents explicitly shared by other users or the platform.
     Holders of the ``users`` permission (and admins) may pass ``scope=all``.
     """
     if scope == "all" and not user_has_permission(user, "users"):
@@ -251,14 +251,7 @@ async def list_agents(
         return _attach_unread_counts(server, user.id, payloads)
 
     owned = registry.list_agents(user.id)
-    shared = [
-        row
-        for row in server.services.agent_repo.list_shared(exclude_user_id=user.id)
-        # System agents (user_id IS NULL, e.g. the admission demo agent) are
-        # addressable by id but belong to no user, so they stay out of the
-        # default "mine + explicitly shared" list.
-        if row.user_id is not None
-    ]
+    shared = server.services.agent_repo.list_shared(exclude_user_id=user.id)
     rows = list({row.agent_id: row for row in [*shared, *owned]}.values())
     shared_owner_username_by_id: dict[int, str] = {}
     for row in shared:

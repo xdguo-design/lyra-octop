@@ -398,40 +398,32 @@ export default function ResourceMarketplacePage() {
           </div>
           <div className={styles.featuredGrid}>
             {(tab === "experts"
-              ? experts
-                  .slice(0, 4)
-                  .map((item) => ({
-                    key: item.slug,
-                    name: pickLocale(item.label, zh ? "zh" : "en") || item.slug,
-                    detail: pickLocale(item.description, zh ? "zh" : "en"),
-                    action: () => navigate("/experts"),
-                  }))
+              ? experts.slice(0, 4).map((item) => ({
+                  key: item.slug,
+                  name: pickLocale(item.label, zh ? "zh" : "en") || item.slug,
+                  detail: pickLocale(item.description, zh ? "zh" : "en"),
+                  action: () => navigate("/experts"),
+                }))
               : tab === "skills"
-              ? skills
-                  .slice(0, 4)
-                  .map((item) => ({
-                    key: item.id,
-                    name: item.name,
-                    detail: item.description,
-                    action: () => void openSkill(item),
-                  }))
+              ? skills.slice(0, 4).map((item) => ({
+                  key: item.id,
+                  name: item.name,
+                  detail: item.description,
+                  action: () => void openSkill(item),
+                }))
               : tab === "connectors"
-              ? connectors
-                  .slice(0, 4)
-                  .map((item) => ({
-                    key: item.kind,
-                    name: item.name,
-                    detail: item.description,
-                    action: () => navigate("/connectors"),
-                  }))
-              : plugins
-                  .slice(0, 4)
-                  .map((item) => ({
-                    key: item.id,
-                    name: item.name || item.id,
-                    detail: item.description || "",
-                    action: () => navigate("/admin/plugins?tab=market"),
-                  }))
+              ? connectors.slice(0, 4).map((item) => ({
+                  key: item.kind,
+                  name: item.name,
+                  detail: item.description,
+                  action: () => navigate("/connectors"),
+                }))
+              : plugins.slice(0, 4).map((item) => ({
+                  key: item.id,
+                  name: item.name || item.id,
+                  detail: item.description || "",
+                  action: () => navigate("/admin/plugins?tab=market"),
+                }))
             ).map((item) => (
               <button
                 type="button"
