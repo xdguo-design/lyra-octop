@@ -74,6 +74,37 @@ describe("useChatAttachments drop", () => {
     expect(result.current.dragOver).toBe(false);
   });
 
+  it("keeps successfully uploaded files when one upload in the batch fails", async () => {
+    vi.mocked(uploadFile).mockImplementation(async (_agentId, file) => {
+      if (file.name === "b.txt") {
+        throw new Error("upload exploded");
+      }
+      return {
+        path: `inbound/${file.name}`,
+        workspace_path: `inbound/${file.name}`,
+        filename: file.name,
+        media_type: file.type || "application/octet-stream",
+        url: "",
+        access_url: `/files/${file.name}`,
+      };
+    });
+    const { result } = renderHook(() => useChatAttachments("agent-1"));
+    const first = new File(["a"], "a.txt", { type: "text/plain" });
+    const second = new File(["b"], "b.txt", { type: "text/plain" });
+
+    await act(async () => {
+      await result.current.processFiles([first, second]);
+    });
+
+    await waitFor(() => {
+      expect(result.current.attachments.map((item) => item.filename)).toEqual([
+        "a.txt",
+      ]);
+    });
+    expect(uploadFile).toHaveBeenCalledTimes(2);
+    expect(message.error).toHaveBeenCalled();
+  });
+
   it("keeps the drop highlight while the pointer is still inside the composer", () => {
     const { result } = renderHook(() => useChatAttachments("agent-1"));
     const shell = document.createElement("div");

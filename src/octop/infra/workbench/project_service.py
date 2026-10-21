@@ -17,6 +17,8 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from octop.infra.utils import posix_compat
+
 _REPO_PATH_RE = re.compile(r"^/([^/]+)/([^/]+?)(?:\.git)?/?$")
 _ENV_NAME_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 _COMMAND_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
@@ -230,13 +232,13 @@ async def _terminate(running: _RunningProcess) -> None:
         await killer.wait()
     else:
         with suppress(ProcessLookupError):
-            getattr(os, "killpg")(process.pid, getattr(signal, "SIGTERM"))
+            posix_compat.killpg(process.pid, signal.SIGTERM)
     try:
         await asyncio.wait_for(process.wait(), timeout=3)
     except TimeoutError:
         if os.name != "nt":
             with suppress(ProcessLookupError):
-                getattr(os, "killpg")(process.pid, getattr(signal, "SIGKILL"))
+                posix_compat.killpg(process.pid, posix_compat.sigkill())
         await process.wait()
     if running.reader_task is not None:
         running.reader_task.cancel()

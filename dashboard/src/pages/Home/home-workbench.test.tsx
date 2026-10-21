@@ -644,8 +644,11 @@ describe("LYRA workbench page integration", () => {
     openSettingsFromProfileMenu();
     const dialog = screen.getByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: /个性与记忆/ }));
-    expect(screen.getByRole("region", { name: "功能模块" })).toBeTruthy();
+    // 设置分区在弹窗内渲染，不再跳转主页面：home 外壳（导航 + 主输入框）保持挂载。
     expect(screen.getByRole("navigation", { name: "主导航" })).toBeTruthy();
+    expect(
+      screen.getByRole("textbox", { name: "给主 Agent 发消息" }),
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "新建任务" }));
     expect(
       screen.getByRole("textbox", { name: "给主 Agent 发消息" }),

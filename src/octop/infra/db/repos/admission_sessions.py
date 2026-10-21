@@ -146,11 +146,13 @@ class AdmissionSessionRepo:
 
     def delete_for_patient(self, owner_user_id: int, patient_ref: str) -> int:
         with self._db.transaction() as conn:
-            return int(conn.execute(
-                "DELETE FROM admission_registration_sessions "
-                "WHERE owner_user_id = ? AND patient_ref = ?",
-                (owner_user_id, patient_ref),
-            ).rowcount)
+            return int(
+                conn.execute(
+                    "DELETE FROM admission_registration_sessions "
+                    "WHERE owner_user_id = ? AND patient_ref = ?",
+                    (owner_user_id, patient_ref),
+                ).rowcount
+            )
 
     def append_turn(
         self,
@@ -262,10 +264,12 @@ class AdmissionSessionRepo:
 
     def delete_expired(self, *, now: int | None = None) -> int:
         with self._db.transaction() as conn:
-            return int(conn.execute(
-                "DELETE FROM admission_registration_sessions WHERE expires_at <= ?",
-                (now if now is not None else now_ts(),),
-            ).rowcount)
+            return int(
+                conn.execute(
+                    "DELETE FROM admission_registration_sessions WHERE expires_at <= ?",
+                    (now if now is not None else now_ts(),),
+                ).rowcount
+            )
 
     def mark_reviewed(
         self,

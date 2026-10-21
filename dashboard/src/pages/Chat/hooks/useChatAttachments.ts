@@ -22,6 +22,10 @@ import {
 } from "../utils/droppedFiles";
 import { useServerUploadLimit } from "../../../hooks/useServerUploadLimit";
 
+type UploadOutcome =
+  | { ok: true; attachment: ChatAttachment }
+  | { ok: false; error: unknown };
+
 export function useChatAttachments(agentId: string | null | undefined) {
   const { t } = useTranslation();
   const { maxUploadBytes, maxUploadMb } = useServerUploadLimit();
@@ -69,32 +73,58 @@ export function useChatAttachments(agentId: string | null | undefined) {
 
       setUploading(true);
       try {
+        // Per-file settle: one failed upload must not discard the files that
+        // already uploaded successfully (Promise.all would reject the batch).
         const results = await Promise.all(
-          fileArr.map(async (file) => {
-            const res = await uploadFile(agentId, file);
-            const workspacePath = res.path || res.workspace_path;
-            const previewUrl =
-              res.access_url ||
-              res.url ||
-              (workspacePath
-                ? agentAttachmentAccessUrl(
-                    agentId,
-                    workspacePath,
-                    res.media_type,
-                  )
-                : "");
-            return {
-              url: previewUrl,
-              filename: res.filename,
-              mediaType: res.media_type,
-              workspacePath,
-              fileId: res.file_id,
-              revisionId: res.revision_id,
-              kind: inferAttachmentKind(file, res.media_type),
-            } satisfies ChatAttachment;
+          fileArr.map(async (file): Promise<UploadOutcome> => {
+            try {
+              const res = await uploadFile(agentId, file);
+              const workspacePath = res.path || res.workspace_path;
+              const previewUrl =
+                res.access_url ||
+                res.url ||
+                (workspacePath
+                  ? agentAttachmentAccessUrl(
+                      agentId,
+                      workspacePath,
+                      res.media_type,
+                    )
+                  : "");
+              return {
+                ok: true,
+                attachment: {
+                  url: previewUrl,
+                  filename: res.filename,
+                  mediaType: res.media_type,
+                  workspacePath,
+                  fileId: res.file_id,
+                  revisionId: res.revision_id,
+                  kind: inferAttachmentKind(file, res.media_type),
+                } satisfies ChatAttachment,
+              };
+            } catch (err: unknown) {
+              return { ok: false, error: err };
+            }
           }),
         );
-        setAttachments((prev) => [...prev, ...results]);
+        const uploaded: ChatAttachment[] = [];
+        const failures: unknown[] = [];
+        for (const result of results) {
+          if (result.ok) uploaded.push(result.attachment);
+          else failures.push(result.error);
+        }
+        if (uploaded.length > 0) {
+          setAttachments((prev) => [...prev, ...uploaded]);
+        }
+        if (failures.length > 0) {
+          antMessage.error(
+            apiErrorMessage(
+              failures[0],
+              t("upload.failed", "Upload failed"),
+              t,
+            ),
+          );
+        }
       } catch (err: unknown) {
         antMessage.error(
           apiErrorMessage(err, t("upload.failed", "Upload failed"), t),
