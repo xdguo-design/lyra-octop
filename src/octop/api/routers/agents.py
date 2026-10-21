@@ -251,7 +251,14 @@ async def list_agents(
         return _attach_unread_counts(server, user.id, payloads)
 
     owned = registry.list_agents(user.id)
-    shared = server.services.agent_repo.list_shared(exclude_user_id=user.id)
+    shared = [
+        row
+        for row in server.services.agent_repo.list_shared(exclude_user_id=user.id)
+        # System agents (user_id IS NULL, e.g. the admission demo agent) are
+        # addressable by id but belong to no user, so they stay out of the
+        # default "mine + explicitly shared" list.
+        if row.user_id is not None
+    ]
     rows = list({row.agent_id: row for row in [*shared, *owned]}.values())
     shared_owner_username_by_id: dict[int, str] = {}
     for row in shared:

@@ -138,7 +138,8 @@ def test_format_path_outside_root_zh_guides_to_storage_root() -> None:
         r"outside root directory: C:\Users\Administrator"
     )
     text = format_stream_error(msg, "zh")
-    assert "存储根目录" in text
+    assert "授权工作区" in text
+    assert "聊天附件上传" in text
     assert "模型调用" not in text
     assert "ValueError" not in text
     assert "outside root" not in text
