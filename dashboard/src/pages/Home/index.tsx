@@ -1,14 +1,33 @@
 import {
   Fragment,
+  lazy,
+  Suspense,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
+  type ComponentProps,
+  type ComponentType,
   type CSSProperties,
+  type LazyExoticComponent,
+  type ReactNode,
 } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import {
+  createPath,
+  parsePath,
+  UNSAFE_LocationContext,
+  UNSAFE_NavigationContext,
+  UNSAFE_RouteContext,
+  useLocation,
+  useNavigate,
+  type Location,
+  type Navigator,
+  type To,
+} from "react-router-dom";
 import MainLayout from "../../layouts/MainLayout";
-import { Modal, Popover, Dropdown, Select, Input, Button } from "antd";
+import { Modal, Popover, Dropdown, Select, Input, Button, Spin } from "antd";
+import RequirePermission from "../../components/RequirePermission";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import dayjs from "dayjs";
@@ -52,6 +71,7 @@ import {
   Menu,
   LockKeyhole,
   Wrench,
+  RotateCcw,
   X,
 } from "lucide-react";
 import { clearAuthToken, request } from "../../api/request";
@@ -74,6 +94,10 @@ import {
 } from "../../api/modules/workbench";
 import { preferencesApi } from "../../api/modules/preferences";
 import { providerApi } from "../../api/modules/provider";
+import {
+  knowledgeBasesApi,
+  type KnowledgeBase,
+} from "../../api/modules/knowledgeBases";
 import { authApi } from "../../api/modules/auth";
 import { apiErrorMessage } from "../../utils/apiError";
 import {
@@ -104,6 +128,7 @@ import AssistantTurnView from "../Chat/components/AssistantTurnView";
 import { groupConsecutiveAssistantMessages } from "../Chat/utils/messageGrouping";
 import EmojiPicker from "../../components/EmojiPicker";
 import ProjectCodeBrowser from "./ProjectCodeBrowser";
+import ProjectShareDialog from "./ProjectShareDialog";
 import { BUILT_IN_CREATIONS } from "../Creations/builtInCreations";
 import { isSttAvailable, useVoiceInput } from "../../hooks/useVoiceInput";
 import type { OctopAgent } from "../../context/AgentContext";
@@ -223,6 +248,138 @@ const SETTINGS_NAV = [
   },
 ] as const;
 
+/** 设置弹窗各分区对应的页面：点击左栏菜单后在弹窗右侧面板内直接渲染，不再跳转主页面。
+ *  内嵌页面运行在隔离的内存导航上下文里，页内 ?tab= / 路径变化不会污染底层页面路由。 */
+const SETTINGS_SECTIONS: Record<string, LazyExoticComponent<ComponentType>> = {
+  "/experts": lazy(() => import("../Experts")),
+  "/personalization/mbti": lazy(() => import("../Agent/Personalization")),
+  "/admin/users": lazy(() => import("../Admin/Users")),
+  "/admin/storage": lazy(() => import("../Admin/Storage")),
+  "/admin/security": lazy(() => import("../Settings/Security")),
+  "/admin/advanced": lazy(() => import("../Settings/AdvancedSettings")),
+};
+
+/** 个性与记忆页内切换 Tab 会在 /personalization/* 之间跳转，分区分缀取父路径。 */
+function settingsSectionPrefix(path: string): string {
+  return path.startsWith("/personalization") ? "/personalization" : path;
+}
+
+/** 内嵌页面在隔离上下文里跳出分区分缀（如专家卡片「对话」→ /chat/...）时，
+ *  把目标交给外层真实导航并关闭弹窗。 */
+function SettingsSectionGuard({
+  prefix,
+  onExit,
+}: {
+  prefix: string;
+  onExit: (to: string) => void;
+}) {
+  const location = useLocation();
+  const lastRef = useRef(location);
+  useEffect(() => {
+    if (lastRef.current === location) return;
+    lastRef.current = location;
+    const inside =
+      location.pathname === prefix ||
+      location.pathname.startsWith(`${prefix}/`);
+    if (!inside) {
+      onExit(`${location.pathname}${location.search}${location.hash}`);
+    }
+  }, [location, prefix, onExit]);
+  return null;
+}
+
+/** 为内嵌分区提供独立的内存导航上下文。react-router v7 禁止嵌套 <Router>
+ *  （<MemoryRouter>/<RouterProvider> 都会触发不变式），因此用其 UNSAFE 上下文
+ *  手工搭建与 <MemoryRouter> 等价的最小实现；面板页只用到 push/replace。 */
+function SettingsIsolatedRouter({
+  initialPath,
+  children,
+}: {
+  initialPath: string;
+  children: ReactNode;
+}) {
+  const [location, setLocation] = useState<Location>(() => ({
+    pathname: initialPath,
+    search: "",
+    hash: "",
+    state: null,
+    key: "settings-root",
+  }));
+  const keyRef = useRef(1);
+  const apply = useCallback((to: To, state?: unknown) => {
+    const path = typeof to === "string" ? parsePath(to) : to;
+    setLocation({
+      pathname: path.pathname ?? "/",
+      search: path.search ?? "",
+      hash: path.hash ?? "",
+      state: state ?? null,
+      key: `settings-${(keyRef.current += 1)}`,
+    });
+  }, []);
+  const navigator = useMemo<Navigator>(
+    () => ({
+      push: apply,
+      replace: apply,
+      go: () => {},
+      createHref: (to) => (typeof to === "string" ? to : createPath(to)),
+      encodeLocation: (to) => {
+        const path = typeof to === "string" ? parsePath(to) : to;
+        return {
+          pathname: path.pathname ?? "",
+          search: path.search ?? "",
+          hash: path.hash ?? "",
+        };
+      },
+    }),
+    [apply],
+  );
+  const navValue = {
+    basename: "/",
+    navigator,
+    static: false,
+  } as ComponentProps<typeof UNSAFE_NavigationContext.Provider>["value"];
+  const locValue = { location, navigationType: "POP" } as ComponentProps<
+    typeof UNSAFE_LocationContext.Provider
+  >["value"];
+  const routeValue = {
+    matches: [],
+    outlet: null,
+    isDataRoute: false,
+  } as ComponentProps<typeof UNSAFE_RouteContext.Provider>["value"];
+  return (
+    <UNSAFE_NavigationContext.Provider value={navValue}>
+      <UNSAFE_LocationContext.Provider value={locValue}>
+        <UNSAFE_RouteContext.Provider value={routeValue}>
+          {children}
+        </UNSAFE_RouteContext.Provider>
+      </UNSAFE_LocationContext.Provider>
+    </UNSAFE_NavigationContext.Provider>
+  );
+}
+
+function SettingsSectionPanel({
+  path,
+  onExit,
+}: {
+  path: string;
+  onExit: (to: string) => void;
+}) {
+  const Page = SETTINGS_SECTIONS[path];
+  if (!Page) return null;
+  return (
+    <SettingsIsolatedRouter key={path} initialPath={path}>
+      <SettingsSectionGuard
+        prefix={settingsSectionPrefix(path)}
+        onExit={onExit}
+      />
+      {/* RequirePermission 读取隔离上下文的路径，和主布局一致地拦截无权限的管理页。 */}
+      <RequirePermission>
+        <Page />
+      </RequirePermission>
+    </SettingsIsolatedRouter>
+  );
+}
+
 const FEATURE_TITLES: Record<string, string> = {
   "/experts": "Agent",
   "/knowledge-bases": "资料库",
@@ -331,6 +488,8 @@ export default function HomePage() {
   const isHomeRoute =
     location.pathname === "/home" || location.pathname === "/";
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** 当前内嵌的设置分区（SETTINGS_NAV 的 path）；null = 「通用」面板。 */
+  const [settingsSection, setSettingsSection] = useState<string | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [sideCollapsed, setSideCollapsed] = useState<boolean>(() => {
     try {
@@ -436,6 +595,16 @@ export default function HomePage() {
   const [codeBrowserProjectId, setCodeBrowserProjectId] = useState<
     string | null
   >(null);
+  const [shareDialogProject, setShareDialogProject] =
+    useState<WorkbenchProject | null>(null);
+  const [knowledgeProject, setKnowledgeProject] =
+    useState<WorkbenchProject | null>(null);
+  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
+  const [projectKnowledgeIds, setProjectKnowledgeIds] = useState<string[]>([]);
+  const [projectKnowledgeLoading, setProjectKnowledgeLoading] = useState(false);
+  const [projectKnowledgeLoadFailed, setProjectKnowledgeLoadFailed] =
+    useState(false);
+  const [projectKnowledgeSaving, setProjectKnowledgeSaving] = useState(false);
   const [activeThread, setActiveThread] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [availableModels, setAvailableModels] = useState<ResolvedModel[]>([]);
@@ -789,9 +958,24 @@ export default function HomePage() {
 
   const runProjectMenu = (key: string, project: WorkbenchProject) => {
     if (key === "task") newTaskInProject(project.project_id);
+    else if (key === "share") setShareDialogProject(project);
     else if (key === "folder") {
       setFolderNameDraft("");
       setFolderModal({ projectId: project.project_id });
+    } else if (key === "knowledge") {
+      setKnowledgeProject(project);
+      setProjectKnowledgeIds(project.knowledge_base_ids || []);
+      setProjectKnowledgeLoadFailed(false);
+      setProjectKnowledgeLoading(true);
+      void knowledgeBasesApi
+        .list()
+        .then(setKnowledgeBases)
+        .catch(() => {
+          setKnowledgeBases([]);
+          setProjectKnowledgeLoadFailed(true);
+          setError(t("workbench.home.projects.knowledgeLoadFailed"));
+        })
+        .finally(() => setProjectKnowledgeLoading(false));
     } else if (key === "code") setCodeBrowserProjectId(project.project_id);
     else if (key === "openGithub") {
       if (project.external_url)
@@ -864,6 +1048,11 @@ export default function HomePage() {
           ]
         : []),
       { type: "divider" as const },
+      { key: "share", label: t("workbench.home.projects.shareProject") },
+      {
+        key: "knowledge",
+        label: t("workbench.home.projects.manageKnowledge"),
+      },
       { key: "rename", label: t("workbench.home.projects.editProject") },
       { key: "icon", label: t("workbench.home.projects.editProjectIcon") },
       {
@@ -1288,11 +1477,12 @@ export default function HomePage() {
   } = useChat(activeThread, agentId, primary?.kind === "team");
   // Manus 式输入框能力：本地文件附件 + 语音输入，复用聊天页同一套管线。
   const {
+    items: uploadItems,
     attachments,
-    uploading,
     fileInputRef,
     handleFileChange,
-    removeAttachment,
+    removeUpload,
+    retryUpload,
     clearAttachments,
   } = useChatAttachments(agentId);
   const voiceInput = useVoiceInput({
@@ -1695,7 +1885,7 @@ export default function HomePage() {
 
   const navigateFromWorkbench = (path: string) => {
     setMobileNavOpen(false);
-    setSettingsOpen(false);
+    closeSettings();
     setMoreOpen(false);
     // Star Planet is an independent surface, never carry its iframe to a feature route.
     setPlatformOpen(false);
@@ -1704,7 +1894,7 @@ export default function HomePage() {
 
   const handleLogout = async () => {
     setMobileNavOpen(false);
-    setSettingsOpen(false);
+    closeSettings();
     await authApi.logout();
     clearAuthToken();
     await applyGuestLocale();
@@ -2043,6 +2233,20 @@ export default function HomePage() {
     };
   }, [settingsOpen]);
 
+  const closeSettings = useCallback(() => {
+    setSettingsOpen(false);
+    setSettingsSection(null);
+  }, []);
+
+  /** 内嵌分区页面请求离开（如专家卡片「对话」）：关闭弹窗并真实导航。 */
+  const exitSettingsSection = useCallback(
+    (to: string) => {
+      closeSettings();
+      if (to) navigate(to);
+    },
+    [closeSettings, navigate],
+  );
+
   const handleAvatarIcon = async (icon: string | null) => {
     if (user) setUser({ ...user, avatar_icon: icon, avatar_url: null });
     try {
@@ -2296,6 +2500,10 @@ export default function HomePage() {
                       )
                         ? [
                             { type: "divider" as const },
+                            {
+                              key: "share",
+                              label: t("workbench.home.projects.shareProject"),
+                            },
                             {
                               key: "rename",
                               label: t("workbench.home.projects.editProject"),
@@ -2963,28 +3171,46 @@ export default function HomePage() {
                   </div>
                 )}
                 <div className="wb-composer">
-                  {attachments.length > 0 && (
+                  {uploadItems.length > 0 && (
                     <div className="wb-composer-attachments">
-                      {attachments.map((file, index) => (
-                        <span
-                          key={file.url + ":" + index}
-                          className="wb-attachment-chip"
-                        >
-                          {file.filename || "文件"}
-                          <button
-                            type="button"
-                            onClick={() => removeAttachment(index)}
-                            aria-label="移除附件"
+                      {uploadItems.map((item) => {
+                        const isDone =
+                          item.status === "done" && item.attachment;
+                        const failed = item.status === "failed";
+                        return (
+                          <span
+                            key={item.key}
+                            className={
+                              "wb-attachment-chip" +
+                              (isDone ? "" : " is-uploading") +
+                              (failed ? " is-failed" : "")
+                            }
+                            data-upload-status={item.status}
                           >
-                            <X size={12} />
-                          </button>
-                        </span>
-                      ))}
-                      {uploading && (
-                        <span className="wb-attachment-chip is-uploading">
-                          上传中…
-                        </span>
-                      )}
+                            {isDone
+                              ? isDone.filename || "文件"
+                              : (failed ? "上传失败 · " : "上传中 · ") +
+                                item.file.name}
+                            {failed && (
+                              <button
+                                type="button"
+                                onClick={() => retryUpload(item.key)}
+                                aria-label="重试上传"
+                                title="重试上传"
+                              >
+                                <RotateCcw size={12} />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => removeUpload(item.key)}
+                              aria-label="移除附件"
+                            >
+                              <X size={12} />
+                            </button>
+                          </span>
+                        );
+                      })}
                     </div>
                   )}
                   {selectedModelOption && (
@@ -3193,13 +3419,19 @@ export default function HomePage() {
         className="wb-settings-modal"
         open={settingsOpen}
         footer={null}
-        onCancel={() => setSettingsOpen(false)}
-        width={880}
+        onCancel={closeSettings}
+        width={settingsSection ? 1080 : 880}
         styles={{ body: { padding: 0 } }}
       >
         <div className="wb-set-shell">
           <aside className="wb-set-nav">
-            <button type="button" className="wb-set-nav-item is-active">
+            <button
+              type="button"
+              className={
+                "wb-set-nav-item" + (settingsSection ? "" : " is-active")
+              }
+              onClick={() => setSettingsSection(null)}
+            >
               <Settings2 size={15} /> 通用
             </button>
             {SETTINGS_NAV.map((group) => (
@@ -3209,12 +3441,12 @@ export default function HomePage() {
                   <button
                     key={path}
                     type="button"
-                    className="wb-set-nav-item"
+                    className={
+                      "wb-set-nav-item" +
+                      (settingsSection === path ? " is-active" : "")
+                    }
                     title={desc}
-                    onClick={() => {
-                      setSettingsOpen(false);
-                      navigate(path);
-                    }}
+                    onClick={() => setSettingsSection(path)}
                   >
                     <Icon size={15} /> {label}
                   </button>
@@ -3222,150 +3454,174 @@ export default function HomePage() {
               </div>
             ))}
           </aside>
-          <section className="wb-set-panel">
-            <h3>通用</h3>
-            <div className="wb-set-label">个人账户</div>
-            <div className="wb-set-account">
-              <ProfileAvatarPicker
-                kind="user"
-                avatarUrl={user?.avatar_url}
-                icon={user?.avatar_icon}
-                onSelectIcon={handleAvatarIcon}
-                onPick={handleAvatarUpload}
-                onRemove={handleAvatarRemove}
-              />
-              <div className="wb-set-field">
-                <div className="wb-set-field-info">
-                  <strong>显示名称</strong>
-                  <small>在工作台与对话中展示的名字</small>
-                </div>
-                <div className="wb-set-account-name">
-                  <Input
-                    value={nameDraft}
-                    maxLength={64}
-                    style={{ width: 170 }}
-                    placeholder={user?.username || "显示名称"}
-                    onChange={(e) => {
-                      setNameDraft(e.target.value);
-                      nameDirtyRef.current = true;
-                    }}
-                    onPressEnter={() => {
-                      if (!nameSaving) void saveDisplayName();
-                    }}
-                  />
-                  <Button
-                    type="primary"
-                    size="small"
-                    loading={nameSaving}
-                    disabled={
-                      (nameDraft.trim() || null) ===
-                      (user?.display_name ?? null)
-                    }
-                    onClick={() => {
-                      void saveDisplayName();
-                    }}
-                  >
-                    保存
-                  </Button>
-                </div>
-              </div>
-              <div className="wb-set-field">
-                <div className="wb-set-field-info">
-                  <strong>登录密码</strong>
-                  <small>
-                    账号 {user?.username || "—"} · 修改后下次登录使用新密码
-                  </small>
-                </div>
-                <Button size="small" onClick={openPwModal}>
-                  修改密码
-                </Button>
-              </div>
-            </div>
-            <div className="wb-set-label">外观</div>
-            <div className="wb-set-field wb-set-card">
-              <div className="wb-set-field-info">
-                <strong>语言</strong>
-                <small>工作台界面显示语言</small>
-              </div>
-              <Select
-                value={currentLocale}
-                classNames={{ popup: { root: "wb-theme-popup" } }}
-                style={{ width: 170 }}
-                onChange={(v) => void handleLocaleChange(v)}
-                options={[
-                  { value: "zh", label: "简体中文" },
-                  { value: "en", label: "English" },
-                ]}
-              />
-            </div>
-            <div className="wb-set-field wb-set-card">
-              <div className="wb-set-field-info">
-                <strong>主题</strong>
-                <small>浅色、深色或跟随系统</small>
-              </div>
-              <div className="wb-set-themes">
-                {THEME_OPTIONS.map(({ key, label, Icon }) => (
-                  <button
-                    key={key}
-                    type="button"
-                    className={
-                      "wb-set-theme" + (preference === key ? " is-active" : "")
-                    }
-                    onClick={() => setPreference(key)}
-                  >
-                    <Icon size={18} />
-                    <span>{label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="wb-set-label">
-              {t("workbench.home.themeGallery.title")}
-            </div>
-            <div
-              className="wb-set-gallery"
-              role="group"
-              aria-label={t("workbench.home.themeGallery.title")}
-            >
-              {THEME_GALLERY_OPTIONS.map((option) => {
-                const selected = skin === option.id;
-                return (
-                  <button
-                    className={
-                      "wb-set-gallery-card" + (selected ? " is-active" : "")
-                    }
-                    key={option.id}
-                    type="button"
-                    aria-label={t(
-                      `workbench.home.themeGallery.themes.${option.galleryKey}`,
-                    )}
-                    aria-pressed={selected}
-                    style={{
-                      backgroundImage: `linear-gradient(180deg, rgba(8, 15, 28, 0.02) 25%, rgba(8, 15, 28, 0.62) 100%), url("${option.image}")`,
-                    }}
-                    onClick={() => setSkin(option.id)}
-                  >
-                    <span>
-                      {t(
-                        `workbench.home.themeGallery.themes.${option.galleryKey}`,
-                      )}
-                    </span>
-                    {selected ? <Check size={14} aria-hidden="true" /> : null}
-                  </button>
-                );
-              })}
-              <div
-                className="wb-set-gallery-card is-coming-soon"
-                role="listitem"
+          <section
+            className={
+              "wb-set-panel" + (settingsSection ? " wb-set-panel-embed" : "")
+            }
+          >
+            {settingsSection ? (
+              <Suspense
+                fallback={
+                  <div className="wb-set-embed-loading">
+                    <Spin />
+                  </div>
+                }
               >
-                {t("workbench.home.themeGallery.comingSoon")}
-              </div>
-            </div>
-            <div className="wb-set-label">更多设置</div>
-            <p className="wb-set-note">
-              系统类设置在左侧导航中选择，进入对应页面管理；模型、ACP
-              协作、插件等工具入口在侧栏「更多」菜单。
-            </p>
+                <SettingsSectionPanel
+                  path={settingsSection}
+                  onExit={exitSettingsSection}
+                />
+              </Suspense>
+            ) : (
+              <>
+                <h3>通用</h3>
+                <div className="wb-set-label">个人账户</div>
+                <div className="wb-set-account">
+                  <ProfileAvatarPicker
+                    kind="user"
+                    avatarUrl={user?.avatar_url}
+                    icon={user?.avatar_icon}
+                    onSelectIcon={handleAvatarIcon}
+                    onPick={handleAvatarUpload}
+                    onRemove={handleAvatarRemove}
+                  />
+                  <div className="wb-set-field">
+                    <div className="wb-set-field-info">
+                      <strong>显示名称</strong>
+                      <small>在工作台与对话中展示的名字</small>
+                    </div>
+                    <div className="wb-set-account-name">
+                      <Input
+                        value={nameDraft}
+                        maxLength={64}
+                        style={{ width: 170 }}
+                        placeholder={user?.username || "显示名称"}
+                        onChange={(e) => {
+                          setNameDraft(e.target.value);
+                          nameDirtyRef.current = true;
+                        }}
+                        onPressEnter={() => {
+                          if (!nameSaving) void saveDisplayName();
+                        }}
+                      />
+                      <Button
+                        type="primary"
+                        size="small"
+                        loading={nameSaving}
+                        disabled={
+                          (nameDraft.trim() || null) ===
+                          (user?.display_name ?? null)
+                        }
+                        onClick={() => {
+                          void saveDisplayName();
+                        }}
+                      >
+                        保存
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="wb-set-field">
+                    <div className="wb-set-field-info">
+                      <strong>登录密码</strong>
+                      <small>
+                        账号 {user?.username || "—"} · 修改后下次登录使用新密码
+                      </small>
+                    </div>
+                    <Button size="small" onClick={openPwModal}>
+                      修改密码
+                    </Button>
+                  </div>
+                </div>
+                <div className="wb-set-label">外观</div>
+                <div className="wb-set-field wb-set-card">
+                  <div className="wb-set-field-info">
+                    <strong>语言</strong>
+                    <small>工作台界面显示语言</small>
+                  </div>
+                  <Select
+                    value={currentLocale}
+                    classNames={{ popup: { root: "wb-theme-popup" } }}
+                    style={{ width: 170 }}
+                    onChange={(v) => void handleLocaleChange(v)}
+                    options={[
+                      { value: "zh", label: "简体中文" },
+                      { value: "en", label: "English" },
+                    ]}
+                  />
+                </div>
+                <div className="wb-set-field wb-set-card">
+                  <div className="wb-set-field-info">
+                    <strong>主题</strong>
+                    <small>浅色、深色或跟随系统</small>
+                  </div>
+                  <div className="wb-set-themes">
+                    {THEME_OPTIONS.map(({ key, label, Icon }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        className={
+                          "wb-set-theme" +
+                          (preference === key ? " is-active" : "")
+                        }
+                        onClick={() => setPreference(key)}
+                      >
+                        <Icon size={18} />
+                        <span>{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="wb-set-label">
+                  {t("workbench.home.themeGallery.title")}
+                </div>
+                <div
+                  className="wb-set-gallery"
+                  role="group"
+                  aria-label={t("workbench.home.themeGallery.title")}
+                >
+                  {THEME_GALLERY_OPTIONS.map((option) => {
+                    const selected = skin === option.id;
+                    return (
+                      <button
+                        className={
+                          "wb-set-gallery-card" + (selected ? " is-active" : "")
+                        }
+                        key={option.id}
+                        type="button"
+                        aria-label={t(
+                          `workbench.home.themeGallery.themes.${option.galleryKey}`,
+                        )}
+                        aria-pressed={selected}
+                        style={{
+                          backgroundImage: `linear-gradient(180deg, rgba(8, 15, 28, 0.02) 25%, rgba(8, 15, 28, 0.62) 100%), url("${option.image}")`,
+                        }}
+                        onClick={() => setSkin(option.id)}
+                      >
+                        <span>
+                          {t(
+                            `workbench.home.themeGallery.themes.${option.galleryKey}`,
+                          )}
+                        </span>
+                        {selected ? (
+                          <Check size={14} aria-hidden="true" />
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                  <div
+                    className="wb-set-gallery-card is-coming-soon"
+                    role="listitem"
+                  >
+                    {t("workbench.home.themeGallery.comingSoon")}
+                  </div>
+                </div>
+                <div className="wb-set-label">更多设置</div>
+                <p className="wb-set-note">
+                  系统类设置在左侧选择后，在此窗口内直接管理；模型、ACP
+                  协作、插件等工具入口在侧栏「更多」菜单。
+                </p>
+              </>
+            )}
           </section>
         </div>
       </Modal>
@@ -3518,6 +3774,59 @@ export default function HomePage() {
         </form>
       </Modal>
       <Modal
+        title={t("workbench.home.projects.manageKnowledge")}
+        open={!!knowledgeProject}
+        width={520}
+        confirmLoading={projectKnowledgeSaving}
+        okText={t("common.save")}
+        cancelText={t("common.cancel")}
+        okButtonProps={{
+          disabled: projectKnowledgeLoading || projectKnowledgeLoadFailed,
+        }}
+        onCancel={() => setKnowledgeProject(null)}
+        onOk={() => {
+          if (!knowledgeProject) return;
+          setProjectKnowledgeSaving(true);
+          void workbenchApi
+            .setProjectKnowledgeBases(
+              knowledgeProject.project_id,
+              projectKnowledgeIds,
+            )
+            .then((ids) => {
+              setProjects((items) =>
+                items.map((item) =>
+                  item.project_id === knowledgeProject.project_id
+                    ? { ...item, knowledge_base_ids: ids }
+                    : item,
+                ),
+              );
+              setKnowledgeProject(null);
+            })
+            .catch(() =>
+              setError(t("workbench.home.projects.knowledgeSaveFailed")),
+            )
+            .finally(() => setProjectKnowledgeSaving(false));
+        }}
+      >
+        <p>{t("workbench.home.projects.knowledgeHint")}</p>
+        {projectKnowledgeLoadFailed && (
+          <p>{t("workbench.home.projects.knowledgeLoadFailed")}</p>
+        )}
+        <Select
+          mode="multiple"
+          value={projectKnowledgeIds}
+          loading={projectKnowledgeLoading}
+          onChange={setProjectKnowledgeIds}
+          options={knowledgeBases.map((base) => ({
+            label: base.name,
+            value: base.id,
+          }))}
+          placeholder={t("workbench.home.projects.knowledgePlaceholder")}
+          style={{ width: "100%" }}
+          optionFilterProp="label"
+        />
+      </Modal>
+      <Modal
         title={t("workbench.home.projects.newFolder")}
         open={!!folderModal}
         width={420}
@@ -3563,6 +3872,12 @@ export default function HomePage() {
           projectId={codeBrowserProjectId}
           open={Boolean(codeBrowserProjectId)}
           onClose={() => setCodeBrowserProjectId(null)}
+        />
+      )}
+      {shareDialogProject && (
+        <ProjectShareDialog
+          project={shareDialogProject}
+          onClose={() => setShareDialogProject(null)}
         />
       )}
     </div>

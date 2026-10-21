@@ -30,8 +30,25 @@ class WorkbenchRepo:
                 "WHERE owner_user_id = ?",
                 (owner_user_id,),
             ).fetchall()
+            knowledge_bases = conn.execute(
+                "SELECT project_id, knowledge_base_id FROM workbench_project_knowledge_bases "
+                "WHERE owner_user_id = ? ORDER BY project_id, knowledge_base_id",
+                (owner_user_id,),
+            ).fetchall()
+        knowledge_by_project: dict[str, list[str]] = {}
+        for row in knowledge_bases:
+            knowledge_by_project.setdefault(str(row["project_id"]), []).append(
+                str(row["knowledge_base_id"])
+            )
+        project_rows = [
+            {
+                **dict(row),
+                "knowledge_base_ids": knowledge_by_project.get(str(row["project_id"]), []),
+            }
+            for row in projects
+        ]
         return {
-            "projects": [dict(row) for row in projects],
+            "projects": project_rows,
             "folders": [dict(row) for row in folders],
             "assignments": [dict(row) for row in assignments],
         }
@@ -168,6 +185,147 @@ class WorkbenchRepo:
                 (owner_user_id, project_id),
             ).fetchone()
         return row is not None
+
+    def create_project_share(
+        self,
+        *,
+        owner_user_id: int,
+        project_id: str,
+        token_hash: str,
+        expires_at: int,
+    ) -> dict[str, Any] | None:
+        share_id = new_short_id()
+        created_at = now_ts()
+        with self._db.transaction() as conn:
+            if not self._owns_project(conn, owner_user_id, project_id):
+                return None
+            conn.execute(
+                "INSERT INTO workbench_project_shares "
+                "(share_id, project_id, owner_user_id, token_hash, created_at, expires_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (share_id, project_id, owner_user_id, token_hash, created_at, expires_at),
+            )
+        return {
+            "share_id": share_id,
+            "project_id": project_id,
+            "created_at": created_at,
+            "expires_at": expires_at,
+            "revoked_at": None,
+        }
+
+    def list_project_shares(self, *, owner_user_id: int, project_id: str) -> list[dict[str, Any]]:
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT share_id, project_id, created_at, expires_at, revoked_at "
+                "FROM workbench_project_shares WHERE owner_user_id = ? AND project_id = ? "
+                "ORDER BY created_at DESC, share_id",
+                (owner_user_id, project_id),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def revoke_project_share(self, *, owner_user_id: int, project_id: str, share_id: str) -> bool:
+        with self._db.transaction() as conn:
+            cur = conn.execute(
+                "UPDATE workbench_project_shares SET revoked_at = ? "
+                "WHERE owner_user_id = ? AND project_id = ? AND share_id = ? "
+                "AND revoked_at IS NULL",
+                (now_ts(), owner_user_id, project_id, share_id),
+            )
+        return bool(cur.rowcount)
+
+    def get_project_share(self, token_hash: str, *, now: int) -> dict[str, Any] | None:
+        with self._db.connect() as conn:
+            row = conn.execute(
+                "SELECT s.share_id, s.project_id, s.owner_user_id, s.expires_at, "
+                "p.name, p.icon, p.parent_id "
+                "FROM workbench_project_shares s "
+                "JOIN workbench_projects p ON p.project_id = s.project_id "
+                "WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ?",
+                (token_hash, now),
+            ).fetchone()
+        if row is None:
+            return None
+        values = dict(row)
+        project = {
+            "project_id": values["project_id"],
+            "name": values["name"],
+            "icon": values["icon"],
+            "parent_id": values["parent_id"],
+        }
+        return {
+            "share_id": values["share_id"],
+            "project_id": values["project_id"],
+            "owner_user_id": values["owner_user_id"],
+            "expires_at": values["expires_at"],
+            "project": project,
+        }
+
+    def get_shared_project_data(self, *, owner_user_id: int, project_id: str) -> dict[str, Any]:
+        with self._db.connect() as conn:
+            projects = conn.execute(
+                "WITH RECURSIVE project_tree(project_id, name, icon, parent_id) AS ("
+                "SELECT project_id, name, icon, parent_id FROM workbench_projects "
+                "WHERE project_id = ? AND owner_user_id = ? "
+                "UNION SELECT p.project_id, p.name, p.icon, p.parent_id "
+                "FROM workbench_projects p JOIN project_tree t ON p.parent_id = t.project_id "
+                "WHERE p.owner_user_id = ?) "
+                "SELECT project_id, name, icon, parent_id FROM project_tree",
+                (project_id, owner_user_id, owner_user_id),
+            ).fetchall()
+            project_ids = [str(row["project_id"]) for row in projects]
+            if not project_ids:
+                return {"projects": [], "folders": [], "threads": []}
+            placeholders = ",".join("?" for _ in project_ids)
+            folders = conn.execute(
+                "SELECT folder_id, project_id, name FROM workbench_folders "
+                f"WHERE owner_user_id = ? AND project_id IN ({placeholders}) "
+                "ORDER BY created_at, folder_id",
+                (owner_user_id, *project_ids),
+            ).fetchall()
+            threads = conn.execute(
+                "SELECT t.thread_id, t.title, a.project_id, a.folder_id "
+                "FROM workbench_thread_assignments a JOIN threads t ON t.thread_id = a.thread_id "
+                f"WHERE a.owner_user_id = ? AND a.project_id IN ({placeholders}) "
+                "ORDER BY t.created_at, t.thread_id",
+                (owner_user_id, *project_ids),
+            ).fetchall()
+        return {
+            "projects": [dict(row) for row in projects],
+            "folders": [dict(row) for row in folders],
+            "threads": [dict(row) for row in threads],
+        }
+
+    def set_project_knowledge_bases(
+        self, *, owner_user_id: int, project_id: str, knowledge_base_ids: list[str]
+    ) -> bool:
+        ts = now_ts()
+        with self._db.transaction() as conn:
+            if not self._owns_project(conn, owner_user_id, project_id):
+                return False
+            conn.execute(
+                "DELETE FROM workbench_project_knowledge_bases "
+                "WHERE owner_user_id = ? AND project_id = ?",
+                (owner_user_id, project_id),
+            )
+            for knowledge_base_id in dict.fromkeys(knowledge_base_ids):
+                conn.execute(
+                    "INSERT INTO workbench_project_knowledge_bases "
+                    "(owner_user_id, project_id, knowledge_base_id, created_at) VALUES (?, ?, ?, ?)",
+                    (owner_user_id, project_id, knowledge_base_id, ts),
+                )
+        return True
+
+    def knowledge_base_ids_for_thread(self, *, owner_user_id: int, thread_id: str) -> list[str]:
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT kb.knowledge_base_id FROM workbench_thread_assignments a "
+                "JOIN workbench_project_knowledge_bases kb "
+                "ON kb.project_id = a.project_id AND kb.owner_user_id = a.owner_user_id "
+                "WHERE a.owner_user_id = ? AND a.thread_id = ? "
+                "ORDER BY kb.knowledge_base_id",
+                (owner_user_id, thread_id),
+            ).fetchall()
+        return [str(row["knowledge_base_id"]) for row in rows]
 
     def delete_project(self, *, owner_user_id: int, project_id: str) -> bool:
         with self._db.transaction() as conn:

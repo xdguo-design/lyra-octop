@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import re
+import secrets
+import time
 from typing import Any, cast
 
 import httpx
@@ -21,6 +25,23 @@ from octop.infra.workbench.code_browser import (
 router = APIRouter()
 
 
+def _audit_project_action(
+    server: Any,
+    user: Any,
+    action: str,
+    project_id: str,
+    target: str | None = None,
+    payload: str | None = None,
+) -> None:
+    server.services.audit_repo.write(
+        actor=user.username,
+        action=action,
+        target=target,
+        payload=payload,
+        project_id=project_id,
+    )
+
+
 class WorkbenchProject(BaseModel):
     project_id: str
     name: str
@@ -28,6 +49,7 @@ class WorkbenchProject(BaseModel):
     parent_id: str | None = None
     external_url: str | None = None
     code_enabled: bool
+    knowledge_base_ids: list[str] = Field(default_factory=list)
     created_at: int
     updated_at: int
 
@@ -84,6 +106,10 @@ class AssignmentBody(BaseModel):
     folder_id: str | None = None
 
 
+class ProjectKnowledgeBasesBody(BaseModel):
+    knowledge_base_ids: list[str] = Field(max_length=100)
+
+
 class LegacyProject(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     thread_ids: list[str] = Field(default_factory=list, max_length=1000)
@@ -117,6 +143,26 @@ class CodeFile(BaseModel):
     path: str
     content: str
     size: int
+
+
+class ProjectShareBody(BaseModel):
+    expires_in_seconds: int = Field(ge=3600, le=30 * 24 * 60 * 60)
+
+
+class ProjectShare(BaseModel):
+    share_id: str
+    project_id: str
+    created_at: int
+    expires_at: int
+    revoked_at: int | None = None
+
+
+class CreatedProjectShare(ProjectShare):
+    token: str
+
+
+def _share_token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def _not_found(message: str = "workbench item not found") -> OctopError:
@@ -164,6 +210,10 @@ async def import_local_projects(
     user: Any = Depends(current_user),
     server: Any = Depends(get_server),
 ) -> Response:
+    before = {
+        item["project_id"]
+        for item in server.services.workbench_repo.list_index(user.id)["projects"]
+    }
     server.services.workbench_repo.import_legacy_projects(
         owner_user_id=user.id,
         projects=[
@@ -171,6 +221,11 @@ async def import_local_projects(
             for item in body.projects
         ],
     )
+    for item in server.services.workbench_repo.list_index(user.id)["projects"]:
+        if item["project_id"] not in before:
+            _audit_project_action(
+                server, user, "workbench.project.create", item["project_id"], payload=item["name"]
+            )
     return Response(status_code=204)
 
 
@@ -196,6 +251,9 @@ async def create_project(
     )
     if row is None:
         raise _not_found("parent project not found")
+    _audit_project_action(
+        server, user, "workbench.project.create", row["project_id"], payload=row["name"]
+    )
     return cast(dict[str, Any], row)
 
 
@@ -276,6 +334,9 @@ async def import_github_project(
     )
     if row is None:
         raise _not_found("workbench project not found")
+    _audit_project_action(
+        server, user, "workbench.project.create", row["project_id"], payload=row["name"]
+    )
     return cast(dict[str, Any], row)
 
 
@@ -309,7 +370,38 @@ async def update_project(
     )
     if row is None:
         raise _not_found("workbench project not found")
+    _audit_project_action(server, user, "workbench.project.update", project_id, payload=row["name"])
     return cast(dict[str, Any], row)
+
+
+@router.put(
+    "/workbench/projects/{project_id}/knowledge-bases",
+    summary="Set knowledge bases used by project conversations",
+    response_model=list[str],
+)
+async def set_project_knowledge_bases(
+    project_id: str,
+    body: ProjectKnowledgeBasesBody,
+    user: Any = Depends(current_user),
+    server: Any = Depends(get_server),
+) -> list[str]:
+    repo = server.services.workbench_repo
+    ids = list(dict.fromkeys(item.strip() for item in body.knowledge_base_ids if item.strip()))
+    visible = {base.id for base in server.services.knowledge_repo.list_visible(user.id)}
+    if any(item not in visible for item in ids):
+        raise _not_found("knowledge base not found")
+    if not repo.set_project_knowledge_bases(
+        owner_user_id=user.id, project_id=project_id, knowledge_base_ids=ids
+    ):
+        raise _not_found("workbench project not found")
+    _audit_project_action(
+        server,
+        user,
+        "workbench.project.knowledge_bases.update",
+        project_id,
+        payload=json.dumps(ids, ensure_ascii=False),
+    )
+    return ids
 
 
 @router.delete(
@@ -322,10 +414,25 @@ async def delete_project(
     user: Any = Depends(current_user),
     server: Any = Depends(get_server),
 ) -> Response:
+    project = next(
+        (
+            item
+            for item in server.services.workbench_repo.list_index(user.id)["projects"]
+            if item["project_id"] == project_id
+        ),
+        None,
+    )
     if not server.services.workbench_repo.delete_project(
         owner_user_id=user.id, project_id=project_id
     ):
         raise _not_found("workbench project not found")
+    _audit_project_action(
+        server,
+        user,
+        "workbench.project.delete",
+        project_id,
+        payload=project["name"] if project else None,
+    )
     return Response(status_code=204)
 
 
@@ -346,6 +453,9 @@ async def create_folder(
     )
     if row is None:
         raise _not_found("workbench project not found")
+    _audit_project_action(
+        server, user, "workbench.folder.create", project_id, row["folder_id"], row["name"]
+    )
     return cast(dict[str, Any], row)
 
 
@@ -369,6 +479,9 @@ async def rename_folder(
     )
     if row is None:
         raise _not_found("workbench folder not found")
+    _audit_project_action(
+        server, user, "workbench.folder.update", row["project_id"], folder_id, row["name"]
+    )
     return cast(dict[str, Any], row)
 
 
@@ -382,8 +495,20 @@ async def delete_folder(
     user: Any = Depends(current_user),
     server: Any = Depends(get_server),
 ) -> Response:
+    folder = next(
+        (
+            item
+            for item in server.services.workbench_repo.list_index(user.id)["folders"]
+            if item["folder_id"] == folder_id
+        ),
+        None,
+    )
     if not server.services.workbench_repo.delete_folder(owner_user_id=user.id, folder_id=folder_id):
         raise _not_found("workbench folder not found")
+    if folder:
+        _audit_project_action(
+            server, user, "workbench.folder.delete", folder["project_id"], folder_id, folder["name"]
+        )
     return Response(status_code=204)
 
 
@@ -398,17 +523,283 @@ async def assign_thread(
     user: Any = Depends(current_user),
     server: Any = Depends(get_server),
 ) -> dict[str, Any]:
-    if not server.services.workbench_repo.assign_thread(
+    repo = server.services.workbench_repo
+    old = next(
+        (
+            item
+            for item in repo.list_index(user.id)["assignments"]
+            if item["thread_id"] == thread_id
+        ),
+        None,
+    )
+    if not repo.assign_thread(
         owner_user_id=user.id,
         thread_id=thread_id,
         project_id=body.project_id,
         folder_id=body.folder_id,
     ):
         raise _not_found("thread, project, or folder not found")
+    if old is None or old["project_id"] != body.project_id or old["folder_id"] != body.folder_id:
+        project_ids = {
+            project_id
+            for project_id in (old["project_id"] if old else None, body.project_id)
+            if project_id is not None
+        }
+        for project_id in project_ids:
+            _audit_project_action(
+                server,
+                user,
+                "workbench.thread.assign",
+                project_id,
+                thread_id,
+                json.dumps(
+                    {
+                        "from_project_id": old["project_id"] if old else None,
+                        "to_project_id": body.project_id,
+                        "folder_id": body.folder_id,
+                    },
+                    ensure_ascii=False,
+                ),
+            )
     return {
         "thread_id": thread_id,
         "project_id": body.project_id,
         "folder_id": body.folder_id,
+    }
+
+
+@router.post(
+    "/workbench/projects/{project_id}/shares",
+    status_code=201,
+    summary="Create a time-limited read-only project share link",
+    response_model=CreatedProjectShare,
+)
+async def create_project_share(
+    project_id: str,
+    body: ProjectShareBody,
+    user: Any = Depends(current_user),
+    server: Any = Depends(get_server),
+) -> dict[str, Any]:
+    token = secrets.token_urlsafe(32)
+    expires_at = int(time.time()) + body.expires_in_seconds
+    row = server.services.workbench_repo.create_project_share(
+        owner_user_id=user.id,
+        project_id=project_id,
+        token_hash=_share_token_hash(token),
+        expires_at=expires_at,
+    )
+    if row is None:
+        raise _not_found("workbench project not found")
+    _audit_project_action(server, user, "workbench.project.share", project_id, row["share_id"])
+    return {**row, "token": token}
+
+
+@router.get(
+    "/workbench/projects/{project_id}/shares",
+    summary="List project share links",
+    response_model=list[ProjectShare],
+)
+async def list_project_shares(
+    project_id: str,
+    user: Any = Depends(current_user),
+    server: Any = Depends(get_server),
+) -> list[dict[str, Any]]:
+    repo = server.services.workbench_repo
+    if not any(
+        project["project_id"] == project_id for project in repo.list_index(user.id)["projects"]
+    ):
+        raise _not_found("workbench project not found")
+    shares: list[dict[str, Any]] = repo.list_project_shares(
+        owner_user_id=user.id, project_id=project_id
+    )
+    return shares
+
+
+@router.delete(
+    "/workbench/projects/{project_id}/shares/{share_id}",
+    status_code=204,
+    summary="Revoke a project share link",
+)
+async def revoke_project_share(
+    project_id: str,
+    share_id: str,
+    user: Any = Depends(current_user),
+    server: Any = Depends(get_server),
+) -> Response:
+    if not server.services.workbench_repo.revoke_project_share(
+        owner_user_id=user.id, project_id=project_id, share_id=share_id
+    ):
+        raise _not_found("workbench share not found")
+    _audit_project_action(server, user, "workbench.project.unshare", project_id, share_id)
+    return Response(status_code=204)
+
+
+@router.get(
+    "/workbench-shares/{token}",
+    summary="Read a shared workbench project without signing in",
+)
+async def get_shared_project(
+    token: str,
+    response: Response,
+    server: Any = Depends(get_server),
+) -> dict[str, Any]:
+    share = server.services.workbench_repo.get_project_share(
+        _share_token_hash(token), now=int(time.time())
+    )
+    if share is None:
+        raise _not_found("shared project not found")
+    data = server.services.workbench_repo.get_shared_project_data(
+        owner_user_id=share["owner_user_id"], project_id=share["project_id"]
+    )
+    project = next(
+        (item for item in data["projects"] if item["project_id"] == share["project_id"]), None
+    )
+    if project is None:
+        raise _not_found("shared project not found")
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+    return {
+        "project": project,
+        "projects": data["projects"],
+        "folders": data["folders"],
+        "threads": data["threads"],
+        "expires_at": share["expires_at"],
+        "timezone": server.services.config.default_timezone,
+    }
+
+
+@router.get(
+    "/workbench-shares/{token}/threads/{thread_id}",
+    summary="Read a shared task conversation",
+)
+async def get_shared_thread_history(
+    token: str,
+    thread_id: str,
+    response: Response,
+    limit: int = Query(default=100, ge=1, le=100),
+    offset: int = Query(default=0, ge=0, le=100_000),
+    server: Any = Depends(get_server),
+) -> dict[str, Any]:
+    share = server.services.workbench_repo.get_project_share(
+        _share_token_hash(token), now=int(time.time())
+    )
+    if share is None:
+        raise _not_found("shared project not found")
+    data = server.services.workbench_repo.get_shared_project_data(
+        owner_user_id=share["owner_user_id"], project_id=share["project_id"]
+    )
+    if not any(item["thread_id"] == thread_id for item in data["threads"]):
+        raise _not_found("shared task not found")
+
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+    message_repo = server.services.thread_message_repo
+    from langchain_core.messages import messages_from_dict  # noqa: PLC0415
+
+    from octop.api.routers.chat.serialize import (  # noqa: PLC0415
+        _serialize_history_message,
+    )
+
+    archive = getattr(server.app_runtime, "history_archive", None)
+    from octop.infra.history.service import HistoryArchive  # noqa: PLC0415
+
+    rows = None
+    wires: list[dict[str, Any]] = []
+    thread = server.services.thread_repo.get(thread_id)
+    if thread is None:
+        raise _not_found("shared task not found")
+    if isinstance(archive, HistoryArchive):
+        from octop.infra.history.reader import read_page  # noqa: PLC0415
+
+        page = await read_page(
+            archive,
+            server.app_runtime.agent_registry,
+            thread.agent_id,
+            thread_id,
+            limit=limit,
+            offset=offset,
+        )
+        wires = page["messages"]
+        has_more = page["has_more"]
+        next_offset = offset + len(wires)
+        status = "ready"
+    else:
+        status = message_repo.projection_status(thread_id)
+        if status != "ready":
+            owner = server.user_manager.get_by_id(share["owner_user_id"])
+            if thread is not None and owner is not None:
+                registry = server.app_runtime.agent_registry
+                busy = getattr(registry, "is_agent_active", lambda _agent_id: False)(
+                    thread.agent_id
+                )
+                if not busy:
+
+                    async def _work() -> None:
+                        from octop.api.routers.chat.serialize import (  # noqa: PLC0415
+                            _backfill_thread_projection,
+                        )
+
+                        await _backfill_thread_projection(
+                            server, thread.agent_id, thread_id, user=owner
+                        )
+
+                    accepted = server.app_runtime.gateway.history_backfill.enqueue(thread_id, _work)
+                    if accepted:
+                        message_repo.mark_projection(thread_id, "queued")
+                        status = "queued"
+            response.headers["Retry-After"] = "2"
+            return {
+                "messages": [],
+                "has_more": False,
+                "next_offset": offset,
+                "history_status": status,
+            }
+        rows, has_more = message_repo.page(thread_id, limit=limit, offset=offset)
+        next_offset = offset + len(rows)
+
+    raw_items = (
+        [(json.loads(row.message_json), row.created_at, row.role) for row in rows]
+        if rows is not None
+        else [(wire, None, None) for wire in wires]
+    )
+    messages: list[dict[str, Any]] = []
+    for wire, created_at, stored_role in raw_items:
+        if stored_role is not None and stored_role not in {
+            "human",
+            "user",
+            "ai",
+            "assistant",
+        }:
+            continue
+        try:
+            rendered = _serialize_history_message(
+                messages_from_dict([wire])[0],
+                fallback_created_at=created_at,
+            )
+        except (ValueError, TypeError, KeyError):
+            continue
+        if rendered is None:
+            continue
+        content = "\n".join(
+            str(block.get("text") or "")
+            for block in rendered.get("content", [])
+            if isinstance(block, dict) and block.get("type") == "text"
+        ).strip()
+        if content:
+            messages.append(
+                {
+                    "role": str(rendered.get("role") or stored_role or ""),
+                    "content": content,
+                    "created_at": int(rendered.get("created_at") or created_at or 0),
+                }
+            )
+    return {
+        "messages": messages,
+        "has_more": has_more,
+        "next_offset": next_offset,
+        "history_status": status,
     }
 
 

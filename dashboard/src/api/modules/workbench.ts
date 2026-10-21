@@ -7,6 +7,7 @@ export interface WorkbenchProject {
   parent_id: string | null;
   external_url?: string | null;
   code_enabled: boolean;
+  knowledge_base_ids: string[];
   created_at: number;
   updated_at: number;
 }
@@ -36,6 +37,46 @@ export interface CodeEntry {
   path: string;
   is_directory: boolean;
   size: number | null;
+}
+
+export interface ProjectShare {
+  share_id: string;
+  project_id: string;
+  created_at: number;
+  expires_at: number;
+  revoked_at: number | null;
+}
+
+export interface CreatedProjectShare extends ProjectShare {
+  token: string;
+}
+
+export interface SharedProjectPayload {
+  project: Pick<WorkbenchProject, "project_id" | "name" | "icon" | "parent_id">;
+  projects: Array<
+    Pick<WorkbenchProject, "project_id" | "name" | "icon" | "parent_id">
+  >;
+  folders: Array<Pick<WorkbenchFolder, "folder_id" | "project_id" | "name">>;
+  threads: Array<
+    Pick<WorkbenchAssignment, "thread_id"> & {
+      project_id: string;
+      folder_id: string | null;
+      title: string | null;
+    }
+  >;
+  expires_at: number;
+  timezone: string;
+}
+
+export interface SharedThreadHistory {
+  messages: Array<{
+    role: "user" | "assistant";
+    content: string;
+    created_at: number;
+  }>;
+  has_more: boolean;
+  next_offset: number;
+  history_status: string;
 }
 
 export const workbenchApi = {
@@ -73,6 +114,14 @@ export const workbenchApi = {
             ? { name, icon }
             : { name, icon, parent_id: parentId },
         ),
+      },
+    ),
+  setProjectKnowledgeBases: (projectId: string, knowledgeBaseIds: string[]) =>
+    request<string[]>(
+      `/workbench/projects/${encodeURIComponent(projectId)}/knowledge-bases`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ knowledge_base_ids: knowledgeBaseIds }),
       },
     ),
   deleteProject: (projectId: string) =>
@@ -122,5 +171,41 @@ export const workbenchApi = {
       `/workbench/projects/${encodeURIComponent(
         projectId,
       )}/code/file?path=${encodeURIComponent(path)}`,
+    ),
+  listShares: (projectId: string) =>
+    request<ProjectShare[]>(
+      `/workbench/projects/${encodeURIComponent(projectId)}/shares`,
+    ),
+  createShare: (projectId: string, expiresInSeconds: number) =>
+    request<CreatedProjectShare>(
+      `/workbench/projects/${encodeURIComponent(projectId)}/shares`,
+      {
+        method: "POST",
+        body: JSON.stringify({ expires_in_seconds: expiresInSeconds }),
+      },
+    ),
+  revokeShare: (projectId: string, shareId: string) =>
+    request<void>(
+      `/workbench/projects/${encodeURIComponent(
+        projectId,
+      )}/shares/${encodeURIComponent(shareId)}`,
+      { method: "DELETE" },
+    ),
+  getSharedProject: (token: string) =>
+    request<SharedProjectPayload>(
+      `/workbench-shares/${encodeURIComponent(token)}`,
+    ),
+  getSharedThreadHistory: (
+    token: string,
+    threadId: string,
+    limit = 100,
+    offset = 0,
+  ) =>
+    request<SharedThreadHistory>(
+      `/workbench-shares/${encodeURIComponent(
+        token,
+      )}/threads/${encodeURIComponent(
+        threadId,
+      )}?limit=${limit}&offset=${offset}`,
     ),
 };

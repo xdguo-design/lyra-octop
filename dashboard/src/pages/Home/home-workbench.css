@@ -3261,6 +3261,10 @@ html[data-theme="dark"] {
   color: var(--wbk-217);
   border-style: dashed;
 }
+.wb-attachment-chip.is-failed {
+  color: #cf1322;
+  border-color: #ffa39e;
+}
 .wb-attachment-chip button {
   display: grid;
   place-items: center;
@@ -3641,6 +3645,17 @@ html[data-skin] .wb-menu-popup button:hover {
 .wb-set-panel {
   padding: 22px 26px;
   overflow-y: auto;
+}
+/* 内嵌设置分区：整个面板交给页面组件（PageShell）自己布局与滚动。 */
+.wb-set-panel.wb-set-panel-embed {
+  padding: 0;
+  overflow: hidden;
+}
+.wb-set-embed-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
 }
 .wb-set-panel h3 {
   margin: 0 0 6px;

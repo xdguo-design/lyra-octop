@@ -15,8 +15,8 @@ import { useTranslation } from "react-i18next";
 import LoginPage from "./pages/Login";
 // Unified LYRA shell: all authenticated routes retain the same workbench navigation.
 const HomePage = lazy(() => import("./pages/Home"));
-const AdmissionDemoPage = lazy(() => import("./pages/AdmissionDemo"));
 const SpeechRecognitionPage = lazy(() => import("./pages/SpeechRecognition"));
+const SharedProjectPage = lazy(() => import("./pages/SharedProject"));
 import RegisterPage from "./pages/Register";
 import OidcComplete from "./pages/Login/OidcComplete";
 import SetupPage from "./pages/Setup";
@@ -172,16 +172,16 @@ function ThemedApp() {
             <Route path="/setup" element={<SetupPage />} />
             <Route path="/invite" element={<InvitePage />} />
             <Route
-              path="/admission-demo"
+              path="/share/:token"
               element={
-                <AuthGuard>
-                  <Suspense fallback={<OctopSpinner />}>
-                    <VoiceOutputProvider>
-                      <AdmissionDemoPage />
-                    </VoiceOutputProvider>
-                  </Suspense>
-                </AuthGuard>
+                <Suspense fallback={<OctopSpinner />}>
+                  <SharedProjectPage />
+                </Suspense>
               }
+            />
+            <Route
+              path="/admission-demo"
+              element={<Navigate to="/creations" replace />}
             />
             <Route
               path="/speech-recognition"

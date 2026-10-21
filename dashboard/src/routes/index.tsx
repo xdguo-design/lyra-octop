@@ -27,6 +27,7 @@ const ModelsPage = lazy(() => import("../pages/Settings/Models"));
 // Lazy-loaded pages — Admin
 const OctopAdminUsersPage = lazy(() => import("../pages/Admin/Users"));
 const AdminSecurityPage = lazy(() => import("../pages/Settings/Security"));
+const AdminAuditLogPage = lazy(() => import("../pages/Admin/AuditLog"));
 const AdvancedSettingsPage = lazy(
   () => import("../pages/Settings/AdvancedSettings"),
 );
@@ -97,6 +98,7 @@ export const pathToKey: Record<string, string> = {
   "/admin/plugins": "admin-plugins",
   "/admin/advanced": "admin-advanced",
   "/admin/security": "admin-security",
+  "/admin/audit-log": "admin-audit-log",
 };
 
 /**
@@ -236,12 +238,13 @@ export const routeConfigs: RouteConfig[] = [
   { path: "/admin/backend", element: <AdminStoragePage /> },
   {
     path: "/admin/audit",
-    element: <Navigate to="/admin/security?tab=audit" replace />,
+    element: <Navigate to="/admin/audit-log" replace />,
   },
   { path: "/admin/agents", element: <Navigate to="/admin/users" replace /> },
   { path: "/admin/plugins", element: <AdminPluginsPage /> },
   { path: "/admin/advanced", element: <AdvancedSettingsPage /> },
   { path: "/admin/security", element: <AdminSecurityPage /> },
+  { path: "/admin/audit-log", element: <AdminAuditLogPage /> },
   {
     path: "/admin/voice",
     element: <Navigate to="/admin/models?tab=voice" replace />,
@@ -261,7 +264,7 @@ export const routeConfigs: RouteConfig[] = [
   },
   {
     path: "/orca/admin/audit",
-    element: <Navigate to="/admin/security?tab=audit" replace />,
+    element: <Navigate to="/admin/audit-log" replace />,
   },
   { path: "/octop/cron", element: <Navigate to="/tasks" replace /> },
   { path: "/octop/channels", element: <Navigate to="/channels" replace /> },
@@ -271,7 +274,7 @@ export const routeConfigs: RouteConfig[] = [
   },
   {
     path: "/octop/admin/audit",
-    element: <Navigate to="/admin/security?tab=audit" replace />,
+    element: <Navigate to="/admin/audit-log" replace />,
   },
   {
     path: "/advanced-settings",

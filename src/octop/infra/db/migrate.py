@@ -1655,6 +1655,7 @@ def _ensure_workbench_schema(db: DatabasePool) -> None:
     pk = _integer_pk_sql(db)
     number_type = "BIGINT" if db.dialect == "postgresql" else "INTEGER"
     boolean_type = "SMALLINT" if db.dialect == "postgresql" else "INTEGER"
+    user_id_type = "BIGINT" if db.dialect == "postgresql" else "INTEGER"
     statements = (
         f"""CREATE TABLE IF NOT EXISTS workbench_projects (
             id {pk},
@@ -1694,6 +1695,28 @@ def _ensure_workbench_schema(db: DatabasePool) -> None:
             owner_user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
             imported_at {number_type} NOT NULL
         )""",
+        f"""CREATE TABLE IF NOT EXISTS workbench_project_shares (
+            id {pk},
+            share_id TEXT NOT NULL UNIQUE,
+            project_id TEXT NOT NULL REFERENCES workbench_projects(project_id) ON DELETE CASCADE,
+            owner_user_id {user_id_type} NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token_hash TEXT NOT NULL UNIQUE,
+            created_at {number_type} NOT NULL,
+            expires_at {number_type} NOT NULL,
+            revoked_at {number_type}
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_workbench_project_shares_owner_project "
+        "ON workbench_project_shares(owner_user_id, project_id, created_at DESC)",
+        f"""CREATE TABLE IF NOT EXISTS workbench_project_knowledge_bases (
+            id {pk},
+            owner_user_id {user_id_type} NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            project_id TEXT NOT NULL REFERENCES workbench_projects(project_id) ON DELETE CASCADE,
+            knowledge_base_id TEXT NOT NULL REFERENCES knowledge_bases(knowledge_base_id) ON DELETE CASCADE,
+            created_at {number_type} NOT NULL,
+            UNIQUE(project_id, knowledge_base_id)
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_workbench_project_knowledge_bases_owner "
+        "ON workbench_project_knowledge_bases(owner_user_id, project_id)",
     )
     with db.connect() as conn:
         for statement in statements:
@@ -1702,6 +1725,12 @@ def _ensure_workbench_schema(db: DatabasePool) -> None:
     _ensure_column(db, "workbench_projects", "parent_id", "TEXT")
     # GitHub-imported projects keep the repository link they came from.
     _ensure_column(db, "workbench_projects", "external_url", "TEXT")
+    if _table_exists(db, "audit_log"):
+        _ensure_column(db, "audit_log", "project_id", "TEXT")
+        with db.connect() as conn:
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_audit_project_ts ON audit_log(project_id, ts)"
+            )
 
 
 def _ensure_bridge_connections_schema(db: DatabasePool) -> None:
@@ -1793,6 +1822,16 @@ def _repair_legacy_schema(db: DatabasePool) -> None:
 def _max_discovered_version(dialect: str) -> int:
     versions = [version for version, _ in _discover(dialect)]
     return max(versions) if versions else 0
+
+
+def latest_schema_version(dialect: str = "sqlite") -> int:
+    """Highest migration version shipped for ``dialect``.
+
+    Public helper so callers (tests, diagnostics) can assert "migrated to
+    latest" without hardcoding a version number that goes stale on every new
+    migration file.
+    """
+    return _max_discovered_version(dialect)
 
 
 def _reconcile_pre_squash_schema_version(db: DatabasePool) -> None:
@@ -2051,6 +2090,15 @@ def _apply_sqlite_migration(db: DatabasePool, version: int, path: Path) -> None:
     if version == 25:
         _ensure_creation_card_category_schema(db)
         with db.connect() as conn:
+            conn.execute("UPDATE _schema_version SET version = ?", (version,))
+        return
+    if version == 27:
+        _ensure_workbench_schema(db)
+        _ensure_column(db, "audit_log", "project_id", "TEXT")
+        with db.connect() as conn:
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_audit_project_ts ON audit_log(project_id, ts)"
+            )
             conn.execute("UPDATE _schema_version SET version = ?", (version,))
         return
     sql = path.read_text(encoding="utf-8")
