@@ -32,7 +32,9 @@ async def test_bootstrap_creates_default_main_agent(patched_app_client: Any) -> 
 
     r = await c.get("/api/agents", headers=auth)
     assert r.status_code == 200
-    agents = r.json()
+    # Platform-shared agents (user_id NULL) may also be listed; the wizard
+    # bootstrap itself must create exactly one agent owned by the admin.
+    agents = [a for a in r.json() if a.get("user_id") is not None]
     assert len(agents) == 1
     assert agents[0]["agent_id"] == "main"
     assert agents[0]["name"] == "小通 · 通用助手"
@@ -54,7 +56,9 @@ async def test_main_not_created_until_finish(patched_app_client: Any) -> None:
     auth = {"Authorization": f"Bearer {admin['access_token']}"}
     r = await c.get("/api/agents", headers=auth)
     assert r.status_code == 200
-    assert r.json() == []
+    # The wizard's default agent must not exist yet; platform-shared agents
+    # (user_id NULL) are unrelated to this bootstrap phase.
+    assert all(a["agent_id"] != "main" for a in r.json())
 
     finish = await c.post(
         "/api/setup/finish",
@@ -63,8 +67,9 @@ async def test_main_not_created_until_finish(patched_app_client: Any) -> None:
     )
     assert finish.status_code == 200
     r = await c.get("/api/agents", headers=auth)
-    assert len(r.json()) == 1
-    assert r.json()[0]["agent_id"] == "main"
+    owned = [a for a in r.json() if a.get("user_id") is not None]
+    assert len(owned) == 1
+    assert owned[0]["agent_id"] == "main"
 
 
 async def test_double_bootstrap_returns_410(patched_app_client: Any) -> None:
@@ -132,7 +137,6 @@ async def test_main_agent_uses_general_assistant_template(patched_app_client: An
     auth = await auth_header(c)
     r = await c.get("/api/agents", headers=auth)
     assert r.status_code == 200
-    agent = r.json()[0]
-    assert agent["agent_id"] == "main"
+    agent = next(a for a in r.json() if a["agent_id"] == "main")
     assert agent["name"] == "小通 · 通用助手"
     assert agent.get("template_name") == "general-assistant"
