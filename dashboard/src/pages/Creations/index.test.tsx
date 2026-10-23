@@ -292,18 +292,18 @@ describe("CreationsPage", () => {
     ).toBeTruthy();
   });
 
-  it("opens Manus creations in a new tab", () => {
+  it("opens a built-in external service in a new tab", () => {
     const openSpy = vi.spyOn(window, "open").mockReturnValue(null);
     renderPage();
-    expect(screen.getByText("门诊电子病历模板工作台")).toBeTruthy();
+    expect(screen.getByText("Lyra 打印")).toBeTruthy();
     const manusCard = screen
-      .getByText("门诊电子病历模板工作台")
+      .getByText("Lyra 打印")
       .closest(".cr-card") as HTMLElement;
     fireEvent.click(
       within(manusCard).getByRole("button", { name: "打开作品" }),
     );
     expect(openSpy).toHaveBeenCalledWith(
-      "https://clinicemr-7tb6c7b9.manus.space/",
+      "https://119.3.216.103/",
       "_blank",
       "noopener,noreferrer",
     );
