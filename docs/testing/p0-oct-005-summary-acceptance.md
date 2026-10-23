@@ -110,6 +110,40 @@
 
 后端全量门禁仍应标记为“未完成”，不能据此宣称全量通过。当前改动没有运行全量前端套件，也没有真实 Provider 或浏览器端到端验收。
 
+### 可复制的本轮定向命令
+
+在仓库根目录执行：
+
+```bash
+uv run --no-sync pytest \
+  tests/unit/files \
+  tests/integration/test_chat_files_api.py \
+  tests/integration/test_workspace_api.py \
+  tests/integration/test_voice_stt_upload.py \
+  tests/unit/api/test_chat_file_binding.py \
+  tests/unit/cron/test_cron_manager.py -q
+
+uv run --no-sync pytest \
+  tests/unit/db/test_admission_sessions_repo.py \
+  tests/unit/test_admission_session_cleanup.py \
+  tests/integration/test_server_lifecycle.py \
+  tests/integration/test_admission_registration_api.py -q
+
+uv run --no-sync pytest tests/unit/i18n -q
+```
+
+在 `dashboard/` 执行：
+
+```bash
+npm run test -- --run src/pages/Chat/components/MessageFileCard.test.tsx
+npx tsc -b
+npx eslint src/pages/Chat/hooks/sseHelpers.ts \
+  src/pages/Chat/components/MessageFileCard.tsx \
+  src/pages/Chat/components/MessageFileCard.test.tsx
+```
+
+本地使用 `--no-sync` 是因为当前运行环境的依赖同步会尝试编译 `evdev`，但容器没有 `clang`。在已有完整依赖的测试实例中可改用项目标准的 `uv run pytest`。
+
 ## 8. 结果汇总与签字
 
 - A 聊天历史：☐通过 ☐失败 ☐未测
