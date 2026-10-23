@@ -247,6 +247,9 @@ def _obsidian_cli_credentials(credentials: dict[str, Any]) -> dict[str, Any]:
     binary_path = str(credentials.get("binary_path") or "").strip()
     if binary_path:
         _reject_obsidian_control_chars("binary_path", binary_path)
+        # The admin-configured local CLI binary path is the connector feature
+        # itself; control characters are rejected and existence verified here.
+        # codeql[python/path-injection]
         if not os.path.isfile(binary_path):
             raise ValueError("binary_path must be an existing file")
         out["binary_path"] = binary_path

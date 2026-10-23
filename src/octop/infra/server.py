@@ -617,7 +617,8 @@ class OctopServer:
             )
             # Displaying the one-time first-run password on the local console is
             # the wizard feature itself, not an accidental log leak.
-            print(banner, flush=True)  # codeql[python/clear-text-logging-sensitive-data]
+            # codeql[python/clear-text-logging-sensitive-data]
+            print(banner, flush=True)
             logger.info(
                 "wizard password generated; file=%s",
                 wizard_home / WIZARD_FILE_NAME,

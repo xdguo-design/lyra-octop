@@ -52,7 +52,8 @@ class Run:
         self.cases.append(case)
         mark = {"PASS": "PASS", "FAIL": "FAIL", "SKIP": "SKIP"}[case.status]
         # Dev-only E2E harness; case details may embed page content on failure.
-        print(f"[{mark}] {case.name} :: {case.detail}")  # codeql[python/clear-text-logging-sensitive-data]
+        # codeql[python/clear-text-logging-sensitive-data]
+        print(f"[{mark}] {case.name} :: {case.detail}")
         return case
 
 
