@@ -80,7 +80,9 @@ async def test_admission_ai_endpoint_rejects_oversized_input(env: Any) -> None:
 
 
 @pytest.mark.parametrize("page", [0, 2])
-async def test_admission_ai_uses_the_bound_expert_model_and_effort(env: Any, monkeypatch, page: int) -> None:
+async def test_admission_ai_uses_the_bound_expert_model_and_effort(
+    env: Any, monkeypatch, page: int
+) -> None:
     client, server, auth = env
     factory = Mock()
     manager = server.app_runtime.agent_registry.harness_manager
