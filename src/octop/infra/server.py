@@ -616,8 +616,8 @@ class OctopServer:
                 "\033[0m\n"
             )
             # Displaying the one-time first-run password on the local console is
-            # the wizard feature itself, not an accidental log leak.
-            # codeql[python/clear-text-logging-sensitive-data]
+            # the wizard feature itself, not an accidental log leak; the CodeQL
+            # alert is dismissed (GHAS ignores inline suppression comments).
             print(banner, flush=True)
             logger.info(
                 "wizard password generated; file=%s",

@@ -249,7 +249,7 @@ def _obsidian_cli_credentials(credentials: dict[str, Any]) -> dict[str, Any]:
         _reject_obsidian_control_chars("binary_path", binary_path)
         # The admin-configured local CLI binary path is the connector feature
         # itself; control characters are rejected and existence verified here.
-        # codeql[python/path-injection]
+        # The CodeQL alert is dismissed (GHAS ignores inline suppression).
         if not os.path.isfile(binary_path):
             raise ValueError("binary_path must be an existing file")
         out["binary_path"] = binary_path

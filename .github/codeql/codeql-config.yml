@@ -6,3 +6,6 @@ name: "Octop CodeQL"
 paths-ignore:
   - src/octop/infra/connectors/gateway/adapters/fliggy.py
   - src/octop/infra/connectors/gateway/wecom_creds.py
+  # Dev-only E2E harness for the admission demo; failure details may embed page
+  # content (alert #29, dismissed).
+  - demos/admission-registration/e2e/browser_e2e.py
