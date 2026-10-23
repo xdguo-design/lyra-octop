@@ -80,6 +80,7 @@ class ProjectBody(BaseModel):
     icon: str = Field(default="📁", min_length=1, max_length=16)
     parent_id: str | None = None
     external_url: str | None = None
+    code_enabled: bool | None = None
 
     @field_validator("name", "icon")
     @classmethod
@@ -241,6 +242,8 @@ async def create_project(
     user: Any = Depends(current_user),
     server: Any = Depends(get_server),
 ) -> dict[str, Any]:
+    if body.code_enabled is True and not bool(getattr(user, "is_admin", False)):
+        raise OctopError(ErrorCode.FORBIDDEN, "only administrators can enable code browsing")
     repo = server.services.workbench_repo
     _validate_project_parent(repo, user.id, None, body.parent_id)
     row = repo.create_project(
@@ -249,6 +252,7 @@ async def create_project(
         icon=body.icon,
         parent_id=body.parent_id,
         external_url=body.external_url,
+        code_enabled=bool(body.code_enabled and getattr(user, "is_admin", False)),
     )
     if row is None:
         raise _not_found("parent project not found")
@@ -352,6 +356,8 @@ async def update_project(
     user: Any = Depends(current_user),
     server: Any = Depends(get_server),
 ) -> dict[str, Any]:
+    if body.code_enabled is True and not bool(getattr(user, "is_admin", False)):
+        raise OctopError(ErrorCode.FORBIDDEN, "only administrators can enable code browsing")
     repo = server.services.workbench_repo
     parent_set = "parent_id" in body.model_fields_set
     if parent_set:
@@ -363,6 +369,7 @@ async def update_project(
         icon=body.icon,
         parent_id=body.parent_id,
         parent_id_set=parent_set,
+        code_enabled=body.code_enabled if bool(getattr(user, "is_admin", False)) else None,
     ):
         raise _not_found("workbench project not found")
     row = next(
@@ -847,6 +854,8 @@ async def list_code(
     user: Any = Depends(current_user),
     server: Any = Depends(get_server),
 ) -> dict[str, Any]:
+    if not bool(getattr(user, "is_admin", False)):
+        raise _not_found("project code is unavailable")
     if not server.services.workbench_repo.owns_code_project(
         owner_user_id=user.id, project_id=project_id
     ):
@@ -872,6 +881,8 @@ async def get_code_file(
     user: Any = Depends(current_user),
     server: Any = Depends(get_server),
 ) -> dict[str, Any]:
+    if not bool(getattr(user, "is_admin", False)):
+        raise _not_found("project code is unavailable")
     if not server.services.workbench_repo.owns_code_project(
         owner_user_id=user.id, project_id=project_id
     ):

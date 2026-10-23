@@ -48,6 +48,19 @@ export interface ChatFileSearchResult {
   matches: ChatFileSegment[];
 }
 
+/** Soft-delete an owned attachment draft that has not been bound to a thread. */
+export async function deleteChatFileDraft(
+  agentId: string,
+  fileId: string,
+): Promise<void> {
+  return request<void>(
+    `/agents/${encodeURIComponent(agentId)}/files/${encodeURIComponent(
+      fileId,
+    )}/draft`,
+    { method: "DELETE" },
+  );
+}
+
 /** Files bound to one conversation thread (metadata only). */
 export async function listThreadFiles(
   agentId: string,
@@ -118,4 +131,5 @@ export const filesApi = {
   getFile,
   getFileSegments,
   searchFile,
+  deleteChatFileDraft,
 };

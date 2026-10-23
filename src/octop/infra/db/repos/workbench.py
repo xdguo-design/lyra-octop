@@ -69,6 +69,7 @@ class WorkbenchRepo:
         icon: str,
         parent_id: str | None = None,
         external_url: str | None = None,
+        code_enabled: bool = False,
     ) -> dict[str, Any] | None:
         project_id = new_short_id()
         ts = now_ts()
@@ -85,7 +86,7 @@ class WorkbenchRepo:
                     icon,
                     parent_id,
                     external_url,
-                    int(name == "星球"),
+                    int(code_enabled),
                     ts,
                     ts,
                 ),
@@ -96,7 +97,7 @@ class WorkbenchRepo:
             "icon": icon,
             "parent_id": parent_id,
             "external_url": external_url,
-            "code_enabled": name == "星球",
+            "code_enabled": code_enabled,
             "created_at": ts,
             "updated_at": ts,
         }
@@ -136,7 +137,7 @@ class WorkbenchRepo:
                             project_id,
                             owner_user_id,
                             legacy["name"],
-                            int(legacy["name"] == "星球"),
+                            0,
                             ts,
                             ts,
                         ),
@@ -167,15 +168,30 @@ class WorkbenchRepo:
         icon: str,
         parent_id: str | None = None,
         parent_id_set: bool = False,
+        code_enabled: bool | None = None,
     ) -> bool:
         with self._db.transaction() as conn:
-            if parent_id_set:
+            if parent_id_set and code_enabled is not None:
+                if parent_id is not None and not self._owns_project(conn, owner_user_id, parent_id):
+                    return False
+                cur = conn.execute(
+                    "UPDATE workbench_projects SET name = ?, icon = ?, parent_id = ?, code_enabled = ?, updated_at = ? "
+                    "WHERE owner_user_id = ? AND project_id = ?",
+                    (name, icon, parent_id, int(code_enabled), now_ts(), owner_user_id, project_id),
+                )
+            elif parent_id_set:
                 if parent_id is not None and not self._owns_project(conn, owner_user_id, parent_id):
                     return False
                 cur = conn.execute(
                     "UPDATE workbench_projects SET name = ?, icon = ?, parent_id = ?, updated_at = ? "
                     "WHERE owner_user_id = ? AND project_id = ?",
                     (name, icon, parent_id, now_ts(), owner_user_id, project_id),
+                )
+            elif code_enabled is not None:
+                cur = conn.execute(
+                    "UPDATE workbench_projects SET name = ?, icon = ?, code_enabled = ?, updated_at = ? "
+                    "WHERE owner_user_id = ? AND project_id = ?",
+                    (name, icon, int(code_enabled), now_ts(), owner_user_id, project_id),
                 )
             else:
                 cur = conn.execute(

@@ -92,6 +92,70 @@ describe("history failures", () => {
       expect.objectContaining({ cursor: "pinned-boundary" }),
     );
   });
+
+  it("drops an older-page response when a refresh starts while it is in flight", async () => {
+    chatStore.setHistoryPage(
+      thread,
+      [{ id: "latest", role: "user", content: "latest", timestamp: 2 }],
+      { hasMore: true, nextOffset: 25, nextCursor: "boundary" },
+    );
+    let resolveOlder!: (value: {
+      thread_id: string;
+      messages: { id: string; role: string; content: string }[];
+      has_more: boolean;
+    }) => void;
+    let resolveLatest!: (value: {
+      thread_id: string;
+      messages: { id: string; role: string; content: string }[];
+      has_more: boolean;
+    }) => void;
+    const olderRequest = new Promise<{
+      thread_id: string;
+      messages: { id: string; role: string; content: string }[];
+      has_more: boolean;
+    }>((resolve) => {
+      resolveOlder = resolve;
+    });
+    const latestRequest = new Promise<{
+      thread_id: string;
+      messages: { id: string; role: string; content: string }[];
+      has_more: boolean;
+    }>((resolve) => {
+      resolveLatest = resolve;
+    });
+    vi.spyOn(octopThreadsApi, "history")
+      .mockReturnValueOnce(olderRequest)
+      .mockReturnValueOnce(latestRequest);
+    const { result } = renderHook(() => useChat(thread, "agent"));
+
+    act(() => {
+      void result.current.loadMoreHistory();
+    });
+    act(() => {
+      void result.current.refreshHistory();
+    });
+    await act(async () => {
+      resolveLatest({
+        thread_id: thread,
+        messages: [{ id: "latest", role: "user", content: "refreshed" }],
+        has_more: true,
+      });
+      await latestRequest;
+    });
+    await act(async () => {
+      resolveOlder({
+        thread_id: thread,
+        messages: [{ id: "old", role: "user", content: "stale older page" }],
+        has_more: false,
+      });
+      await olderRequest;
+    });
+
+    expect(chatStore.getSnapshot(thread).messages.map((message) => message.id)).toEqual([
+      "latest",
+    ]);
+  });
+
   it("retries the failed older page with the same cursor", async () => {
     chatStore.setHistoryPage(
       thread,

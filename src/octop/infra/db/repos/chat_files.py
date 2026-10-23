@@ -91,6 +91,18 @@ class ChatFileRepo:
             row = conn.execute("SELECT * FROM chat_files WHERE file_id = ?", (file_id,)).fetchone()
         return ChatFileRow.from_row(row) if row else None
 
+    def delete_draft(self, file_id: str, *, user_id: int, agent_id: str) -> bool:
+        """Soft-delete only an owned file that has not been bound to a thread."""
+        deleted_at = now_ts()
+        with self._db.transaction() as conn:
+            changed = conn.execute(
+                "UPDATE chat_files SET deleted_at = ?, updated_at = ? "
+                "WHERE file_id = ? AND user_id = ? AND agent_id = ? "
+                "AND thread_id IS NULL AND deleted_at IS NULL",
+                (deleted_at, deleted_at, file_id, user_id, agent_id),
+            ).rowcount
+        return changed > 0
+
     def get_revision(self, revision_id: str) -> ChatFileRevisionRow | None:
         with self._db.connect() as conn:
             row = conn.execute(

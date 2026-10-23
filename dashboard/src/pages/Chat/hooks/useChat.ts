@@ -863,7 +863,7 @@ export function useChat(
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyRefreshing, setHistoryRefreshing] = useState(false);
   const loadGenRef = useRef(0);
-  const loadMoreInFlightRef = useRef(false);
+  const loadMoreInFlightRef = useRef(new Set<string>());
   const refreshInFlightRef = useRef(false);
 
   const attachAfterHistory = useCallback(
@@ -1013,7 +1013,7 @@ export function useChat(
     const key = stableSessionId;
     const snap = chatStore.getSnapshot(key);
     if (
-      loadMoreInFlightRef.current ||
+      loadMoreInFlightRef.current.has(key) ||
       snap.historyLoadingMore ||
       !snap.historyHasMore ||
       !agentId ||
@@ -1022,7 +1022,7 @@ export function useChat(
       return false;
     }
 
-    loadMoreInFlightRef.current = true;
+    loadMoreInFlightRef.current.add(key);
     chatStore.setHistoryLoadingMore(key, true);
     const offset = snap.historyNextOffset;
     const gen = loadGenRef.current;
@@ -1037,6 +1037,7 @@ export function useChat(
         offset,
         cursor: snap.historyNextCursor,
       });
+      if (loadGenRef.current !== gen || stableSessionId !== key) return false;
       chatStore.prependHistoryMessages(key, older, {
         hasMore,
         nextOffset,
@@ -1051,7 +1052,7 @@ export function useChat(
       }
       return false;
     } finally {
-      loadMoreInFlightRef.current = false;
+      loadMoreInFlightRef.current.delete(key);
       chatStore.setHistoryLoadingMore(key, false);
     }
   }, [agentId, stableSessionId]);
