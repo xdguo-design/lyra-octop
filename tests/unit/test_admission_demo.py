@@ -128,6 +128,9 @@ def test_extract_output_enforces_page_allowlist_and_value_limits() -> None:
         page=1,
     )
     assert output == {"contact_phone": "13800138000"}
+    assert _extract_fields_output(
+        json.dumps({"contact_phone": "13800138000", "occupation": "学生"}), page=0
+    ) == {"contact_phone": "13800138000", "occupation": "学生"}
     assert _extract_fields_output("not JSON", page=2) == {}
 
 
