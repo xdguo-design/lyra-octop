@@ -57,8 +57,38 @@ async def test_list_includes_only_enabled_explicitly_shared_system_agents(env) -
     assert "system-shared" in rows
     assert rows["system-shared"]["is_shared"] is True
     assert rows["system-shared"]["is_owner"] is False
+    assert rows["system-shared"]["chat_visible"] is True
     assert "system-private" not in rows
     assert "system-disabled" not in rows
+
+
+async def test_owner_can_hide_agent_from_chat_without_disabling_it(env) -> None:
+    c, srv, admin_auth = env
+    owner_auth = await create_user(c, admin_auth, username="chat_visibility_owner")
+    created = await c.post(
+        "/api/agents",
+        headers=owner_auth,
+        json={"name": "platform workflow", "config": {}},
+    )
+    assert created.status_code == 201, created.text
+    agent_id = created.json()["agent_id"]
+
+    hidden = await c.patch(
+        f"/api/agents/{agent_id}", headers=owner_auth, json={"chat_visible": False}
+    )
+    assert hidden.status_code == 200, hidden.text
+    assert hidden.json()["chat_visible"] is False
+    assert srv.services.agent_repo.get(agent_id).enabled == 1
+
+    listed = await c.get("/api/agents", headers=owner_auth)
+    row = next(item for item in listed.json() if item["agent_id"] == agent_id)
+    assert row["chat_visible"] is False
+
+    restored = await c.patch(
+        f"/api/agents/{agent_id}", headers=owner_auth, json={"chat_visible": True}
+    )
+    assert restored.status_code == 200, restored.text
+    assert restored.json()["chat_visible"] is True
 
 
 async def test_admin_scope_all_lists_every_user(env) -> None:

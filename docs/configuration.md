@@ -172,6 +172,7 @@ Each variable, when set, takes precedence over the matching key in
 | `OCTOP_CORS_ORIGINS` | comma-sep list | empty | Permitted CORS origins for the dashboard / external callers |
 | `OCTOP_ENABLE_DASHBOARD` | bool | `true` | Serve the built React SPA at `/` |
 | `OCTOP_ENABLE_API_DOCS` | bool | `false` | Expose Scalar API docs at `/api/docs` |
+| `OCTOP_WORKBENCH_PREVIEW_DOMAIN` | DNS name | empty | Base domain for remote GitHub previews (for example `preview.example.com`); requires wildcard DNS and Nginx HTTPS proxying for `*.preview.example.com` |
 | `OCTOP_REQUIRE_SETUP_PASSWORD` | bool | `true` | Require wizard password during initial setup |
 | `OCTOP_MAX_UPLOAD_MB` | int | `100` | Max upload size in MiB for chat attachments, IM inbound, and knowledge documents (1–1024) |
 | `OCTOP_DATABASE_URL` | string | empty | Full DSN — overrides the `OCTOP_DATABASE_*` fields below |

@@ -146,6 +146,7 @@ class OctopConfig:
     workbench_code_root: str | None = None
     workbench_launch_root: str | None = None
     workbench_launch_profiles: list[dict[str, Any]] = field(default_factory=list)
+    workbench_preview_domain: str | None = None
 
     @property
     def max_upload_bytes(self) -> int:
@@ -521,6 +522,8 @@ def load_config(path: Path) -> OctopConfig:
         merged["workbench_code_root"] = v.strip() or None
     if v := os.environ.get("OCTOP_WORKBENCH_LAUNCH_ROOT"):
         merged["workbench_launch_root"] = v.strip() or None
+    if v := os.environ.get("OCTOP_WORKBENCH_PREVIEW_DOMAIN"):
+        merged["workbench_preview_domain"] = v.strip() or None
 
     capabilities = _parse_capabilities_section(raw.get("capabilities"))
     if v := os.environ.get("OCTOP_ENABLE_MOBILE"):
@@ -648,4 +651,9 @@ def load_config(path: Path) -> OctopConfig:
             else None
         ),
         workbench_launch_profiles=merged.get("workbench_launch_profiles") or [],
+        workbench_preview_domain=(
+            str(merged["workbench_preview_domain"]).strip()
+            if merged.get("workbench_preview_domain")
+            else None
+        ),
     )

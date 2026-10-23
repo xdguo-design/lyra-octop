@@ -136,16 +136,16 @@ async def test_trusted_project_launch_requires_admin_and_owned_profile(
         def has_profile(self, url: str) -> bool:
             return url == repo_url
 
-        def status(self, url: str) -> dict[str, str | None]:
+        def status(self, url: str, _item_id: str | None = None) -> dict[str, str | None]:
             return self.running
 
-        def thumbnail_origins(self, _url: str) -> tuple[str, ...]:
+        def thumbnail_origins(self, _url: str, _item_id: str | None = None) -> tuple[str, ...]:
             return ("http://127.0.0.1:49152", "http://127.0.0.1:49153")
 
-        async def start(self, _url: str) -> dict[str, str | None]:
+        async def start(self, _url: str, _item_id: str | None = None) -> dict[str, str | None]:
             return self.running
 
-        async def stop(self, _url: str) -> dict[str, str | None]:
+        async def stop(self, _url: str, _item_id: str | None = None) -> dict[str, str | None]:
             self.running = {"status": "stopped", "url": None, "logs": None}
             return self.running
 

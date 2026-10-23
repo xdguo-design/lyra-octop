@@ -893,6 +893,7 @@ export function useChat(
       reasoningEffort?: string | null,
       conversationMode?: "ask" | "plan" | "craft" | null,
       hitlPolicy?: HitlSessionPolicy | null,
+      acpRunner?: string | null,
     ) => {
       const key = storeKey || stableSessionId;
 
@@ -927,6 +928,7 @@ export function useChat(
         reasoningEffort,
         conversationMode,
         hitlPolicy,
+        acpRunner,
       );
     },
     [stableSessionId],

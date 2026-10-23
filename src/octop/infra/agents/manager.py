@@ -995,6 +995,14 @@ class AgentManager:
             raise OctopError(ErrorCode.AGENT_NOT_FOUND, f"agent {agent_id!r} not found")
         return row
 
+    def set_chat_visible(self, agent_id: str, visible: bool) -> AgentRow:
+        """Persist whether this agent is available in the main chat UI."""
+        self._repos.agent_repo.set_chat_visible(agent_id, visible)
+        row = self._repos.agent_repo.get(agent_id)
+        if row is None:
+            raise OctopError(ErrorCode.AGENT_NOT_FOUND, f"agent {agent_id!r} not found")
+        return row
+
     def set_icon_url(self, agent_id: str, icon_url: str | None) -> AgentRow:
         """Persist display avatar URL without reloading the harness agent."""
         row = self._repos.agent_repo.get(agent_id)
@@ -3810,6 +3818,8 @@ class AgentManager:
                 disabled = set(host_tools_disabled(disabled))
             harness_cfg.tools_disabled = frozenset(disabled)
         applied = policy.apply_to_config(harness_cfg)
+        if isinstance(cfg.get("model_retry_enabled"), bool):
+            applied = replace(applied, model_retry_enabled=cfg["model_retry_enabled"])
         applied = self._apply_team_host_config(applied, row)
         applied = self._merge_agently_write_interrupts(
             applied, self._connector_uid_for(row) if not team_host else None

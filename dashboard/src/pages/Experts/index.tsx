@@ -302,6 +302,7 @@ export default function ExpertsPage() {
         | "description"
         | "default_model"
         | "is_shared"
+        | "chat_visible"
         | "color"
         | "icon_url"
       >,
@@ -316,6 +317,7 @@ export default function ExpertsPage() {
                 description: updated.description,
                 default_model: updated.default_model,
                 is_shared: updated.is_shared,
+                chat_visible: updated.chat_visible,
                 color: updated.color,
                 icon_url: updated.icon_url,
               }

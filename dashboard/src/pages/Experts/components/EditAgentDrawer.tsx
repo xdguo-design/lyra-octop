@@ -103,6 +103,7 @@ interface AgentDetail {
   welcome_message?: string | null;
   knowledge_base_ids?: string[];
   mcp_servers?: string[];
+  chat_visible?: boolean;
   config?: Record<string, unknown>;
 }
 
@@ -139,6 +140,7 @@ interface EditFormValues {
   description: string;
   welcome_message?: string;
   is_shared?: boolean;
+  hide_from_chat?: boolean;
   default_model: string;
   reasoning_mode?: "auto" | "enabled" | "disabled";
   reasoning_effort?: string;
@@ -168,6 +170,7 @@ interface EditAgentDrawerProps {
       | "description"
       | "default_model"
       | "is_shared"
+      | "chat_visible"
       | "color"
       | "icon_url"
     >,
@@ -323,6 +326,7 @@ function EditAgentDrawerBody({
           welcome_message:
             typeof ag.welcome_message === "string" ? ag.welcome_message : "",
           is_shared: agent.is_shared ?? false,
+          hide_from_chat: agent.chat_visible === false,
           default_model: selectedModel,
           reasoning_mode:
             reasoningConfig?.mode ??
@@ -503,6 +507,7 @@ function EditAgentDrawerBody({
           name: values.name,
           description: values.description || null,
           is_shared: values.is_shared ?? false,
+          chat_visible: !(values.hide_from_chat ?? false),
           default_model: defaultModelFromForm(values.default_model),
           color: nextColor,
           config: nextConfig,
@@ -536,6 +541,7 @@ function EditAgentDrawerBody({
         description: values.description || null,
         default_model: defaultModel,
         is_shared: values.is_shared ?? false,
+        chat_visible: !(values.hide_from_chat ?? false),
         color: nextColor,
         icon_url: iconUrl,
       });
@@ -837,6 +843,14 @@ function EditAgentDrawerBody({
               <Form.Item
                 name="is_shared"
                 label={t("experts.share.toggle")}
+                valuePropName="checked"
+              >
+                <Switch />
+              </Form.Item>
+              <Form.Item
+                name="hide_from_chat"
+                label={t("experts.hideFromChat")}
+                extra={t("experts.hideFromChatHint")}
                 valuePropName="checked"
               >
                 <Switch />

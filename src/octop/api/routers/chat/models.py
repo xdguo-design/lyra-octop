@@ -126,6 +126,8 @@ class UserTurnWsFrame(BaseModel):
     thread_id: str | None = None
     model: str | None = None
     default_model: str | None = None
+    acp_runner: str | None = None
+    acp_model: str | None = None
     reasoning_mode: Literal["auto", "enabled", "disabled"] | None = None
     reasoning_effort: str | None = None
     conversation_mode: Literal["ask", "plan", "craft"] | None = None
@@ -169,6 +171,8 @@ class RenameThreadBody(BaseModel):
     title: str | None = None
     pinned: bool | None = None
     model_ref: str | None = None
+    acp_runner: str | None = None
+    acp_model: str | None = None
     reasoning_mode: Literal["auto", "enabled", "disabled"] | None = None
     reasoning_effort: str | None = None
     conversation_mode: Literal["ask", "plan", "craft"] | None = None

@@ -22,7 +22,14 @@ class WorkbenchRepo:
             ).fetchall()
             folders = conn.execute(
                 "SELECT folder_id, project_id, name, created_at, updated_at "
-                "FROM workbench_folders WHERE owner_user_id = ? ORDER BY created_at, folder_id",
+                "FROM workbench_folders WHERE owner_user_id = ? AND deleted_at IS NULL "
+                "ORDER BY created_at, folder_id",
+                (owner_user_id,),
+            ).fetchall()
+            recycled_folders = conn.execute(
+                "SELECT folder_id, project_id, name, created_at, updated_at "
+                "FROM workbench_folders WHERE owner_user_id = ? AND deleted_at IS NOT NULL "
+                "ORDER BY deleted_at DESC, folder_id",
                 (owner_user_id,),
             ).fetchall()
             assignments = conn.execute(
@@ -50,6 +57,7 @@ class WorkbenchRepo:
         return {
             "projects": project_rows,
             "folders": [dict(row) for row in folders],
+            "recycled_folders": [dict(row) for row in recycled_folders],
             "assignments": [dict(row) for row in assignments],
         }
 
@@ -380,7 +388,17 @@ class WorkbenchRepo:
     def delete_folder(self, *, owner_user_id: int, folder_id: str) -> bool:
         with self._db.transaction() as conn:
             cur = conn.execute(
-                "DELETE FROM workbench_folders WHERE owner_user_id = ? AND folder_id = ?",
+                "UPDATE workbench_folders SET deleted_at = ? "
+                "WHERE owner_user_id = ? AND folder_id = ? AND deleted_at IS NULL",
+                (now_ts(), owner_user_id, folder_id),
+            )
+        return bool(cur.rowcount > 0)
+
+    def restore_folder(self, *, owner_user_id: int, folder_id: str) -> bool:
+        with self._db.transaction() as conn:
+            cur = conn.execute(
+                "UPDATE workbench_folders SET deleted_at = NULL "
+                "WHERE owner_user_id = ? AND folder_id = ? AND deleted_at IS NOT NULL",
                 (owner_user_id, folder_id),
             )
         return bool(cur.rowcount > 0)
@@ -413,7 +431,8 @@ class WorkbenchRepo:
                 return False
             if folder_id:
                 folder = conn.execute(
-                    "SELECT 1 FROM workbench_folders WHERE owner_user_id = ? AND project_id = ? AND folder_id = ?",
+                    "SELECT 1 FROM workbench_folders WHERE owner_user_id = ? AND project_id = ? "
+                    "AND folder_id = ? AND deleted_at IS NULL",
                     (owner_user_id, project_id, folder_id),
                 ).fetchone()
                 if folder is None:

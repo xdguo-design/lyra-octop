@@ -29,6 +29,44 @@ def test_parses_json_fences_and_embedded_objects() -> None:
     assert _parse_json_object("不是 JSON") is None
 
 
+def test_admission_model_timing_tracks_model_latency_and_usage(monkeypatch) -> None:
+    from octop.infra.admission_demo import _AdmissionModelTiming
+
+    timing = _AdmissionModelTiming()
+    ticks = iter((10.0, 11.5))
+    monkeypatch.setattr("octop.infra.admission_demo.perf_counter", lambda: next(ticks))
+    response = SimpleNamespace(
+        generations=[
+            [
+                SimpleNamespace(
+                    message=AIMessage(
+                        content="{}",
+                        usage_metadata={"input_tokens": 42, "output_tokens": 7, "total_tokens": 49},
+                    )
+                )
+            ]
+        ]
+    )
+
+    timing.on_chat_model_start(
+        {},
+        [
+            [
+                SimpleNamespace(type="system", content="x" * 5),
+                SimpleNamespace(type="human", content="y"),
+            ]
+        ],
+        run_id="model-run",
+    )
+    timing.on_llm_end(response, run_id="model-run")
+
+    assert timing.elapsed_ms == 1500
+    assert timing.calls == 1
+    assert timing.input_tokens == 42
+    assert timing.output_tokens == 7
+    assert (timing.message_count, timing.system_chars, timing.user_chars) == (2, 5, 1)
+
+
 @pytest.mark.parametrize(
     ("content", "expected"),
     [
@@ -241,18 +279,46 @@ async def test_agent_call_uses_bound_model_and_selected_thinking(
     assert request["skills"] == []
     assert request["mcp_servers"] == []
     disabled = registry.sync_tools_disabled.call_args.args[1]
-    assert {"write_todos", "read_file", "ls"} <= disabled
+    assert {"write_todos", "read_file", "ls", "delete"} <= disabled
     assert request["messages"][0]["role"] == "system"
     assert "admission-router" in request["messages"][0]["content"]
     assert request["user"] is None
     assert request["model"] == "ModelScope/Qwen/Qwen3.5-27B"
+    assert request["configurable"]["model_settings"] == {"max_tokens": 256}
     if enabled is None:
-        assert request["configurable"] == {}
+        assert request["configurable"] == {"model_settings": {"max_tokens": 256}}
     else:
         assert request["configurable"]["octop_reasoning_overrides"]["extra_body"] == {
             "chat_template_kwargs": {"enable_thinking": enabled}
         }
     assert json.loads(request["messages"][1]["content"]) == {"text": "你好"}
+
+
+@pytest.mark.asyncio
+async def test_candidate_confirmation_uses_small_completion_budget(monkeypatch) -> None:
+    from octop.infra.admission_demo import _call_admission_skill
+
+    registry = SimpleNamespace(
+        call=AsyncMock(return_value={"messages": [AIMessage(content='{"decision":"unknown"}')]}),
+        sync_tools_disabled=Mock(),
+        get_row=lambda _id: SimpleNamespace(default_model="provider/model"),
+        get_config=lambda _id: {},
+        providers=SimpleNamespace(
+            is_model_ref_usable=lambda _ref: True,
+            get_model_reasoning_capability=lambda _ref: None,
+        ),
+    )
+    monkeypatch.setattr("octop.infra.admission_demo._ensure_admission_agent", AsyncMock())
+
+    await _call_admission_skill(
+        SimpleNamespace(app_runtime=SimpleNamespace(agent_registry=registry)),
+        skill="admission-patient-info",
+        payload={"mode": "candidate_confirmation", "utterance": "我再想想"},
+    )
+
+    request = registry.call.await_args.args[1]
+    assert request["configurable"]["model_settings"] == {"max_tokens": 64}
+    assert len(request["callbacks"]) == 1
 
 
 @pytest.mark.asyncio
@@ -457,10 +523,11 @@ async def test_pins_initial_active_model_without_changing_an_existing_binding(bo
         get_row=lambda _id: row,
         get_config=lambda _id: {
             "admission_demo_agent": True,
-            "max_iters": 12,
+            "max_iters": 32,
             "max_input_length": 20000,
             "temperature": 0.2,
             "max_tokens": 512,
+            "model_retry_enabled": False,
             "reasoning": {"mode": "disabled"},
         },
         default_mcp_servers=lambda _id: ["china_address_resolver"],
@@ -480,3 +547,40 @@ async def test_pins_initial_active_model_without_changing_an_existing_binding(bo
         )
     else:
         registry.update.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_upgrades_existing_admission_graph_budget_without_changing_model() -> None:
+    row = SimpleNamespace(
+        user_id=None, is_shared=1, icon_url="/avatar.png", default_model="pinned/model"
+    )
+    config = {
+        "admission_demo_agent": True,
+        "max_iters": 12,
+        "max_input_length": 20000,
+        "temperature": 0.2,
+        "max_tokens": 512,
+        "model_retry_enabled": False,
+        "reasoning": {"mode": "disabled"},
+        "checkpointer": False,
+    }
+    registry = SimpleNamespace(
+        get_row=lambda _id: row,
+        get_config=lambda _id: config,
+        default_mcp_servers=lambda _id: ["china_address_resolver"],
+        update=AsyncMock(return_value=row),
+    )
+    server = SimpleNamespace(app_runtime=SimpleNamespace(agent_registry=registry))
+
+    await provision_admission_agent(server)
+
+    registry.update.assert_awaited_once()
+    updates = registry.update.await_args.kwargs
+    assert updates["max_iters"] == 32
+    assert "model_retry_enabled" not in updates
+    assert json.loads(updates["config_json"]) == {
+        **config,
+        "max_iters": 32,
+        "model_retry_enabled": False,
+    }
+    assert "default_model" not in updates

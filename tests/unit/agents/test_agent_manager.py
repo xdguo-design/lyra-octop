@@ -1396,6 +1396,17 @@ def test_build_harness_config_respects_config_json_backend(manager: AgentManager
     assert cfg.backend == custom
 
 
+def test_build_harness_config_can_disable_model_retry(manager: AgentManager) -> None:
+    from langchain.agents.middleware import ModelRetryMiddleware
+
+    cfg = manager._build_harness_config(
+        _row(config_json=json.dumps({"model_retry_enabled": False}))
+    )
+
+    assert not cfg.model_retry_enabled
+    assert not any(isinstance(item, ModelRetryMiddleware) for item in (cfg.middleware or []))
+
+
 def test_backend_spec_for_row_neutralizes_host_root_on_windows(
     manager: AgentManager, monkeypatch: Any
 ) -> None:

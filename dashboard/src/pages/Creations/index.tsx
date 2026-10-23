@@ -72,6 +72,7 @@ function isGithubRepositoryUrl(value: string | null): boolean {
     return (
       url.protocol === "https:" &&
       url.hostname === "github.com" &&
+      !url.port &&
       /^\/[^/]+\/[^/]+(?:\.git)?\/?$/.test(url.pathname) &&
       !url.search &&
       !url.hash &&
@@ -84,24 +85,7 @@ function isGithubRepositoryUrl(value: string | null): boolean {
 }
 
 function isLaunchableProjectUrl(value: string | null): boolean {
-  if (!value) return false;
-  try {
-    const url = new URL(value);
-    return (
-      url.protocol === "https:" &&
-      url.hostname.toLowerCase() === "github.com" &&
-      !url.port &&
-      /^\/xdguo-design\/data-upload-product(?:\.git)?\/?$/i.test(
-        url.pathname,
-      ) &&
-      !url.search &&
-      !url.hash &&
-      !url.username &&
-      !url.password
-    );
-  } catch {
-    return false;
-  }
+  return isGithubRepositoryUrl(value);
 }
 
 function creationCategory(item: CreationItem): CreationCategory {

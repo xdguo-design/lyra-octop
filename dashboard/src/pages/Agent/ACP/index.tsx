@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, App, Button, Empty, Form, Switch } from "antd";
+import { Alert, App, Button, Empty, Form, Select, Switch } from "antd";
 
 import { useTranslation } from "react-i18next";
 import PageShell from "../../../layouts/PageShell";
@@ -44,12 +44,18 @@ export function ACPPanel({ agentId: agentIdProp }: ACPPanelProps = {}) {
   const [runnersLoading, setRunnersLoading] = useState(true);
   const [toolLoading, setToolLoading] = useState(false);
   const [toolToggleLoading, setToolToggleLoading] = useState(false);
+  const [defaultModel, setDefaultModel] = useState<string | null>(null);
+  const [modelOptions, setModelOptions] = useState<
+    { value: string; label: string }[]
+  >([]);
+  const [defaultModelSaving, setDefaultModelSaving] = useState(false);
   const [hoverKey, setHoverKey] = useState<string | null>(null);
   const [toggleLoadingKey, setToggleLoadingKey] = useState<string | null>(null);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isCreateMode, setIsCreateMode] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [installingOpenCode, setInstallingOpenCode] = useState(false);
   const [form] = Form.useForm();
   const activeAgentIdRef = useRef(activeAgentId);
 
@@ -108,6 +114,7 @@ export function ACPPanel({ agentId: agentIdProp }: ACPPanelProps = {}) {
         const data = await acpApi.getConfig(agentId);
         if (!cancelled && activeAgentIdRef.current === agentId) {
           setToolEnabled(data.tool_enabled);
+          setDefaultModel(data.default_model || null);
         }
       } catch {
         if (!cancelled && activeAgentIdRef.current === agentId) {
@@ -124,6 +131,42 @@ export function ACPPanel({ agentId: agentIdProp }: ACPPanelProps = {}) {
       cancelled = true;
     };
   }, [activeAgentId, t]);
+
+  useEffect(() => {
+    if (!activeAgentId || !runners.opencode?.enabled) {
+      setModelOptions([]);
+      return;
+    }
+    let cancelled = false;
+    void acpApi
+      .getOpenCodeModels(activeAgentId)
+      .then(({ models }) => {
+        if (!cancelled) setModelOptions(models);
+      })
+      .catch(() => {
+        if (!cancelled) setModelOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeAgentId, runners.opencode?.enabled]);
+
+  const saveDefaultModel = async () => {
+    if (!activeAgentId) return;
+    setDefaultModelSaving(true);
+    try {
+      const saved = await acpApi.updateConfig(activeAgentId, {
+        tool_enabled: toolEnabled,
+        default_model: defaultModel,
+      });
+      setDefaultModel(saved.default_model || null);
+      message.success(t("acp.configSaved"));
+    } catch {
+      message.error(t("acp.configFailed"));
+    } finally {
+      setDefaultModelSaving(false);
+    }
+  };
 
   const orderedKeys = useMemo(() => {
     const keys = Object.keys(runners || {});
@@ -163,6 +206,19 @@ export function ACPPanel({ agentId: agentIdProp }: ACPPanelProps = {}) {
     },
     [],
   );
+
+  const installOpenCode = async () => {
+    setInstallingOpenCode(true);
+    try {
+      const result = await acpApi.installOpenCode();
+      setRunners((current) => ({ ...current, opencode: result.runner }));
+      message.success(t("acp.openCodeInstallSuccess"));
+    } catch {
+      message.error(t("acp.openCodeInstallFailed"));
+    } finally {
+      setInstallingOpenCode(false);
+    }
+  };
 
   const handleToolToggle = async (checked: boolean) => {
     const agentId = activeAgentIdRef.current;
@@ -295,10 +351,25 @@ export function ACPPanel({ agentId: agentIdProp }: ACPPanelProps = {}) {
           <div className={styles.description}>{t("acp.description")}</div>
           <p className={styles.scopeHint}>{t("acp.globalRunnersHint")}</p>
         </div>
-        <Button type="primary" onClick={openCreate}>
-          {t("acp.create")}
-        </Button>
+        <div className={styles.toolbarActions}>
+          <Button
+            loading={installingOpenCode}
+            onClick={() => void installOpenCode()}
+          >
+            {t("acp.openCodeInstall")}
+          </Button>
+          <Button type="primary" onClick={openCreate}>
+            {t("acp.create")}
+          </Button>
+        </div>
       </div>
+
+      <Alert
+        type="info"
+        showIcon
+        className={styles.outboundBlockedAlert}
+        message={t("acp.openCodeInstallHint")}
+      />
 
       {activeAgentId && outboundBlocked ? (
         <Alert
@@ -344,6 +415,34 @@ export function ACPPanel({ agentId: agentIdProp }: ACPPanelProps = {}) {
           </div>
         )}
       </div>
+
+      {activeAgentId && runners.opencode?.enabled ? (
+        <div className={styles.agentToolSection}>
+          <p className={styles.scopeHint}>{t("acp.directChatDefaultHint")}</p>
+          <div className={styles.toolToggle}>
+            <span>{t("acp.directChatDefaultModel")}</span>
+            <Select
+              allowClear
+              style={{ minWidth: 240 }}
+              value={defaultModel}
+              placeholder={t("acp.directChatChooseModel")}
+              options={modelOptions.map((option) => ({
+                value: option.value,
+                label: option.label,
+              }))}
+              onChange={(value: string | undefined) =>
+                setDefaultModel(value || null)
+              }
+            />
+            <Button
+              loading={defaultModelSaving}
+              onClick={() => void saveDefaultModel()}
+            >
+              {t("common.save", "保存")}
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <ACPDrawer
         open={drawerOpen}

@@ -1,5 +1,7 @@
 # 从创作卡片一键启动并嵌入本地项目
 
+> **2026-10-22 更新：** GitHub 服务卡片现可由管理员自动浅克隆并通过 Docker 预览；不再限于下文所述的受信任本地 profile。Docker 版的入口、约束和限制以 [GitHub repository Docker preview](2026-10-22-github-docker-preview.md) 为准；其余本地 profile 兼容约束仍适用。
+
 ## 问题拆解
 
 ### 目标

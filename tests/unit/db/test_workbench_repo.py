@@ -81,7 +81,7 @@ def test_project_knowledge_bases_follow_assigned_threads_and_owner_scope(
     )
 
 
-def test_deleting_folder_or_project_only_ungroups_threads(
+def test_recycling_folder_preserves_assignments_and_can_be_restored(
     setup_db: tuple[SqlitePool, int, int],
 ) -> None:
     db, owner_id, _ = setup_db
@@ -99,12 +99,24 @@ def test_deleting_folder_or_project_only_ungroups_threads(
     )
 
     assert repo.delete_folder(owner_user_id=owner_id, folder_id=folder["folder_id"])
-    assignment = repo.list_index(owner_id)["assignments"][0]
+    index = repo.list_index(owner_id)
+    assert index["folders"] == []
+    assert index["recycled_folders"][0]["folder_id"] == folder["folder_id"]
+    assignment = index["assignments"][0]
     assert assignment == {
         "thread_id": "thread_owner",
         "project_id": project["project_id"],
-        "folder_id": None,
+        "folder_id": folder["folder_id"],
     }
+    assert not repo.assign_thread(
+        owner_user_id=owner_id,
+        thread_id="thread_owner",
+        project_id=project["project_id"],
+        folder_id=folder["folder_id"],
+    )
+    assert repo.restore_folder(owner_user_id=owner_id, folder_id=folder["folder_id"])
+    assert repo.list_index(owner_id)["folders"][0]["folder_id"] == folder["folder_id"]
+    assert repo.list_index(owner_id)["assignments"][0]["folder_id"] == folder["folder_id"]
 
     assert repo.delete_project(owner_user_id=owner_id, project_id=project["project_id"])
     assert repo.list_index(owner_id)["assignments"] == []

@@ -29,6 +29,7 @@ export interface WorkbenchAssignment {
 export interface WorkbenchIndex {
   projects: WorkbenchProject[];
   folders: WorkbenchFolder[];
+  recycled_folders: WorkbenchFolder[];
   assignments: WorkbenchAssignment[];
 }
 
@@ -148,6 +149,11 @@ export const workbenchApi = {
     request<void>(`/workbench/folders/${encodeURIComponent(folderId)}`, {
       method: "DELETE",
     }),
+  restoreFolder: (folderId: string) =>
+    request<void>(
+      `/workbench/folders/${encodeURIComponent(folderId)}/restore`,
+      { method: "POST" },
+    ),
   assignThread: (
     threadId: string,
     projectId: string | null,

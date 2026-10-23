@@ -387,6 +387,8 @@ class ThreadRegistry:
         thread_id: str,
         *,
         model_ref: str | None | object = ...,
+        acp_runner: str | None | object = ...,
+        acp_model: str | None | object = ...,
         reasoning_mode: str | None | object = ...,
         reasoning_effort: str | None | object = ...,
         conversation_mode: str | None | object = ...,
@@ -396,6 +398,8 @@ class ThreadRegistry:
         self._threads.update_composer(
             thread_id,
             model_ref=model_ref,
+            acp_runner=acp_runner,
+            acp_model=acp_model,
             reasoning_mode=reasoning_mode,
             reasoning_effort=reasoning_effort,
             conversation_mode=conversation_mode,

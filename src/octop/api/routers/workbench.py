@@ -71,6 +71,7 @@ class WorkbenchAssignment(BaseModel):
 class WorkbenchIndex(BaseModel):
     projects: list[WorkbenchProject]
     folders: list[WorkbenchFolder]
+    recycled_folders: list[WorkbenchFolder] = Field(default_factory=list)
     assignments: list[WorkbenchAssignment]
 
 
@@ -488,7 +489,7 @@ async def rename_folder(
 @router.delete(
     "/workbench/folders/{folder_id}",
     status_code=204,
-    summary="Delete a folder and return its tasks to the project",
+    summary="Move a project folder to the recycle bin",
 )
 async def delete_folder(
     folder_id: str,
@@ -507,8 +508,40 @@ async def delete_folder(
         raise _not_found("workbench folder not found")
     if folder:
         _audit_project_action(
-            server, user, "workbench.folder.delete", folder["project_id"], folder_id, folder["name"]
+            server,
+            user,
+            "workbench.folder.delete",
+            folder["project_id"],
+            folder_id,
+            folder["name"],
         )
+    return Response(status_code=204)
+
+
+@router.post(
+    "/workbench/folders/{folder_id}/restore",
+    status_code=204,
+    summary="Restore a project folder from the recycle bin",
+)
+async def restore_folder(
+    folder_id: str,
+    user: Any = Depends(current_user),
+    server: Any = Depends(get_server),
+) -> Response:
+    repo = server.services.workbench_repo
+    folder = next(
+        (
+            item
+            for item in repo.list_index(user.id)["recycled_folders"]
+            if item["folder_id"] == folder_id
+        ),
+        None,
+    )
+    if folder is None or not repo.restore_folder(owner_user_id=user.id, folder_id=folder_id):
+        raise _not_found("workbench folder not found in recycle bin")
+    _audit_project_action(
+        server, user, "workbench.folder.restore", folder["project_id"], folder_id, folder["name"]
+    )
     return Response(status_code=204)
 
 

@@ -34,6 +34,7 @@ import dayjs from "dayjs";
 import {
   ArrowLeft,
   ArrowRight,
+  Brain,
   Bot,
   Check,
   Cpu,
@@ -94,6 +95,8 @@ import {
 } from "../../api/modules/workbench";
 import { preferencesApi } from "../../api/modules/preferences";
 import { providerApi } from "../../api/modules/provider";
+import { acpApi } from "../../api/modules/acp";
+import type { ACPModelOption } from "../../api/types/acp";
 import {
   knowledgeBasesApi,
   type KnowledgeBase,
@@ -124,6 +127,7 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { useChatAttachments } from "../Chat/hooks/useChatAttachments";
 import ExpertAgentAvatar from "../Chat/components/ExpertAgentAvatar";
+import { blocksAcpOutboundFromConfig } from "../Experts/components/agentBackendForm";
 import AssistantTurnView from "../Chat/components/AssistantTurnView";
 import { groupConsecutiveAssistantMessages } from "../Chat/utils/messageGrouping";
 import EmojiPicker from "../../components/EmojiPicker";
@@ -165,9 +169,7 @@ function isLaunchableProjectUrl(value: string | null): boolean {
       url.protocol === "https:" &&
       url.hostname.toLowerCase() === "github.com" &&
       !url.port &&
-      /^\/xdguo-design\/data-upload-product(?:\.git)?\/?$/i.test(
-        url.pathname,
-      ) &&
+      /^\/[^/]+\/[^/]+(?:\.git)?\/?$/.test(url.pathname) &&
       !url.search &&
       !url.hash &&
       !url.username &&
@@ -522,6 +524,11 @@ export default function HomePage() {
   const [threads, setThreads] = useState<OctopThread[]>([]);
   const [projects, setProjects] = useState<WorkbenchProject[]>([]);
   const [folders, setFolders] = useState<WorkbenchFolder[]>([]);
+  const [recycledFolders, setRecycledFolders] = useState<WorkbenchFolder[]>([]);
+  const [recycleBinOpen, setRecycleBinOpen] = useState(false);
+  const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [assignments, setAssignments] = useState<WorkbenchAssignment[]>([]);
   const [archivedIds, setArchivedIds] = useState<string[]>([]);
   const [showArchived, setShowArchived] = useState(false);
@@ -611,6 +618,16 @@ export default function HomePage() {
   const [modelsReady, setModelsReady] = useState(false);
   const [preferredModel, setPreferredModel] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [reasoningMode, setReasoningMode] = useState<
+    "auto" | "enabled" | "disabled"
+  >("auto");
+  const [reasoningEffort, setReasoningEffort] = useState<string | null>(null);
+  const [directOpenCode, setDirectOpenCode] = useState(false);
+  const [openCodeEnabled, setOpenCodeEnabled] = useState(false);
+  const [openCodeDefaultModel, setOpenCodeDefaultModel] = useState<
+    string | null
+  >(null);
+  const [openCodeModels, setOpenCodeModels] = useState<ACPModelOption[]>([]);
   const [threadModelSelections, setThreadModelSelections] = useState<
     Record<string, string | null>
   >({});
@@ -656,14 +673,18 @@ export default function HomePage() {
     }
   };
 
+  const chatVisibleAgents = useMemo(
+    () => agents.filter((a) => a.chat_visible !== false),
+    [agents],
+  );
   const primary = useMemo(
-    () => selectPrimaryAgent(agents, preferredHostId),
-    [agents, preferredHostId],
+    () => selectPrimaryAgent(chatVisibleAgents, preferredHostId),
+    [chatVisibleAgents, preferredHostId],
   );
   // 输入框可直接切换对话 Agent：所有运行中且非桥接的 Agent（团队与专家都可单聊）。
   const agentOptions = useMemo(
-    () => agents.filter((a) => a.state === "running" && !a.bridge),
-    [agents],
+    () => chatVisibleAgents.filter((a) => a.state === "running" && !a.bridge),
+    [chatVisibleAgents],
   );
   const chooseAgent = (id: string) => {
     taskEpoch.current += 1;
@@ -779,6 +800,9 @@ export default function HomePage() {
     await workbenchApi.deleteProject(id);
     setProjects((prev) => prev.filter((project) => project.project_id !== id));
     setFolders((prev) => prev.filter((folder) => folder.project_id !== id));
+    setRecycledFolders((prev) =>
+      prev.filter((folder) => folder.project_id !== id),
+    );
     setAssignments((prev) =>
       prev.filter((assignment) => assignment.project_id !== id),
     );
@@ -814,17 +838,22 @@ export default function HomePage() {
   };
   const removeFolder = async (folderId: string) => {
     await workbenchApi.deleteFolder(folderId);
+    const removed = folders.find((folder) => folder.folder_id === folderId);
     setFolders((prev) =>
       prev.filter((folder) => folder.folder_id !== folderId),
     );
-    setAssignments((prev) =>
-      prev.map((assignment) =>
-        assignment.folder_id === folderId
-          ? { ...assignment, folder_id: null }
-          : assignment,
-      ),
-    );
+    if (removed) setRecycledFolders((prev) => [removed, ...prev]);
     if (activeFolder === folderId) setActiveFolder(null);
+  };
+  const restoreFolder = async (folderId: string) => {
+    await workbenchApi.restoreFolder(folderId);
+    const restored = recycledFolders.find(
+      (folder) => folder.folder_id === folderId,
+    );
+    if (restored) setFolders((prev) => [...prev, restored]);
+    setRecycledFolders((prev) =>
+      prev.filter((folder) => folder.folder_id !== folderId),
+    );
   };
   const toggleArchiveThread = (threadId: string) => {
     const next = archivedIds.includes(threadId)
@@ -1227,6 +1256,34 @@ export default function HomePage() {
                   : "")
               }
             >
+              <button
+                type="button"
+                className={
+                  "wb-project-folder-toggle" +
+                  (collapsedFolderIds.has(folder.folder_id)
+                    ? " is-collapsed"
+                    : "")
+                }
+                aria-label={t(
+                  collapsedFolderIds.has(folder.folder_id)
+                    ? "workbench.home.projects.expandFolder"
+                    : "workbench.home.projects.collapseFolder",
+                  { name: folder.name },
+                )}
+                aria-expanded={!collapsedFolderIds.has(folder.folder_id)}
+                aria-controls={`wb-folder-content-${folder.folder_id}`}
+                onClick={() =>
+                  setCollapsedFolderIds((previous) => {
+                    const next = new Set(previous);
+                    if (next.has(folder.folder_id))
+                      next.delete(folder.folder_id);
+                    else next.add(folder.folder_id);
+                    return next;
+                  })
+                }
+              >
+                <ChevronDown size={12} />
+              </button>
               {inlineRename?.type === "folder" &&
               inlineRename.id === folder.folder_id ? (
                 <div className="wb-nav-item wb-project-inline-edit">
@@ -1305,11 +1362,11 @@ export default function HomePage() {
                   title={t("common.delete")}
                   onClick={() =>
                     Modal.confirm({
-                      title: t("workbench.home.projects.deleteFolderTitle", {
+                      title: t("workbench.home.projects.recycleFolderTitle", {
                         name: folder.name,
                       }),
-                      content: t("workbench.home.projects.deleteFolderHint"),
-                      okText: t("workbench.home.projects.delete"),
+                      content: t("workbench.home.projects.recycleFolderHint"),
+                      okText: t("workbench.home.projects.moveToRecycleBin"),
                       cancelText: t("workbench.home.projects.cancel"),
                       okButtonProps: { danger: true },
                       onOk: () =>
@@ -1325,9 +1382,15 @@ export default function HomePage() {
                 </button>
               </span>
             </div>
-            {projectBucket(project.project_id, folder.folder_id).map(
-              renderTaskRow,
-            )}
+            <div
+              id={`wb-folder-content-${folder.folder_id}`}
+              className="wb-project-folder-content"
+              hidden={collapsedFolderIds.has(folder.folder_id)}
+            >
+              {projectBucket(project.project_id, folder.folder_id).map(
+                renderTaskRow,
+              )}
+            </div>
           </Fragment>
         ))}
       {(projectChildren.get(project.project_id) ?? []).map((child) =>
@@ -1336,6 +1399,15 @@ export default function HomePage() {
     </div>
   );
   const agentId = primary?.agent_id || null;
+  const activeThreadRow = threads.find(
+    (thread) => thread.thread_id === activeThread,
+  );
+  const usingOpenCode = activeThread
+    ? activeThreadRow?.acp_runner === "opencode"
+    : directOpenCode;
+  const canUseOpenCode = Boolean(
+    primary && !blocksAcpOutboundFromConfig(primary.config ?? null),
+  );
   const activeThreadModel =
     threads.find((thread) => thread.thread_id === activeThread)?.model_ref ??
     null;
@@ -1382,61 +1454,155 @@ export default function HomePage() {
     };
   }, [agentId, location.pathname]);
   useEffect(() => {
+    if (!agentId) return;
+    let cancelled = false;
+    void acpApi
+      .getConfig(agentId)
+      .then((config) => {
+        if (cancelled) return;
+        setOpenCodeEnabled(Boolean(config.runners?.opencode?.enabled));
+        setOpenCodeDefaultModel(config.default_model || null);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOpenCodeEnabled(false);
+          setOpenCodeDefaultModel(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [agentId]);
+  useEffect(() => {
+    if (!usingOpenCode || !agentId) return;
+    let cancelled = false;
+    setModelsReady(false);
+    void acpApi
+      .getOpenCodeModels(agentId)
+      .then(({ models }) => {
+        if (!cancelled) {
+          setOpenCodeModels(models);
+          setModelsReady(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOpenCodeModels([]);
+          setModelsReady(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [agentId, usingOpenCode]);
+  useEffect(() => {
     modelSelectionTouched.current = false;
   }, [agentId, activeThread]);
   useEffect(() => {
     if (!activeThread && modelSelectionTouched.current) return;
-    const requestedModel =
-      activeThread &&
-      Object.prototype.hasOwnProperty.call(threadModelSelections, activeThread)
-        ? threadModelSelections[activeThread]
-        : activeThreadModel || preferredModel;
+    const requestedModel = usingOpenCode
+      ? activeThreadRow?.acp_model || openCodeDefaultModel
+      : activeThread &&
+        Object.prototype.hasOwnProperty.call(
+          threadModelSelections,
+          activeThread,
+        )
+      ? threadModelSelections[activeThread]
+      : activeThreadModel || preferredModel;
     const isAvailable = (
       candidate: string | null | undefined,
     ): candidate is string =>
       Boolean(
         candidate &&
-          availableModels.some(
-            (model) => modelOptionValue(model) === candidate,
+          (usingOpenCode ? openCodeModels : availableModels).some(
+            (model) =>
+              ("value" in model ? model.value : modelOptionValue(model)) ===
+              candidate,
           ),
       );
     setSelectedModel(
       isAvailable(requestedModel)
         ? requestedModel
-        : isAvailable(preferredModel)
+        : !usingOpenCode && isAvailable(preferredModel)
         ? preferredModel
         : null,
     );
   }, [
     agentId,
+    usingOpenCode,
+    activeThreadRow?.acp_model,
+    openCodeDefaultModel,
     activeThread,
     activeThreadModel,
     preferredModel,
     availableModels,
+    openCodeModels,
     threadModelSelections,
   ]);
-  const selectedModelOption = availableModels.find(
-    (model) => modelOptionValue(model) === selectedModel,
+  const selectedModelOption = usingOpenCode
+    ? openCodeModels.find((model) => model.value === selectedModel)
+    : availableModels.find(
+        (model) => modelOptionValue(model) === selectedModel,
+      );
+  const selectedModelLabel = selectedModelOption
+    ? "value" in selectedModelOption
+      ? selectedModelOption.label
+      : modelOptionLabel(selectedModelOption)
+    : null;
+  const selectedReasoningCapability = usingOpenCode
+    ? null
+    : availableModels.find((model) => modelOptionValue(model) === selectedModel)
+        ?.reasoning_config;
+  const effectiveReasoningMode = activeThread
+    ? activeThreadRow?.reasoning_mode ??
+      selectedReasoningCapability?.default_mode ??
+      reasoningMode
+    : reasoningMode;
+  const effectiveReasoningEffort = activeThread
+    ? activeThreadRow?.reasoning_effort ??
+      selectedReasoningCapability?.default_effort ??
+      reasoningEffort
+    : reasoningEffort;
+  const showReasoningToggle = Boolean(
+    selectedReasoningCapability?.toggle &&
+      selectedReasoningCapability.adapter !== "status_only",
   );
+  const reasoningToggleActive =
+    effectiveReasoningMode === "enabled" ||
+    (effectiveReasoningMode === "auto" &&
+      selectedReasoningCapability?.default_mode === "enabled");
+  const currentModelOptions = usingOpenCode ? openCodeModels : availableModels;
   const modelMenuItems = [
-    { key: "auto", label: t("chat.modelAuto", "自动") },
-    ...availableModels.map((model) => ({
-      key: modelOptionValue(model),
-      label: modelOptionLabel(model),
+    ...(!usingOpenCode
+      ? [{ key: "auto", label: t("chat.modelAuto", "自动") }]
+      : []),
+    ...currentModelOptions.map((model) => ({
+      key: "value" in model ? model.value : modelOptionValue(model),
+      label: "value" in model ? model.label : modelOptionLabel(model),
     })),
-    ...(!modelsReady || availableModels.length > 0
+    ...(!modelsReady || currentModelOptions.length > 0
       ? []
       : [
           {
             key: "empty",
-            label: t("chat.noModelsAvailable", "当前 Agent 暂无可用模型"),
+            label: usingOpenCode
+              ? t("acp.directChatModelEmpty")
+              : t("chat.noModelsAvailable", "当前 Agent 暂无可用模型"),
             disabled: true,
           },
         ]),
   ];
   const handleModelMenu: (info: { key: string }) => void = ({ key }) => {
     if (!modelsReady || key === "empty") return;
+    if (key === "empty") return;
     const model = key === "auto" ? null : key;
+    const capability = availableModels.find(
+      (item) => modelOptionValue(item) === model,
+    )?.reasoning_config;
+    const nextReasoningMode = capability?.default_mode ?? "auto";
+    const nextReasoningEffort = capability?.default_effort ?? null;
+    setReasoningMode(nextReasoningMode);
+    setReasoningEffort(nextReasoningEffort);
     modelSelectionTouched.current = true;
     setSelectedModel(model);
     if (activeThread && agentId) {
@@ -1447,19 +1613,62 @@ export default function HomePage() {
       setThreads((previous) =>
         previous.map((thread) =>
           thread.thread_id === activeThread
-            ? { ...thread, model_ref: model }
+            ? usingOpenCode
+              ? { ...thread, acp_model: model }
+              : {
+                  ...thread,
+                  model_ref: model,
+                  reasoning_mode: nextReasoningMode,
+                  reasoning_effort: nextReasoningEffort,
+                }
             : thread,
         ),
       );
       const version = ++modelPatchVersion.current;
       modelPatchQueue.current = modelPatchQueue.current
         .then(() =>
-          octopThreadsApi.patch(agentId, activeThread, { model_ref: model }),
+          octopThreadsApi.patch(
+            agentId,
+            activeThread,
+            usingOpenCode
+              ? { acp_model: model }
+              : {
+                  model_ref: model,
+                  reasoning_mode: nextReasoningMode,
+                  reasoning_effort: nextReasoningEffort,
+                },
+          ),
         )
         .then(() => undefined)
         .catch(() => {
           if (version === modelPatchVersion.current) {
             setError(t("chat.modelSaveFailed", "模型设置保存失败"));
+          }
+        });
+    }
+  };
+  const handleReasoningToggle = () => {
+    const nextMode = reasoningToggleActive ? "disabled" : "enabled";
+    setReasoningMode(nextMode);
+    if (activeThread && agentId) {
+      setThreads((previous) =>
+        previous.map((thread) =>
+          thread.thread_id === activeThread
+            ? { ...thread, reasoning_mode: nextMode }
+            : thread,
+        ),
+      );
+      const version = ++modelPatchVersion.current;
+      modelPatchQueue.current = modelPatchQueue.current
+        .then(() =>
+          octopThreadsApi.patch(agentId, activeThread, {
+            reasoning_mode: nextMode,
+          }),
+        )
+        .then(() => undefined)
+        .catch(() => {
+          if (version === modelPatchVersion.current) {
+            setError(t("chat.reasoningSaveFailed", "思考设置保存失败"));
           }
         });
     }
@@ -1479,8 +1688,10 @@ export default function HomePage() {
   const {
     items: uploadItems,
     attachments,
+    uploading,
     fileInputRef,
     handleFileChange,
+    handlePaste,
     removeUpload,
     retryUpload,
     clearAttachments,
@@ -1655,6 +1866,7 @@ export default function HomePage() {
     setShowArchived(false);
     setProjects([]);
     setFolders([]);
+    setRecycledFolders([]);
     setAssignments([]);
     if (!agentId) return;
     let cancelled = false;
@@ -1676,6 +1888,7 @@ export default function HomePage() {
             if (!cancelled) {
               setProjects(imported.projects);
               setFolders(imported.folders);
+              setRecycledFolders(imported.recycled_folders ?? []);
               setAssignments(imported.assignments);
             }
             return;
@@ -1684,6 +1897,7 @@ export default function HomePage() {
         if (!cancelled) {
           setProjects(index.projects);
           setFolders(index.folders);
+          setRecycledFolders(index.recycled_folders ?? []);
           setAssignments(index.assignments);
         }
       })
@@ -1989,35 +2203,91 @@ export default function HomePage() {
   };
 
   // 输入框左下的 Agent 选择器：切换后消息发给选中的 Agent。
-  const agentMenuItems = agentOptions.length
-    ? agentOptions.map((a) => ({
-        key: a.agent_id,
-        label: (
-          <span className="wb-agent-option">
-            <ExpertAgentAvatar
-              iconName={a.icon_name}
-              iconUrl={a.icon_url}
-              color={a.color}
-              size={24}
-            />
-            <span>
-              {(a.kind === "team" ? "★ " : "") + (a.name || a.agent_id)}
+  const agentMenuItems = [
+    ...(agentOptions.length
+      ? agentOptions.map((a) => ({
+          key: a.agent_id,
+          label: (
+            <span className="wb-agent-option">
+              <ExpertAgentAvatar
+                iconName={a.icon_name}
+                iconUrl={a.icon_url}
+                color={a.color}
+                size={24}
+              />
+              <span>
+                {(a.kind === "team" ? "★ " : "") + (a.name || a.agent_id)}
+              </span>
             </span>
-          </span>
-        ),
-      }))
-    : [{ key: "agent-empty", label: "没有运行中的 Agent", disabled: true }];
+          ),
+        }))
+      : [{ key: "agent-empty", label: "没有运行中的 Agent", disabled: true }]),
+    ...(openCodeEnabled && canUseOpenCode
+      ? [{ key: "opencode", label: "OpenCode" }]
+      : []),
+  ];
   const handleAgentMenu: (info: { key: string }) => void = ({ key }) => {
-    if (key && key !== primary?.agent_id) chooseAgent(key);
+    if (key === "opencode") {
+      setDirectOpenCode(true);
+      if (activeThread && agentId) {
+        setThreads((items) =>
+          items.map((thread) =>
+            thread.thread_id === activeThread
+              ? {
+                  ...thread,
+                  acp_runner: "opencode",
+                  acp_model: openCodeDefaultModel,
+                }
+              : thread,
+          ),
+        );
+        void octopThreadsApi
+          .patch(agentId, activeThread, {
+            acp_runner: "opencode",
+            acp_model: openCodeDefaultModel,
+          })
+          .catch(() => setError(t("acp.directChatSaveFailed")));
+        setSelectedModel(openCodeDefaultModel);
+      }
+      return;
+    }
+    if (
+      key &&
+      key !== "agent-empty" &&
+      (usingOpenCode || key !== primary?.agent_id)
+    ) {
+      setDirectOpenCode(false);
+      if (activeThread && agentId) {
+        setThreads((items) =>
+          items.map((thread) =>
+            thread.thread_id === activeThread
+              ? { ...thread, acp_runner: null, acp_model: null }
+              : thread,
+          ),
+        );
+        void octopThreadsApi.patch(agentId, activeThread, {
+          acp_runner: null,
+          acp_model: null,
+        });
+      }
+      chooseAgent(key);
+    }
   };
 
   const send = async (provided?: string) => {
     const text = (provided ?? input).trim();
-    if (!text || !agentId || sending || isStreaming || hasPendingApproval)
+    if (
+      (!text && attachments.length === 0) ||
+      uploading ||
+      !agentId ||
+      sending ||
+      isStreaming ||
+      hasPendingApproval
+    )
       return;
     const firstQuestionTitle = activeThread
       ? threads.find((item) => item.thread_id === activeThread)?.title || ""
-      : clipThreadTitle(text);
+      : clipThreadTitle(text || attachments[0]?.filename || "图片消息");
     const epoch = taskEpoch.current;
     setSending(true);
     setError("");
@@ -2025,7 +2295,12 @@ export default function HomePage() {
       let threadId = activeThread;
       let sessionKey = threadId || "";
       if (!threadId) {
-        const created = await octopThreadsApi.create(agentId);
+        const created = usingOpenCode
+          ? await octopThreadsApi.create(agentId, {
+              acp_runner: "opencode",
+              acp_model: selectedModel || openCodeDefaultModel,
+            })
+          : await octopThreadsApi.create(agentId);
         if (epoch !== taskEpoch.current) return;
         threadId = created.thread_id;
         sessionKey = created.session_key;
@@ -2038,7 +2313,13 @@ export default function HomePage() {
             title: firstQuestionTitle,
             last_active: now,
             created_at: now,
-            model_ref: selectedModel,
+            model_ref: usingOpenCode ? null : selectedModel,
+            acp_runner: usingOpenCode ? "opencode" : null,
+            acp_model: usingOpenCode
+              ? selectedModel || openCodeDefaultModel
+              : null,
+            reasoning_mode: usingOpenCode ? null : effectiveReasoningMode,
+            reasoning_effort: usingOpenCode ? null : effectiveReasoningEffort,
           },
           ...prev,
         ]);
@@ -2058,14 +2339,47 @@ export default function HomePage() {
       if (!threadId || epoch !== taskEpoch.current) return;
       // The existing Octop WebSocket store handles streaming and reconnection.
       // Do not dispatch worker messages directly from this surface.
-      sendMessage(
-        text,
-        sessionKey,
-        agentId,
-        attachments.length ? attachments : undefined,
-        threadId,
-        selectedModel,
-      );
+      if (usingOpenCode) {
+        sendMessage(
+          text,
+          sessionKey,
+          agentId,
+          attachments.length ? attachments : undefined,
+          threadId,
+          null,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          "opencode",
+        );
+      } else {
+        const args = [
+          text,
+          sessionKey,
+          agentId,
+          attachments.length ? attachments : undefined,
+          threadId,
+          selectedModel,
+        ] as const;
+        if (selectedReasoningCapability) {
+          sendMessage(
+            ...args,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            effectiveReasoningMode,
+            effectiveReasoningEffort,
+          );
+        } else {
+          sendMessage(...args);
+        }
+      }
       setInput("");
       setPendingAssignment(null);
       clearAttachments();
@@ -2562,6 +2876,55 @@ export default function HomePage() {
               {(projectChildren.get(null) ?? []).map((project) =>
                 renderProjectNode(project, 0),
               )}
+              <section className="wb-sidebar-section wb-recycle-section">
+                <button
+                  type="button"
+                  className="wb-task-filter"
+                  aria-expanded={recycleBinOpen}
+                  onClick={() => setRecycleBinOpen((open) => !open)}
+                >
+                  <strong>{t("workbench.home.projects.recycleBin")}</strong>
+                  <span>{recycledFolders.length}</span>
+                </button>
+                {recycleBinOpen && (
+                  <div className="wb-recycled-folders">
+                    {recycledFolders.length === 0 ? (
+                      <span className="wb-recycle-empty">
+                        {t("workbench.home.projects.recycleBinEmpty")}
+                      </span>
+                    ) : (
+                      recycledFolders.map((folder) => (
+                        <div
+                          className="wb-recycled-folder"
+                          key={folder.folder_id}
+                        >
+                          <Folder size={13} />
+                          <span title={folder.name}>{folder.name}</span>
+                          <button
+                            type="button"
+                            aria-label={t(
+                              "workbench.home.projects.restoreFolderNamed",
+                              { name: folder.name },
+                            )}
+                            title={t("workbench.home.projects.restoreFolder")}
+                            onClick={() =>
+                              void restoreFolder(folder.folder_id).catch(() =>
+                                setError(
+                                  t(
+                                    "workbench.home.projects.restoreFolderFailed",
+                                  ),
+                                ),
+                              )
+                            }
+                          >
+                            <RotateCcw size={13} />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </section>
             </>
           )}
           <div className="wb-sidebar-section wb-task-section">
@@ -3213,22 +3576,6 @@ export default function HomePage() {
                       })}
                     </div>
                   )}
-                  {selectedModelOption && (
-                    <div className="wb-composer-model">
-                      <Cpu size={13} />
-                      <span>
-                        {selectedModelOption.name || selectedModelOption.model}
-                      </span>
-                      <button
-                        type="button"
-                        aria-label={t("chat.modelAuto", "自动")}
-                        title={t("chat.modelAuto", "自动")}
-                        onClick={() => handleModelMenu({ key: "auto" })}
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  )}
                   <textarea
                     ref={inputRef}
                     rows={2}
@@ -3241,6 +3588,7 @@ export default function HomePage() {
                         ? "给主 Agent 一个任务，或者聊聊你的想法…"
                         : "请先在 Agent 团队中启动主 Agent"
                     }
+                    onPaste={handlePaste}
                     onKeyDown={(e) => {
                       if (
                         e.key === "Enter" &&
@@ -3281,7 +3629,9 @@ export default function HomePage() {
                       menu={{
                         items: agentMenuItems,
                         onClick: handleAgentMenu,
-                        selectedKeys: primary?.agent_id
+                        selectedKeys: usingOpenCode
+                          ? ["opencode"]
+                          : primary?.agent_id
                           ? [primary.agent_id]
                           : [],
                       }}
@@ -3292,17 +3642,21 @@ export default function HomePage() {
                         aria-label="选择对话 Agent"
                         title="选择由哪个 Agent 处理消息"
                       >
-                        {primary ? (
+                        {usingOpenCode ? (
+                          <Bot size={15} />
+                        ) : primary ? (
                           <ExpertAgentAvatar
                             iconName={primary.icon_name}
                             iconUrl={primary.icon_url}
                             color={primary.color}
-                            size={22}
+                            size={18}
                           />
                         ) : (
                           <Bot size={15} />
                         )}
-                        {primary?.name || "选择 Agent"}{" "}
+                        {usingOpenCode
+                          ? "OpenCode"
+                          : primary?.name || "选择 Agent"}{" "}
                         <ChevronDown size={13} />
                       </button>
                     </Dropdown>
@@ -3325,13 +3679,34 @@ export default function HomePage() {
                       >
                         <Cpu size={14} />
                         <span>
-                          {selectedModelOption
-                            ? modelOptionLabel(selectedModelOption)
+                          {selectedModelLabel
+                            ? selectedModelLabel
                             : t("chat.modelAuto", "自动")}
                         </span>
                         <ChevronDown size={13} />
                       </button>
                     </Dropdown>
+                    {showReasoningToggle && (
+                      <button
+                        type="button"
+                        className={
+                          "wb-composer-reasoning" +
+                          (reasoningToggleActive ? " is-active" : "")
+                        }
+                        aria-label={t("chat.deepThinking", "深度思考")}
+                        aria-pressed={reasoningToggleActive}
+                        title={`${t("chat.deepThinking", "深度思考")}：${t(
+                          reasoningToggleActive
+                            ? "chat.reasoningEnabled"
+                            : "chat.reasoningDisabled",
+                          reasoningToggleActive ? "开启" : "关闭",
+                        )}`}
+                        onClick={handleReasoningToggle}
+                      >
+                        <Brain size={14} />
+                        <span>{t("chat.deepThinking", "深度思考")}</span>
+                      </button>
+                    )}
                     <Dropdown
                       trigger={["click"]}
                       placement="topLeft"
@@ -3380,7 +3755,8 @@ export default function HomePage() {
                         type="button"
                         className="wb-composer-send"
                         disabled={
-                          !input.trim() ||
+                          (!input.trim() && attachments.length === 0) ||
+                          uploading ||
                           !primary ||
                           sending ||
                           hasPendingApproval
@@ -3399,15 +3775,6 @@ export default function HomePage() {
                     hidden
                     onChange={handleFileChange}
                   />
-                </div>
-                <div className="wb-composer-caption">
-                  <span>
-                    <ShieldCheck size={13} />{" "}
-                    会话由私有部署管理，模型调用依照已配置的提供商
-                  </span>
-                  <span>
-                    此工作台只呈现聊天记录，内部执行明细在高级对话中查看。
-                  </span>
                 </div>
               </div>
             </div>

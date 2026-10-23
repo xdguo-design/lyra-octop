@@ -37,7 +37,7 @@ Legacy per-agent `config_json.acp.runners` is migrated to the user-global store 
 | `pi` | `npx` | `-y`, `pi-acp` |
 | `kilo_code` | `kilo` | `acp` |
 
-Install the CLI on the host where `octop run` executes, ensure it is on `PATH` (or set an absolute `command` in the runner drawer). Built-in runners cannot be deleted; custom runners can be added from **Add runner**.
+The ACP page can install OpenCode on the Linux host where `octop run` executes and enable its runner for the current account. Installation uses the Octop service account and does not require `sudo`. Then sign OpenCode in as that same service account so its connected models are available. Other runners must be installed on the host where `octop run` executes and be on `PATH` (or use an absolute `command` in the runner drawer). Built-in runners cannot be deleted; custom runners can be added from **Add runner**.
 
 #### Kilo Code (optional external coding agent)
 
@@ -147,6 +147,7 @@ Interactive docs: `/api/docs` (tag **agents**).
 |--------|------|------|
 | `GET` | `/api/acp` | — |
 | `PUT` | `/api/acp` | `{ "runners": { "<id>": { … } } }` |
+| `POST` | `/api/acp/opencode/install` | — (administrator; Linux host only) |
 | `GET` | `/api/acp/{runner_name}` | — |
 | `PUT` | `/api/acp/{runner_name}` | runner object |
 | `DELETE` | `/api/acp/{runner_name}` | custom runners only |

@@ -14,10 +14,12 @@ import { clipThreadTitle } from "../Chat/utils/threadTitle";
 
 const mocks = vi.hoisted(() => ({
   request: vi.fn(),
+  requestUpload: vi.fn(),
   list: vi.fn(),
   create: vi.fn(),
   history: vi.fn(),
   rename: vi.fn(),
+  patch: vi.fn(),
   workbenchGet: vi.fn(),
   workbenchImport: vi.fn(),
   assignThread: vi.fn(),
@@ -30,6 +32,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../api/request", () => ({
   request: mocks.request,
+  requestUpload: mocks.requestUpload,
   bridgeAgentHeaders: () => undefined,
 }));
 vi.mock("../../api/modules/octopThreads", () => ({
@@ -39,6 +42,7 @@ vi.mock("../../api/modules/octopThreads", () => ({
     create: mocks.create,
     history: mocks.history,
     rename: mocks.rename,
+    patch: mocks.patch,
   },
 }));
 vi.mock("../../api/modules/workbench", () => ({
@@ -117,6 +121,14 @@ beforeEach(() => {
           bridge: false,
           member_ids: ["worker"],
         },
+        {
+          agent_id: "platform-only",
+          name: "仅平台使用",
+          kind: "expert",
+          state: "running",
+          bridge: false,
+          chat_visible: false,
+        },
       ]);
     }
     if (path === "/voice/active") {
@@ -126,7 +138,35 @@ beforeEach(() => {
         stt_realtime: false,
       });
     }
+    if (path === "/providers/resolved") {
+      return Promise.resolve([
+        {
+          provider_id: 1,
+          provider_name: "Zhipu Coding Plan",
+          provider_kind: "openai",
+          model: "glm-5.3-flash",
+          name: "glm-5.3-flash",
+          reasoning_config: {
+            supported: true,
+            toggle: true,
+            default_mode: "disabled",
+            default_effort: "medium",
+            efforts: ["low", "medium", "high"],
+            effort_type: "enum",
+            adapter: "thinking",
+          },
+        },
+      ]);
+    }
     return Promise.reject(new Error("Unexpected request: " + path));
+  });
+  mocks.requestUpload.mockResolvedValue({
+    path: "inbound/pasted.png",
+    workspace_path: "inbound/pasted.png",
+    filename: "pasted.png",
+    media_type: "image/png",
+    url: "",
+    access_url: "/files/pasted.png",
   });
   mocks.list.mockResolvedValue([]);
   mocks.create.mockResolvedValue({
@@ -135,6 +175,7 @@ beforeEach(() => {
   });
   mocks.history.mockResolvedValue({ messages: [], has_more: false });
   mocks.rename.mockResolvedValue(undefined);
+  mocks.patch.mockResolvedValue(undefined);
   mocks.workbenchGet.mockResolvedValue({
     projects: [],
     folders: [],
@@ -173,7 +214,7 @@ function openSettingsFromProfileMenu() {
 }
 
 describe("LYRA workbench page integration", () => {
-  it("starts the trusted project from Home, embeds it, and can stop it", async () => {
+  it("starts a registered GitHub project from Home, embeds it, and can stop it", async () => {
     const itemId = "project-1";
     mocks.request.mockImplementation((path: string, options?: RequestInit) => {
       if (path === "/auth/me") {
@@ -188,9 +229,9 @@ describe("LYRA workbench page integration", () => {
             {
               item_id: itemId,
               kind: "service",
-              name: "数据转换平台",
+              name: "智能网关",
               description: "",
-              url: "https://github.com/xdguo-design/data-upload-product",
+              url: "https://github.com/xdguo-design/lyra-gateway",
               folder_id: null,
               created_at: 1,
               updated_at: 1,
@@ -238,10 +279,10 @@ describe("LYRA workbench page integration", () => {
     });
     renderHome();
     fireEvent.click(screen.getByRole("button", { name: /内置平台/ }));
-    const project = await screen.findByRole("button", { name: /数据转换平台/ });
+    const project = await screen.findByRole("button", { name: /智能网关/ });
     fireEvent.click(project);
     await waitFor(() => {
-      const frame = screen.getByTitle("数据转换平台") as HTMLIFrameElement;
+      const frame = screen.getByTitle("智能网关") as HTMLIFrameElement;
       expect(frame.src).toBe("http://127.0.0.1:8090/");
     });
     fireEvent.click(
@@ -276,6 +317,83 @@ describe("LYRA workbench page integration", () => {
     expect(
       screen.queryByRole("complementary", { name: "主 Agent 和内置平台" }),
     ).toBeNull();
+  });
+
+  it("toggles deep thinking and sends the selected reasoning settings", async () => {
+    renderHome();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "选择模型" })).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "选择模型" }));
+    fireEvent.click(
+      await screen.findByText("Zhipu Coding Plan / glm-5.3-flash"),
+    );
+    const reasoning = await screen.findByRole("button", { name: "深度思考" });
+    expect(reasoning.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(reasoning);
+    expect(reasoning.getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "给主 Agent 发消息" }),
+      {
+        target: { value: "请分析" },
+      },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "发送消息" }));
+    await waitFor(() =>
+      expect(mocks.sendMessage).toHaveBeenCalledWith(
+        "请分析",
+        "session-1",
+        "team-primary",
+        undefined,
+        "thread-1",
+        "Zhipu Coding Plan/glm-5.3-flash",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        "enabled",
+        "medium",
+      ),
+    );
+  });
+
+  it("pastes and sends an image from the home composer", async () => {
+    renderHome();
+    const field = screen.getByRole("textbox", { name: "给主 Agent 发消息" });
+    await waitFor(() =>
+      expect((field as HTMLTextAreaElement).disabled).toBe(false),
+    );
+    const image = new File(["image"], "pasted.png", { type: "image/png" });
+    fireEvent.paste(field, {
+      clipboardData: {
+        items: [{ kind: "file", getAsFile: () => image }],
+      },
+    });
+
+    await waitFor(() => expect(mocks.requestUpload).toHaveBeenCalledOnce());
+    expect(
+      (screen.getByRole("button", { name: "发送消息" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "发送消息" }));
+
+    await waitFor(() =>
+      expect(mocks.sendMessage).toHaveBeenCalledWith(
+        "",
+        "session-1",
+        "team-primary",
+        [
+          expect.objectContaining({
+            filename: "pasted.png",
+            kind: "image",
+            mediaType: "image/png",
+          }),
+        ],
+        "thread-1",
+        null,
+      ),
+    );
   });
 
   it("applies the matching global skin when a theme card is selected", async () => {
@@ -548,15 +666,82 @@ describe("LYRA workbench page integration", () => {
     expect(within(list).getByText("你好")).toBeTruthy();
   });
 
+  it("collapses each project folder independently", async () => {
+    mocks.list.mockResolvedValueOnce([
+      {
+        thread_id: "thread-folder",
+        title: "文件夹任务",
+        channel_type: "web",
+        session_key: "s-folder",
+        last_active: 1,
+        created_at: 1,
+      },
+    ]);
+    mocks.workbenchGet.mockResolvedValueOnce({
+      projects: [
+        {
+          project_id: "planet",
+          name: "星球",
+          icon: "📁",
+          parent_id: null,
+          code_enabled: false,
+          created_at: 1,
+          updated_at: 1,
+        },
+      ],
+      folders: [
+        {
+          folder_id: "prototype",
+          project_id: "planet",
+          name: "页面原型",
+          created_at: 1,
+          updated_at: 1,
+        },
+      ],
+      assignments: [
+        {
+          thread_id: "thread-folder",
+          project_id: "planet",
+          folder_id: "prototype",
+        },
+      ],
+    });
+
+    renderHome();
+    await screen.findByText("页面原型");
+    const content = document.getElementById("wb-folder-content-prototype");
+    expect(content).toBeTruthy();
+    expect(within(content as HTMLElement).getByText("文件夹任务")).toBeTruthy();
+
+    const toggle = screen.getByRole("button", {
+      name: "workbench.home.projects.collapseFolder",
+    });
+    fireEvent.click(toggle);
+    expect(content).toHaveAttribute("hidden");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(toggle);
+    expect(content).not.toHaveAttribute("hidden");
+  });
+
   it("keeps ACP runners out of the chat agent selector", async () => {
     mocks.acpConfig.mockResolvedValueOnce({
       tool_enabled: true,
       runners: { "Z-Code": { enabled: true }, Disabled: { enabled: false } },
     });
+    window.localStorage.setItem(
+      "octop:workbench:primary-agent",
+      "platform-only",
+    );
     renderHome();
-    fireEvent.click(screen.getByRole("button", { name: "选择对话 Agent" }));
+    const agentSelector = screen.getByRole("button", {
+      name: "选择对话 Agent",
+    });
+    await waitFor(() => expect(agentSelector).toHaveTextContent("主 Agent"));
+    fireEvent.click(agentSelector);
     const menu = await screen.findByRole("menu");
     expect(within(menu).queryByText("Z-Code")).toBeNull();
+    expect(within(menu).queryByText("仅平台使用")).toBeNull();
     expect(within(menu).getByText("研究 Agent")).toBeTruthy();
   });
 

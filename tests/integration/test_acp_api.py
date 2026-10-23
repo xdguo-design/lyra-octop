@@ -72,6 +72,26 @@ async def test_acp_builtin_runner_cannot_delete(env) -> None:
     assert r.status_code == 403
 
 
+async def test_install_opencode_enables_global_runner(env, monkeypatch: pytest.MonkeyPatch) -> None:
+    from octop.infra.agents import opencode_setup
+
+    c, _srv, auth, _agent_id = env
+
+    async def _installed() -> str:
+        return "/home/octop/.opencode/bin/opencode"
+
+    monkeypatch.setattr(opencode_setup, "install_opencode", _installed)
+    r = await c.post("/api/acp/opencode/install", headers=auth)
+    assert r.status_code == 200
+    assert r.json()["command"] == "/home/octop/.opencode/bin/opencode"
+    assert r.json()["runner"]["enabled"] is True
+    assert r.json()["runner"]["args"] == ["acp"]
+    assert r.json()["runner"]["trusted"] is False
+
+    saved = await c.get("/api/acp", headers=auth)
+    assert saved.json()["runners"]["opencode"]["command"] == r.json()["command"]
+
+
 async def test_acp_tool_allowed_for_scoped_root_dir(env) -> None:
     """Directory sandbox does not block enabling outbound acp_runner."""
     c, _srv, auth, _agent_id = env

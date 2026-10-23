@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import os
 import re
+import secrets
 import signal
 import socket
 import subprocess
+import tempfile
 from collections import deque
 from contextlib import suppress
 from dataclasses import dataclass, field
@@ -19,11 +22,14 @@ import httpx
 
 from octop.infra.utils import posix_compat
 
-_REPO_PATH_RE = re.compile(r"^/([^/]+)/([^/]+?)(?:\.git)?/?$")
+_REPO_PATH_RE = re.compile(r"^/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?$")
 _ENV_NAME_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 _COMMAND_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 _MAX_LOG_BYTES = 8192
 _START_TIMEOUT = 30.0
+_DOCKER_BUILD_TIMEOUT = 900.0
+_DOCKER_START_TIMEOUT = 60.0
+_PREVIEW_DOMAIN_LABEL_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 _CHILD_ENV_KEYS = {
     "APPDATA",
     "GOCACHE",
@@ -75,9 +81,22 @@ class _ProjectRuntime:
     profile: ProjectServiceProfile
     status: str = "stopped"
     url: str | None = None
+    upstream_url: str | None = None
+    preview_token: str | None = None
     processes: list[_RunningProcess] = field(default_factory=list)
     logs: deque[str] = field(default_factory=lambda: deque(maxlen=2))
     thumbnail_origins: tuple[str, ...] = ()
+
+
+@dataclass
+class _DockerRuntime:
+    repository_url: str
+    project_id: str | None
+    status: str = "stopped"
+    url: str | None = None
+    upstream_url: str | None = None
+    preview_token: str | None = None
+    logs: deque[str] = field(default_factory=lambda: deque(maxlen=2))
 
 
 def normalize_repository_url(value: str) -> str | None:
@@ -96,9 +115,26 @@ def normalize_repository_url(value: str) -> str | None:
             or match is None
         ):
             return None
+        if match.group(1) in {".", ".."} or match.group(2) in {".", ".."}:
+            return None
         return f"https://github.com/{match.group(1).lower()}/{match.group(2).lower()}"
     except ValueError:
         return None
+
+
+def _normalize_preview_domain(value: str | None) -> str | None:
+    if not value:
+        return None
+    domain = value.strip().lower().rstrip(".")
+    labels = domain.split(".")
+    if (
+        len(domain) > 253
+        or len(labels) < 2
+        or not any(char.isalpha() for char in domain)
+        or any(len(label) > 63 or not _PREVIEW_DOMAIN_LABEL_RE.fullmatch(label) for label in labels)
+    ):
+        raise ValueError("workbench_preview_domain must be a DNS name without scheme or wildcard")
+    return domain
 
 
 def _process_spec(raw: Any, field_name: str) -> ProcessSpec:
@@ -250,42 +286,108 @@ class ProjectServiceManager:
         self,
         code_root: str | Path | None,
         profiles: dict[str, ProjectServiceProfile],
+        project_root: str | Path | None = None,
+        preview_domain: str | None = None,
     ) -> None:
         self._code_root = code_root
         self._profiles = profiles
         self._runtimes: dict[str, _ProjectRuntime] = {}
+        self._project_root = Path(project_root) if project_root is not None else None
+        self._preview_domain = _normalize_preview_domain(preview_domain)
+        self._docker_runtimes: dict[tuple[str, str | None], _DockerRuntime] = {}
         self._lock = asyncio.Lock()
 
-    def status(self, repository_url: str) -> dict[str, str | None]:
+    def status(self, repository_url: str, project_id: str | None = None) -> dict[str, str | None]:
         key = normalize_repository_url(repository_url)
-        runtime = self._runtimes.get(key or "")
-        if runtime is None:
+        if key is not None and key not in self._profiles:
+            docker_runtime = self._docker_runtimes.get((key, project_id))
+            return {
+                "status": docker_runtime.status if docker_runtime else "stopped",
+                "url": docker_runtime.url if docker_runtime else None,
+                "logs": "\n".join(docker_runtime.logs)[-_MAX_LOG_BYTES:] or None
+                if docker_runtime
+                else None,
+            }
+        process_runtime = self._runtimes.get(key or "")
+        if process_runtime is None:
             return {"status": "stopped", "url": None, "logs": None}
-        if runtime.status == "running" and any(
-            p.process.returncode is not None for p in runtime.processes
+        if process_runtime.status == "running" and any(
+            p.process.returncode is not None for p in process_runtime.processes
         ):
-            runtime.status = "failed"
-            runtime.url = None
+            process_runtime.status = "failed"
+            process_runtime.url = None
         return {
-            "status": runtime.status,
-            "url": runtime.url,
-            "logs": "\n".join(runtime.logs)[-_MAX_LOG_BYTES:] or None,
+            "status": process_runtime.status,
+            "url": process_runtime.url,
+            "logs": "\n".join(process_runtime.logs)[-_MAX_LOG_BYTES:] or None,
         }
 
     def has_profile(self, repository_url: str) -> bool:
         key = normalize_repository_url(repository_url)
-        return key is not None and key in self._profiles
+        return key is not None and (key in self._profiles or self._project_root is not None)
 
-    def thumbnail_origins(self, repository_url: str) -> tuple[str, ...]:
+    def thumbnail_origins(
+        self, repository_url: str, project_id: str | None = None
+    ) -> tuple[str, ...]:
         key = normalize_repository_url(repository_url)
-        runtime = self._runtimes.get(key or "")
-        return runtime.thumbnail_origins if runtime and runtime.status == "running" else ()
+        if key is not None and key not in self._profiles:
+            docker_runtime = self._docker_runtimes.get((key, project_id))
+            return (
+                (docker_runtime.upstream_url,)
+                if docker_runtime
+                and docker_runtime.status == "running"
+                and docker_runtime.upstream_url
+                else ()
+            )
+        process_runtime = self._runtimes.get(key or "")
+        return (
+            process_runtime.thumbnail_origins
+            if process_runtime and process_runtime.status == "running"
+            else ()
+        )
 
-    async def start(self, repository_url: str) -> dict[str, str | None]:
+    def preview_upstream_for_host(self, host: str) -> str | None:
+        token = self._preview_token_from_host(host)
+        if token is None:
+            return None
+        for runtime in self._docker_runtimes.values():
+            if (
+                runtime.preview_token == token
+                and runtime.status == "running"
+                and runtime.upstream_url
+            ):
+                return runtime.upstream_url
+        for process_runtime in self._runtimes.values():
+            if (
+                process_runtime.preview_token == token
+                and process_runtime.status == "running"
+                and process_runtime.upstream_url
+            ):
+                return process_runtime.upstream_url
+        return None
+
+    def is_preview_host(self, host: str) -> bool:
+        return self._preview_token_from_host(host) is not None
+
+    def _preview_token_from_host(self, host: str) -> str | None:
+        if self._preview_domain is None:
+            return None
+        normalized_host = host.partition(":")[0].rstrip(".").lower()
+        suffix = f".{self._preview_domain}"
+        if not normalized_host.endswith(suffix):
+            return None
+        token = normalized_host[: -len(suffix)]
+        return token if re.fullmatch(r"[0-9a-f]{48}", token) else None
+
+    async def start(
+        self, repository_url: str, project_id: str | None = None
+    ) -> dict[str, str | None]:
         key = normalize_repository_url(repository_url)
         profile = self._profiles.get(key or "")
-        if key is None or profile is None:
+        if key is None:
             raise KeyError("project launch profile not found")
+        if profile is None:
+            return await self._start_docker_project(key, project_id)
         async with self._lock:
             current = self.status(key)
             if current["status"] == "running":
@@ -313,7 +415,12 @@ class ProjectServiceManager:
                     backend_url,
                 )
                 await self._wait_health(frontend_url + profile.frontend.health_path, runtime)
-                runtime.url = frontend_url
+                runtime.upstream_url = frontend_url
+                if self._preview_domain:
+                    runtime.preview_token = runtime.preview_token or secrets.token_hex(24)
+                    runtime.url = f"https://{runtime.preview_token}.{self._preview_domain}"
+                else:
+                    runtime.url = frontend_url
                 runtime.status = "running"
                 return self.status(key)
             except asyncio.CancelledError:
@@ -329,6 +436,198 @@ class ProjectServiceManager:
                 await self._stop_runtime(runtime)
                 runtime.status = "failed"
                 raise RuntimeError(_redact_log("\n".join(runtime.logs).encode())) from exc
+
+    def _docker_names(self, repository_url: str, project_id: str | None) -> tuple[Path, str, str]:
+        if self._project_root is None:
+            raise RuntimeError("Docker project previews are not configured")
+        parsed = urlsplit(repository_url)
+        match = _REPO_PATH_RE.fullmatch(parsed.path)
+        if match is None:
+            raise ValueError("invalid GitHub repository URL")
+        owner, repository = match.groups()
+        root = self._project_root.resolve()
+        project_name = repository.removesuffix(".git").lower()
+        item_suffix = (
+            hashlib.sha256(project_id.encode()).hexdigest()[:16] if project_id else "shared"
+        )
+        checkout = (root / "github" / owner.lower() / project_name / item_suffix).resolve()
+        if not checkout.is_relative_to(root):
+            raise ValueError("repository path escapes the project root")
+        name = hashlib.sha256(f"{repository_url}\0{project_id or ''}".encode()).hexdigest()[:16]
+        return checkout, f"octop-project-{name}", f"octop-project:{name}"
+
+    async def _docker_command(
+        self,
+        *args: str,
+        cwd: Path | None = None,
+        timeout: float = 30.0,
+        check: bool = True,
+    ) -> str:
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *args,
+                cwd=cwd,
+                env=_child_environment(),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+        except FileNotFoundError as exc:
+            raise RuntimeError(f"{args[0]} is not installed on the Octop host") from exc
+
+        async def read_output() -> bytes:
+            output = bytearray()
+            assert process.stdout is not None
+            while chunk := await process.stdout.read(4096):
+                output.extend(chunk)
+                if len(output) > _MAX_LOG_BYTES:
+                    del output[:-_MAX_LOG_BYTES]
+            return bytes(output)
+
+        try:
+            output, _ = await asyncio.wait_for(
+                asyncio.gather(read_output(), process.wait()), timeout=timeout
+            )
+        except TimeoutError as exc:
+            process.kill()
+            await process.wait()
+            raise RuntimeError(f"{args[0]} timed out") from exc
+        text = _redact_log(output)
+        if check and process.returncode:
+            raise RuntimeError(text or f"{args[0]} exited with status {process.returncode}")
+        if process.returncode and not check:
+            return ""
+        return text.strip()
+
+    async def _clone_project(self, repository_url: str, checkout: Path) -> None:
+        checkout.parent.mkdir(parents=True, exist_ok=True)
+        if checkout.exists():
+            if checkout.is_symlink() or not checkout.is_dir():
+                raise RuntimeError("project checkout path is not a directory")
+            return
+        with tempfile.TemporaryDirectory(prefix="octop-clone-", dir=checkout.parent) as temp:
+            target = Path(temp) / "source"
+            await self._docker_command(
+                "git", "clone", "--depth", "1", repository_url, str(target), timeout=180
+            )
+            target.replace(checkout)
+
+    @staticmethod
+    def _container_port(checkout: Path) -> int:
+        dockerfile = checkout / "Dockerfile"
+        if not dockerfile.is_file() or not dockerfile.resolve().is_relative_to(checkout.resolve()):
+            raise RuntimeError("repository must contain a Dockerfile inside its root")
+        with dockerfile.open("rb") as source:
+            content = source.read(65536).decode("utf-8", errors="replace")
+        for line in content.splitlines():
+            match = re.match(r"^\s*EXPOSE\s+(\d+)(?:/tcp)?(?:\s|$)", line, re.IGNORECASE)
+            if match and 1 <= int(match.group(1)) <= 65535:
+                return int(match.group(1))
+        raise RuntimeError("Dockerfile must expose a numeric TCP port")
+
+    async def _start_docker_project(
+        self, repository_url: str, project_id: str | None
+    ) -> dict[str, str | None]:
+        checkout, container, image = self._docker_names(repository_url, project_id)
+        async with self._lock:
+            runtime_key = (repository_url, project_id)
+            runtime = self._docker_runtimes.setdefault(
+                runtime_key, _DockerRuntime(repository_url, project_id)
+            )
+            if runtime.status == "running" and runtime.url:
+                return self.status(repository_url, project_id)
+            runtime.status = "starting"
+            runtime.url = None
+            runtime.upstream_url = None
+            runtime.logs.clear()
+            try:
+                await self._docker_command("docker", "info", "--format={{.ServerVersion}}")
+                await self._clone_project(repository_url, checkout)
+                port = self._container_port(checkout)
+                image_result = await self._docker_command(
+                    "docker", "image", "inspect", image, check=False
+                )
+                if not image_result:
+                    await self._docker_command(
+                        "docker",
+                        "build",
+                        "--tag",
+                        image,
+                        str(checkout),
+                        timeout=_DOCKER_BUILD_TIMEOUT,
+                    )
+                existing = await self._docker_command(
+                    "docker", "inspect", "--format={{.State.Status}}", container, check=False
+                )
+                if existing and existing != "running":
+                    await self._docker_command("docker", "start", container)
+                elif not existing:
+                    await self._docker_command(
+                        "docker",
+                        "run",
+                        "--detach",
+                        "--name",
+                        container,
+                        "--publish",
+                        f"127.0.0.1::{port}",
+                        "--cap-drop",
+                        "ALL",
+                        "--security-opt",
+                        "no-new-privileges",
+                        "--pids-limit",
+                        "256",
+                        "--memory",
+                        "1g",
+                        "--cpus",
+                        "2",
+                        image,
+                    )
+                published = await self._docker_command("docker", "port", container, f"{port}/tcp")
+                match = re.search(r"127\.0\.0\.1:(\d+)", published)
+                if match is None:
+                    raise RuntimeError("Docker did not publish the project port on loopback")
+                upstream_url = f"http://127.0.0.1:{match.group(1)}"
+                runtime.upstream_url = upstream_url
+                if self._preview_domain:
+                    runtime.preview_token = runtime.preview_token or secrets.token_hex(24)
+                    url = f"https://{runtime.preview_token}.{self._preview_domain}"
+                else:
+                    url = upstream_url
+                await self._wait_docker_health(upstream_url)
+                runtime.url = url
+                runtime.status = "running"
+                return self.status(repository_url, project_id)
+            except asyncio.CancelledError:
+                with suppress(Exception):
+                    await self._docker_command(
+                        "docker", "stop", "--time", "5", container, check=False
+                    )
+                runtime.status = "stopped"
+                raise
+            except Exception as exc:
+                runtime.logs.append(str(exc))
+                try:
+                    await self._docker_command(
+                        "docker", "stop", "--time", "5", container, check=False
+                    )
+                    logs = await self._docker_command("docker", "logs", container, check=False)
+                    if logs:
+                        runtime.logs.append(logs)
+                except Exception:
+                    pass
+                runtime.status = "failed"
+                runtime.url = None
+                runtime.upstream_url = None
+                raise RuntimeError(_redact_log("\n".join(runtime.logs).encode())) from exc
+
+    async def _wait_docker_health(self, url: str) -> None:
+        async with httpx.AsyncClient(timeout=1.0) as client:
+            async with asyncio.timeout(_DOCKER_START_TIMEOUT):
+                while True:
+                    try:
+                        await client.get(url)
+                        return
+                    except httpx.HTTPError:
+                        await asyncio.sleep(0.25)
 
     async def _start_process(
         self,
@@ -383,23 +682,59 @@ class ProjectServiceManager:
             await _terminate(process)
         runtime.processes.clear()
         runtime.url = None
+        runtime.upstream_url = None
         runtime.thumbnail_origins = ()
 
-    async def stop(self, repository_url: str) -> dict[str, str | None]:
+    async def stop(
+        self, repository_url: str, project_id: str | None = None
+    ) -> dict[str, str | None]:
         key = normalize_repository_url(repository_url)
-        if key is None or key not in self._profiles:
+        if key is None:
             raise KeyError("project launch profile not found")
+        if key not in self._profiles:
+            if self._project_root is None:
+                raise KeyError("project launch profile not found")
+            _, container, _ = self._docker_names(key, project_id)
+            async with self._lock:
+                try:
+                    state = await self._docker_command(
+                        "docker", "inspect", "--format={{.State.Status}}", container, check=False
+                    )
+                    if state == "running":
+                        await self._docker_command("docker", "stop", "--time", "5", container)
+                except RuntimeError:
+                    pass
+                docker_runtime = self._docker_runtimes.setdefault(
+                    (key, project_id), _DockerRuntime(key, project_id)
+                )
+                docker_runtime.status = "stopped"
+                docker_runtime.url = None
+                docker_runtime.upstream_url = None
+                docker_runtime.logs.clear()
+                return self.status(key, project_id)
         async with self._lock:
-            runtime = self._runtimes.get(key)
-            if runtime is not None:
-                await self._stop_runtime(runtime)
-                runtime.status = "stopped"
-                runtime.logs.clear()
+            process_runtime = self._runtimes.get(key)
+            if process_runtime is not None:
+                await self._stop_runtime(process_runtime)
+                process_runtime.status = "stopped"
+                process_runtime.logs.clear()
             return self.status(key)
 
     async def close(self) -> None:
         async with self._lock:
-            for runtime in self._runtimes.values():
-                await self._stop_runtime(runtime)
-                runtime.status = "stopped"
-                runtime.logs.clear()
+            for process_runtime in self._runtimes.values():
+                await self._stop_runtime(process_runtime)
+                process_runtime.status = "stopped"
+                process_runtime.logs.clear()
+        for docker_runtime in self._docker_runtimes.values():
+            if docker_runtime.status == "running" or docker_runtime.status == "starting":
+                try:
+                    _, container, _ = self._docker_names(
+                        docker_runtime.repository_url, docker_runtime.project_id
+                    )
+                    await self._docker_command("docker", "stop", "--time", "5", container)
+                except Exception:
+                    pass
+                docker_runtime.status = "stopped"
+                docker_runtime.url = None
+                docker_runtime.upstream_url = None

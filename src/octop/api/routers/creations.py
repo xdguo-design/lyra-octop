@@ -205,9 +205,15 @@ def _launchable_item(server: Any, user: Any, item_id: str) -> dict[str, Any]:
     return cast(dict[str, Any], row)
 
 
+async def _stop_item_runtime(server: Any, item: dict[str, Any]) -> None:
+    manager = server.project_service_manager
+    if item["kind"] == "service" and item["url"] and manager and manager.has_profile(item["url"]):
+        await manager.stop(item["url"], item["item_id"])
+
+
 @router.get(
     "/creations/items/{item_id}/launch",
-    summary="Get a trusted local project launch status",
+    summary="Get a registered GitHub project launch status",
     response_model=ProjectLaunchStatus,
 )
 async def get_project_launch_status(
@@ -216,7 +222,7 @@ async def get_project_launch_status(
     server: Any = Depends(get_server),
 ) -> ProjectLaunchStatus:
     row = _launchable_item(server, user, item_id)
-    status = server.project_service_manager.status(row["url"])
+    status = server.project_service_manager.status(row["url"], item_id)
     return ProjectLaunchStatus(
         **status,
         thumbnail_url=_with_thumbnail(row, server.paths.root, user.id)["thumbnail_url"],
@@ -225,7 +231,7 @@ async def get_project_launch_status(
 
 @router.post(
     "/creations/items/{item_id}/launch",
-    summary="Start a trusted local project preview",
+    summary="Clone and start a registered GitHub project preview",
     response_model=ProjectLaunchStatus,
 )
 async def start_project_preview(
@@ -236,13 +242,14 @@ async def start_project_preview(
     row = _launchable_item(server, user, item_id)
     manager = server.project_service_manager
     try:
-        status = await manager.start(row["url"])
+        status = await manager.start(row["url"], item_id)
     except RuntimeError:
-        status = manager.status(row["url"])
+        status = manager.status(row["url"], item_id)
     if status["status"] == "running" and status["url"]:
+        origins = manager.thumbnail_origins(row["url"], item_id)
         await capture_trusted_local_thumbnail(
-            status["url"],
-            manager.thumbnail_origins(row["url"]),
+            origins[0] if origins else status["url"],
+            origins,
             creation_thumbnail_path(server.paths.root, user.id, item_id),
         )
     return ProjectLaunchStatus(
@@ -253,7 +260,7 @@ async def start_project_preview(
 
 @router.delete(
     "/creations/items/{item_id}/launch",
-    summary="Stop a trusted local project preview",
+    summary="Stop a registered GitHub project preview",
     response_model=ProjectLaunchStatus,
 )
 async def stop_project_preview(
@@ -262,7 +269,7 @@ async def stop_project_preview(
     server: Any = Depends(get_server),
 ) -> ProjectLaunchStatus:
     row = _launchable_item(server, user, item_id)
-    status = await server.project_service_manager.stop(row["url"])
+    status = await server.project_service_manager.stop(row["url"], item_id)
     return ProjectLaunchStatus(
         **status,
         thumbnail_url=_with_thumbnail(row, server.paths.root, user.id)["thumbnail_url"],
@@ -375,6 +382,8 @@ async def update_item(
     if previous is None:
         raise OctopError(ErrorCode.NOT_FOUND, "creation item not found")
     values = body.model_dump()
+    if previous["url"] != body.url or (previous["kind"] == "service" and body.kind != "service"):
+        await _stop_item_runtime(server, previous)
     if not repo.update_item(owner_user_id=user.id, item_id=item_id, values=values):
         raise OctopError(ErrorCode.NOT_FOUND, "creation item or folder not found")
     thumbnail_path = creation_thumbnail_path(server.paths.root, user.id, item_id)
@@ -410,6 +419,17 @@ async def delete_item(
     user: Any = Depends(current_user),
     server: Any = Depends(get_server),
 ) -> Response:
+    item = next(
+        (
+            row
+            for row in server.services.creation_repo.list_items(user.id)
+            if row["item_id"] == item_id
+        ),
+        None,
+    )
+    if item is None:
+        raise OctopError(ErrorCode.NOT_FOUND, "creation item not found")
+    await _stop_item_runtime(server, item)
     if not server.services.creation_repo.delete_item(owner_user_id=user.id, item_id=item_id):
         raise OctopError(ErrorCode.NOT_FOUND, "creation item not found")
     await asyncio.to_thread(

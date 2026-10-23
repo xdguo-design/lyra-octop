@@ -3277,12 +3277,13 @@ html::-webkit-scrollbar-thumb:hover {
   flex: none;
 }
 .home-guidance {
-  padding: 10px;
-  margin-top: 12px;
+  padding: 8px 9px;
+  margin-top: 7px;
+  border: 1px solid #dce9f5;
   border-radius: 10px;
-  background: linear-gradient(115deg, #e1f5ff, #e3ebff);
+  background: rgba(255, 255, 255, 0.78);
   color: #213c65;
-  font-size: 13px;
+  font-size: 12px;
 }
 .home-guidance p {
   width: auto;
@@ -3290,13 +3291,16 @@ html::-webkit-scrollbar-thumb:hover {
   margin: 6px 0 0;
 }
 .page-shell {
-  width: 100%;
-  max-width: 620px;
+  width: min(100%, 320px);
+  max-width: 320px;
   height: auto;
   max-height: none;
   min-height: 100dvh;
   padding: 6px 10px max(6px, env(safe-area-inset-bottom));
+  border: 2px solid #b9cee6;
+  border-radius: 14px;
   background: linear-gradient(160deg, #f3fcff, #edf5ff 65%, #f5fcff);
+  box-shadow: 0 10px 28px rgba(41, 73, 117, 0.12);
 }
 .topbar {
   min-height: 30px;
@@ -3330,8 +3334,8 @@ html::-webkit-scrollbar-thumb:hover {
 }
 .page-shell--home .mascot-stage {
   grid-template-columns: 1fr minmax(0, 1.9fr) 1fr;
-  height: clamp(180px, 50vw, 240px);
-  padding-bottom: 34px;
+  height: clamp(170px, 36vw, 220px);
+  padding-bottom: 20px;
 }
 .mascot-stage .mascot-image {
   width: 100%;
@@ -3340,15 +3344,28 @@ html::-webkit-scrollbar-thumb:hover {
   justify-self: center;
 }
 .mascot-stage .mascot-shortcut {
-  min-width: 0;
-  padding: 5px 8px;
-  font-size: 10px;
-  transform: none;
+  min-width: 74px;
+  padding: 7px 10px;
+  border: 1px solid #d4e5f4;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 2px 8px rgba(36, 82, 128, 0.1);
+  color: #244f78;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  transform: translateY(6px);
+}
+.mascot-stage .mascot-shortcut:nth-of-type(1) {
+  transform: translate(clamp(6px, 2vw, 14px), 6px);
+}
+.mascot-stage .mascot-shortcut:nth-of-type(2) {
+  transform: translate(clamp(-14px, -2vw, -6px), 6px);
 }
 .mascot-stage .assistant-greeting {
-  right: 8%;
-  bottom: 8px;
-  left: 8%;
+  right: 12%;
+  bottom: 6px;
+  left: 12%;
 }
 .voice-stage--home {
   display: block;
@@ -3388,20 +3405,20 @@ html::-webkit-scrollbar-thumb:hover {
   box-shadow: none;
 }
 .conversation-card {
-  padding: 12px;
+  padding: 9px 11px;
   background: linear-gradient(115deg, #e1f5ff, #e3ebff);
 }
 .conversation-title {
-  margin-bottom: 8px;
-  font-size: 16px;
+  margin-bottom: 6px;
+  font-size: 15px;
 }
 .conversation-prompts {
-  gap: 7px;
+  gap: 5px;
 }
 .page-shell--home .prompt-button,
 .prompt-button {
-  min-height: 42px;
-  padding: 9px 14px;
+  min-height: 38px;
+  padding: 7px 12px;
   font-size: 14px;
 }
 .scene-mascot {
@@ -3794,6 +3811,29 @@ html::-webkit-scrollbar-thumb:hover {
 .conversation-message-row .conversation-message {
   max-width: calc(100% - 27px);
 }
+.conversation-message-row--patient-info .conversation-message {
+  max-width: 100%;
+}
+.conversation-message-row:not(.conversation-message-row--patient-info) {
+  position: relative;
+  display: block;
+}
+.conversation-message-row:not(.conversation-message-row--patient-info) .conversation-message {
+  max-width: 100%;
+}
+.conversation-message-row:not(.conversation-message-row--patient-info) > .conversation-message__speaker {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+}
+.conversation-message-row:not(.conversation-message-row--patient-info) .conversation-message__header,
+.conversation-message-row--application .application-message__header {
+  padding-right: 38px;
+}
+.conversation-message-row:not(.conversation-message-row--patient-info)
+  .conversation-message:not(.conversation-message--titled) {
+  padding-right: 38px;
+}
 .conversation-message__speaker {
   flex-basis: 20px;
   width: 20px;
@@ -4091,6 +4131,12 @@ html::-webkit-scrollbar-thumb:hover {
   flex: none;
   font-size: 11px;
 }
+.conversation-message__header-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
 .conversation-message__body {
   margin: 0;
 }
@@ -4363,7 +4409,7 @@ html::-webkit-scrollbar-thumb:hover {
 }
 /* 首页固定话术：直接接在「智能导诊」卡片下方，不做独立弹层 */
 .home-guide-reply {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
 }
 .home-guide-reply .conversation-message__speaker svg {
   width: 15px;
@@ -4600,15 +4646,15 @@ html::-webkit-scrollbar-thumb:hover {
   position: absolute;
   right: auto;
   bottom: 12px;
-  left: calc(50% + 44px);
-  width: 32px;
-  height: 32px;
-  min-height: 32px;
+  left: calc(50% + 47px);
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
   padding: 0;
   border: 1px solid #dce8f6;
-  border-radius: 18px;
+  border-radius: 50%;
   background: #fff;
-  font-size: 18px;
+  font-size: 14px;
 }
 .voice-pill__manual i {
   transition: transform 0.2s;
@@ -4722,5 +4768,13 @@ html::-webkit-scrollbar-thumb:hover {
     animation: none;
     box-shadow: 0 0 8px 3px rgb(57 126 255 / 35%);
     opacity: 1;
+  }
+}
+@media (max-width: 380px) {
+  .page-shell--home .mascot-stage .mascot-image {
+    transform: translateY(-8px);
+  }
+  .page-shell--home .mascot-stage .assistant-greeting {
+    bottom: 4px;
   }
 }

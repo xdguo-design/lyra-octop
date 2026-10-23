@@ -14,7 +14,13 @@ export interface ACPRunnerConfig {
 
 export interface ACPConfig {
   tool_enabled: boolean;
+  default_model?: string | null;
   runners: Record<string, ACPRunnerConfig>;
+}
+
+export interface ACPModelOption {
+  value: string;
+  label: string;
 }
 
 export function parseArgsText(value: unknown): string[] {

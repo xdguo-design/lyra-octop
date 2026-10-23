@@ -259,6 +259,10 @@ describe('complete admission workflow', () => {
       wrapper.find('.conversation-message--patient-info .conversation-message__header')
     expect(header().text()).toContain('患者信息填写')
     expect(header().text()).toContain('必填（5/5）')
+    expect(header().find('button[aria-label="播放此回复"]').exists()).toBe(true)
+    expect(
+      wrapper.findAll('.conversation-message-row--patient-info > .conversation-message__speaker').length
+    ).toBe(0)
     wrapper.vm.fields.phone = ''
     await settle(wrapper)
     expect(header().text()).toContain('必填（4/5）')
@@ -277,6 +281,7 @@ describe('complete admission workflow', () => {
     })
     await settle(wrapper)
     expect(header().text()).toContain('必填（0/5）')
+    expect(header().find('button[aria-label="播放此回复"]').exists()).toBe(true)
     wrapper.destroy()
   })
 
@@ -1234,6 +1239,24 @@ describe('complete admission workflow', () => {
     expect(wrapper.vm.page).toBe('form')
     expect(wrapper.vm.conversationVisible).toBe(true)
     expect(wrapper.vm.fields.name).toBe('演示患者')
+    wrapper.destroy()
+  })
+
+  it('starts voice input after confirming the application', async () => {
+    const wrapper = mountApp()
+    api.verify.mockResolvedValue({ identityToken: 'identity-demo-token', fields: validFields() })
+    await startAdmission(wrapper)
+    await wrapper.find('.reader-trigger').trigger('click')
+    await settle(wrapper)
+    expect(wrapper.vm.page).toBe('applications')
+
+    await wrapper.find('.application-continue').trigger('click')
+    await loadValidation()
+    await settle(wrapper)
+
+    expect(wrapper.vm.page).toBe('form')
+    expect(wrapper.find('.voice-pill--mic').exists()).toBe(true)
+    expect(wrapper.find('.voice-pill--text').exists()).toBe(false)
     wrapper.destroy()
   })
 

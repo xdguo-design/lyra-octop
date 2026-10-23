@@ -413,6 +413,8 @@ class OctopServer:
         self.project_service_manager = ProjectServiceManager(
             config.workbench_launch_root,
             parse_profiles(config.workbench_launch_profiles),
+            self.paths.root / "projects",
+            config.workbench_preview_domain,
         )
 
         from octop.infra.utils.browser_media import (  # noqa: PLC0415

@@ -129,6 +129,12 @@ def test_loads_workbench_launch_profiles(tmp_path: Path):
     assert cfg.workbench_launch_profiles == [profile]
 
 
+def test_workbench_preview_domain_env_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("OCTOP_WORKBENCH_PREVIEW_DOMAIN", "Preview.Example.com")
+    cfg = load_config(tmp_path / "config.json")
+    assert cfg.workbench_preview_domain == "Preview.Example.com"
+
+
 def test_loads_max_upload_mb(tmp_path: Path):
     cfg_path = tmp_path / "config.json"
     cfg_path.write_text(json.dumps({"max_upload_mb": 50}))

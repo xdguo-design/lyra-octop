@@ -8,7 +8,10 @@ import logging
 import re
 import uuid
 from pathlib import Path
+from time import perf_counter
 from typing import Any, Literal, cast
+
+from langchain_core.callbacks import BaseCallbackHandler
 
 from octop.infra.admission_registration_demo import REGIONS
 from octop.infra.agents.providers.reasoning import (
@@ -25,13 +28,15 @@ _ADMISSION_AGENT_NAME = "入院登记助手"
 _ADMISSION_AGENT_AVATAR = "/experts/avatars/admission-assistant.png"
 _ADMISSION_AGENT_LOCK = asyncio.Lock()
 _ADMISSION_AGENT_RUNTIME = {
-    "max_iters": 12,
+    # LangGraph also counts middleware: one tool-free model response takes 13 steps.
+    "max_iters": 32,
     # 输入预算按 tokens 计且包含工具 schema：patient-info 技能系统消息 ~2.2K +
     # 运行时重新注入的内置工具目录 ~8.6K + ≤6000B 转写负载 ~2.6K，合计近 14K；
     # 低于此值调用会 ContextOverflowError → 503（语音模式整体不可用）。
     "max_input_length": 20000,
     "temperature": 0.2,
     "max_tokens": 512,
+    "model_retry_enabled": False,
 }
 _ADMISSION_AGENT_REASONING = {"mode": "disabled"}
 _SKILL_DIR = Path(__file__).with_name("admission_demo_skills")
@@ -116,6 +121,76 @@ class AdmissionModelRateLimitError(RuntimeError):
 
 class AdmissionContextTooLongError(ValueError):
     """The structured admission context exceeds the active model input budget."""
+
+
+class _AdmissionModelTiming(BaseCallbackHandler):
+    """Measure provider model time without retaining prompts or completions."""
+
+    def __init__(self) -> None:
+        self._started: dict[str, float] = {}
+        self.elapsed_ms = 0
+        self.calls = 0
+        self.input_tokens = 0
+        self.output_tokens = 0
+        self.message_count = 0
+        self.system_chars = 0
+        self.user_chars = 0
+        self.tool_names: list[str] = []
+        self.reasoning_tokens = 0
+
+    def on_chat_model_start(
+        self,
+        serialized: dict[str, Any],
+        messages: list[list[Any]],
+        *,
+        run_id: Any,
+        **kwargs: Any,
+    ) -> None:
+        self._started[str(run_id)] = perf_counter()
+        for batch in messages:
+            self.message_count += len(batch)
+            for message in batch:
+                content = getattr(message, "content", "")
+                if not isinstance(content, str):
+                    continue
+                if getattr(message, "type", "") == "system":
+                    self.system_chars += len(content)
+                elif getattr(message, "type", "") == "human":
+                    self.user_chars += len(content)
+        invocation = kwargs.get("invocation_params")
+        tools = invocation.get("tools") if isinstance(invocation, dict) else None
+        if isinstance(tools, list):
+            for tool in tools:
+                if isinstance(tool, dict):
+                    function = tool.get("function")
+                    name = function.get("name") if isinstance(function, dict) else tool.get("name")
+                else:
+                    name = getattr(tool, "name", None)
+                if isinstance(name, str) and name not in self.tool_names:
+                    self.tool_names.append(name)
+
+    def on_llm_end(self, response: Any, *, run_id: Any, **kwargs: Any) -> None:
+        self._finish(run_id, response)
+
+    def on_llm_error(self, error: BaseException, *, run_id: Any, **kwargs: Any) -> None:
+        self._finish(run_id)
+
+    def _finish(self, run_id: Any, response: Any = None) -> None:
+        started = self._started.pop(str(run_id), None)
+        if started is not None:
+            self.elapsed_ms += round((perf_counter() - started) * 1000)
+            self.calls += 1
+        generations = getattr(response, "generations", None) or []
+        if generations:
+            from octop.infra.agents.threads.context_breakdown import usage_dict_from_message
+
+            for batch in generations:
+                for generation in batch:
+                    usage = usage_dict_from_message(getattr(generation, "message", None))
+                    if usage:
+                        self.input_tokens += int(usage.get("input_tokens", 0))
+                        self.output_tokens += int(usage.get("output_tokens", 0))
+                        self.reasoning_tokens += int(usage.get("reasoning_tokens", 0))
 
 
 def _is_model_rate_limited(exc: Exception) -> bool:
@@ -247,6 +322,8 @@ async def provision_admission_agent(server: Any) -> Any:
             any(config.get(key) != value for key, value in _ADMISSION_AGENT_RUNTIME.items())
             or config.get("reasoning") != _ADMISSION_AGENT_REASONING
         ):
+            from octop.infra.agents.settings.runtime_limits import AGENT_RUNTIME_CONFIG_KEYS
+
             row = await registry.update(
                 _ADMISSION_AGENT_ID,
                 config_json=json.dumps(
@@ -257,7 +334,11 @@ async def provision_admission_agent(server: Any) -> Any:
                     },
                     ensure_ascii=False,
                 ),
-                **_ADMISSION_AGENT_RUNTIME,
+                **{
+                    key: value
+                    for key, value in _ADMISSION_AGENT_RUNTIME.items()
+                    if key in AGENT_RUNTIME_CONFIG_KEYS
+                },
             )
         return row
 
@@ -288,7 +369,7 @@ def _disable_admission_tools(registry: Any) -> None:
 
     try:
         registry.sync_tools_disabled(
-            _ADMISSION_AGENT_ID, {entry.name for entry in BUILTIN_TOOL_CATALOG}
+            _ADMISSION_AGENT_ID, {entry.name for entry in BUILTIN_TOOL_CATALOG} | {"delete"}
         )
     except Exception:
         logger.debug("admission demo tool denylist sync failed", exc_info=True)
@@ -329,6 +410,7 @@ async def _call_admission_skill_with_model(
     payload: dict[str, Any],
     user_id: int | None = None,
 ) -> tuple[str | None, str]:
+    prepare_started = perf_counter()
     await _ensure_admission_agent(server)
     registry = server.app_runtime.agent_registry
     _disable_admission_tools(registry)
@@ -348,6 +430,10 @@ async def _call_admission_skill_with_model(
     configurable: dict[str, Any] = {}
     if overrides:
         configurable["octop_reasoning_overrides"] = overrides
+    if skill == "admission-router":
+        configurable["model_settings"] = {"max_tokens": 256}
+    elif payload.get("mode") == "candidate_confirmation":
+        configurable["model_settings"] = {"max_tokens": 64}
     # 技能内容作为显式 system 消息注入：运行时的 skills 注入不稳定
     # （短输入时模型偶尔当作无结构化任务自由作答），直接放进 messages 保证到达。
     skill_text = await _read_skill_text(skill)
@@ -367,6 +453,7 @@ async def _call_admission_skill_with_model(
             logger.info(
                 "admission address MCP is unavailable to current user; continuing without it"
             )
+    timing = _AdmissionModelTiming()
     request = {
         "messages": [
             {"role": "system", "content": skill_text},
@@ -379,14 +466,35 @@ async def _call_admission_skill_with_model(
         "skills": [],
         "mcp_servers": mcp_servers,
         "configurable": configurable,
+        "callbacks": [timing],
     }
+    prepare_ms = round((perf_counter() - prepare_started) * 1000)
+    call_started = perf_counter()
     try:
-        result = await registry.call(_ADMISSION_AGENT_ID, request)
-    except OctopError as exc:
-        if not mcp_servers or exc.code != ErrorCode.CONNECTOR_MCP_LOAD_FAILED:
-            raise
-        logger.warning("admission address MCP failed; retrying this turn without MCP")
-        result = await registry.call(_ADMISSION_AGENT_ID, {**request, "mcp_servers": []})
+        try:
+            result = await registry.call(_ADMISSION_AGENT_ID, request)
+        except OctopError as exc:
+            if not mcp_servers or exc.code != ErrorCode.CONNECTOR_MCP_LOAD_FAILED:
+                raise
+            logger.warning("admission address MCP failed; retrying this turn without MCP")
+            result = await registry.call(_ADMISSION_AGENT_ID, {**request, "mcp_servers": []})
+    finally:
+        logger.info(
+            "admission model timing skill=%s model=%s prepare_ms=%d agent_ms=%d model_ms=%d model_calls=%d input_tokens=%d output_tokens=%d reasoning_tokens=%d messages=%d system_chars=%d user_chars=%d tools=%s",
+            skill,
+            model_ref,
+            prepare_ms,
+            round((perf_counter() - call_started) * 1000),
+            timing.elapsed_ms,
+            timing.calls,
+            timing.input_tokens,
+            timing.output_tokens,
+            timing.reasoning_tokens,
+            timing.message_count,
+            timing.system_chars,
+            timing.user_chars,
+            ",".join(timing.tool_names) or "none",
+        )
     messages = result.get("messages") if isinstance(result, dict) else None
     if not isinstance(messages, list):
         return None, model_name

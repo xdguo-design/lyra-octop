@@ -143,7 +143,7 @@ describe("CreationsPage", () => {
     expect(screen.queryByTitle("智能入院登记 · 作品")).toBeNull();
   });
 
-  it("embeds the configured local project preview and returns to Creations", async () => {
+  it("embeds a registered GitHub project preview and returns to Creations", async () => {
     const itemId = "project-1";
     const previewUrl = "http://127.0.0.1:8090/";
     const openSpy = vi.spyOn(window, "open").mockReturnValue(null);
@@ -159,7 +159,7 @@ describe("CreationsPage", () => {
               kind: "service",
               name: "数据转换平台",
               description: "",
-              url: "https://github.com/xdguo-design/data-upload-product",
+              url: "https://github.com/xdguo-design/lyra-gateway",
               folder_id: null,
               created_at: 1,
               updated_at: 1,
@@ -211,10 +211,6 @@ describe("CreationsPage", () => {
     const card = await screen
       .findByText("数据转换平台")
       .then((node) => node.closest(".cr-card") as HTMLElement);
-    expect(card.querySelector(".cr-thumb img")).toHaveAttribute(
-      "src",
-      "/workbench/thumbs/data-upload-product.png",
-    );
     fireEvent.click(within(card).getByRole("button", { name: "启动预览" }));
     fireEvent.click(
       await within(card).findByRole("button", { name: "打开预览" }),
@@ -224,12 +220,9 @@ describe("CreationsPage", () => {
     expect(openSpy).not.toHaveBeenCalled();
     expect(
       within(card).getByRole("link", {
-        name: /github.com\/xdguo-design\/data-upload-product/,
+        name: /github.com\/xdguo-design\/lyra-gateway/,
       }),
-    ).toHaveAttribute(
-      "href",
-      "https://github.com/xdguo-design/data-upload-product",
-    );
+    ).toHaveAttribute("href", "https://github.com/xdguo-design/lyra-gateway");
 
     fireEvent.click(screen.getByRole("button", { name: "创作" }));
     expect(screen.queryByTitle("数据转换平台 · 作品")).toBeNull();

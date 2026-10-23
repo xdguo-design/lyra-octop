@@ -47,6 +47,7 @@ async def test_projects_folders_and_thread_assignments_are_account_scoped(
     assert (await client.get("/api/workbench", headers=other_auth)).json() == {
         "projects": [],
         "folders": [],
+        "recycled_folders": [],
         "assignments": [],
     }
 
@@ -55,9 +56,27 @@ async def test_projects_folders_and_thread_assignments_are_account_scoped(
     )
     assert deleted.status_code == 204
     index = (await client.get("/api/workbench", headers=admin_auth)).json()
+    assert index["folders"] == []
+    assert index["recycled_folders"][0]["folder_id"] == folder["folder_id"]
     assert index["assignments"] == [
-        {"thread_id": "thread_workbench", "project_id": project["project_id"], "folder_id": None}
+        {
+            "thread_id": "thread_workbench",
+            "project_id": project["project_id"],
+            "folder_id": folder["folder_id"],
+        }
     ]
+    denied_restore = await client.post(
+        f"/api/workbench/folders/{folder['folder_id']}/restore", headers=other_auth
+    )
+    assert denied_restore.status_code == 404
+
+    restored = await client.post(
+        f"/api/workbench/folders/{folder['folder_id']}/restore", headers=admin_auth
+    )
+    assert restored.status_code == 204
+    index = (await client.get("/api/workbench", headers=admin_auth)).json()
+    assert index["folders"][0]["folder_id"] == folder["folder_id"]
+    assert index["recycled_folders"] == []
 
     deleted = await client.delete(
         f"/api/workbench/projects/{project['project_id']}", headers=admin_auth

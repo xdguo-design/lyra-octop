@@ -327,6 +327,9 @@ export const AgentCard = memo(function AgentCard({
                     : t("experts.share.badge")}
                 </Tag>
               )}
+              {agent.chat_visible === false && (
+                <Tag>{t("experts.chatHiddenBadge")}</Tag>
+              )}
               <RemoteExpertHint agent={agent} />
             </div>
             <div className={styles.agentCardIdRow}>

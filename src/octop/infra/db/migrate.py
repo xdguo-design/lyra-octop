@@ -2101,6 +2101,21 @@ def _apply_sqlite_migration(db: DatabasePool, version: int, path: Path) -> None:
             )
             conn.execute("UPDATE _schema_version SET version = ?", (version,))
         return
+    if version == 28:
+        if _table_exists(db, "threads"):
+            _ensure_column(db, "threads", "acp_runner", "TEXT")
+            _ensure_column(db, "threads", "acp_model", "TEXT")
+        with db.connect() as conn:
+            conn.execute("UPDATE _schema_version SET version = ?", (version,))
+        return
+    if version == 29:
+        if _table_exists(db, "workbench_folders"):
+            _ensure_column(db, "workbench_folders", "deleted_at", "INTEGER")
+        if _table_exists(db, "agents"):
+            _ensure_column(db, "agents", "chat_visible", "INTEGER NOT NULL DEFAULT 1")
+        with db.connect() as conn:
+            conn.execute("UPDATE _schema_version SET version = ?", (version,))
+        return
     sql = path.read_text(encoding="utf-8")
     with db.connect() as conn:
         conn.executescript(sql)

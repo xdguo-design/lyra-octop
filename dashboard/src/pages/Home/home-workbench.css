@@ -277,10 +277,29 @@
   align-items: center;
   padding-left: 12px;
 }
+.wb-project-folder-toggle {
+  position: absolute;
+  left: 12px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--wbk-250);
+}
+.wb-project-folder-toggle svg {
+  transition: transform 0.15s ease;
+}
+.wb-project-folder-toggle.is-collapsed svg {
+  transform: rotate(-90deg);
+}
 .wb-project-folder-row .wb-nav-item {
   flex: 1;
   min-width: 0;
-  padding-left: 12px;
+  padding-left: 22px;
 }
 .wb-project-folder-row .wb-project-actions {
   right: 4px;
@@ -718,6 +737,8 @@ html[data-theme="dark"] {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
   gap: 0;
   padding: 26px 16px 15px;
   background: var(--wbk-9);
@@ -896,6 +917,53 @@ html[data-theme="dark"] {
   flex-direction: column;
   gap: 3px;
   scrollbar-width: thin;
+}
+.wb-recycle-section {
+  display: block;
+  margin-top: 12px;
+  letter-spacing: normal;
+}
+.wb-recycled-folders {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 7px;
+}
+.wb-recycled-folder {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 5px 7px;
+  border-radius: 6px;
+  color: var(--wbk-20);
+  font-size: 12px;
+}
+.wb-recycled-folder > span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wb-recycled-folder button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 23px;
+  height: 23px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.wb-recycled-folder button:hover {
+  background: var(--wbk-251);
+}
+.wb-recycle-empty {
+  padding: 3px 7px;
+  color: var(--wbk-20);
+  font-size: 11px;
 }
 .wb-task-empty {
   margin: 10px 10px;
@@ -1306,20 +1374,25 @@ html[data-theme="dark"] {
   margin: 5px auto 19px;
 }
 .wb-composer {
-  padding: 16px 17px 12px;
+  padding: 8px 12px 5px 14px;
   background: var(--wbk-3);
-  border: 1.5px solid var(--wbk-80);
-  border-radius: 15px;
-  box-shadow: 0 8px 33px var(--wbk-224);
+  border: 1px solid var(--wbk-80);
+  border-radius: 24px;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
+  transition:
+    border-color var(--fn-transition-fast),
+    box-shadow var(--fn-transition-fast);
 }
 .wb-composer:focus-within {
-  border-color: var(--wbk-81);
-  box-shadow: 0 0 0 3px var(--wbk-225);
+  border-color: color-mix(in srgb, var(--fn-color-brand) 30%, transparent);
+  box-shadow:
+    0 0 0 4px var(--fn-color-brand-glow),
+    0 22px 46px var(--fn-color-brand-shadow);
 }
 .wb-composer textarea {
   display: block;
   width: 100%;
-  min-height: 49px;
+  min-height: 46px;
   max-height: 145px;
   resize: vertical;
   outline: none !important;
@@ -1337,59 +1410,24 @@ html[data-theme="dark"] {
 .wb-composer-bottom {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-top: 11px;
-}
-.wb-composer-model {
-  display: flex;
-  align-items: center;
   gap: 6px;
-  max-width: 220px;
-  padding: 6px 10px;
-  background: var(--wbk-83);
-  color: var(--wbk-84);
-  border-radius: 7px;
-  font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-}
-.wb-composer-model {
-  width: max-content;
-  margin: 0 0 20px;
-  border: 1px solid var(--wbk-209);
-}
-.wb-composer-model span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.wb-composer-model button {
-  display: grid;
-  place-items: center;
-  flex: none;
-  padding: 1px;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-.wb-composer-model button:hover {
-  color: var(--wbk-235);
+  margin-top: 4px;
 }
 .wb-composer-model-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   flex: none;
   max-width: min(260px, 34vw);
-  height: 34px;
-  padding: 0 11px;
+  height: 30px;
+  padding: 0 9px;
   overflow: hidden;
   border: 1px solid var(--wbk-209);
   border-radius: 999px;
   background: var(--wbk-62);
   color: var(--wbk-216);
   font:
-    500 12px/1 PingFang SC,
+    500 11px/1 PingFang SC,
     Microsoft YaHei,
     sans-serif;
   cursor: pointer;
@@ -1409,6 +1447,28 @@ html[data-theme="dark"] {
 }
 .wb-composer-model-trigger svg {
   flex: none;
+}
+.wb-composer-reasoning {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--wbk-209);
+  border-radius: 999px;
+  background: var(--wbk-62);
+  color: var(--wbk-216);
+  font:
+    500 11px/1 PingFang SC,
+    Microsoft YaHei,
+    sans-serif;
+  cursor: pointer;
+}
+.wb-composer-reasoning.is-active {
+  border-color: var(--wbk-212);
+  background: var(--wbk-233);
+  color: var(--wbk-235);
 }
 @media (max-width: 740px) {
   .wb-composer-bottom {
@@ -1444,14 +1504,14 @@ html[data-theme="dark"] {
 }
 .wb-composer-tip {
   color: var(--wbk-86);
-  font-size: 11px;
+  font-size: 10px;
 }
 .wb-composer-send {
   display: grid;
   flex: none;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   color: white !important;
   background: var(--wbk-87);
   border: none;
@@ -1462,22 +1522,6 @@ html[data-theme="dark"] {
 }
 .wb-composer-send.is-stop {
   background: var(--wbk-89);
-}
-.wb-composer-caption {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 4px 0;
-  font:
-    11px/1.5 "PingFang SC",
-    "Microsoft YaHei",
-    sans-serif;
-  color: var(--wbk-90);
-}
-.wb-composer-caption span {
-  display: flex;
-  align-items: center;
-  gap: 5px;
 }
 .wb-alert {
   margin: 7px 0;
@@ -2143,7 +2187,8 @@ html[data-theme="dark"] {
     margin: 6px auto 9px;
   }
   .wb-composer {
-    padding: 10px 11px;
+    padding: 6px 10px 6px 14px;
+    border-radius: 20px;
   }
   .wb-composer textarea {
     min-height: 37px;
@@ -2151,13 +2196,6 @@ html[data-theme="dark"] {
   }
   .wb-composer-privacy,
   .wb-composer-tip {
-    display: none;
-  }
-  .wb-composer-caption {
-    padding-top: 6px;
-    font-size: 10px;
-  }
-  .wb-composer-caption > span:last-child {
     display: none;
   }
   .wb-conversation-head {
@@ -2222,7 +2260,7 @@ html[data-theme="dark"] {
   margin: 0 auto;
 }
 .wb-center-column .wb-composer-wrap {
-  margin: 6px auto 19px;
+  margin: 6px auto 8px;
 }
 .wb-center-column .wb-composer-wrap.wb-composer-empty {
   margin-top: auto;
@@ -3079,9 +3117,6 @@ html[data-theme="dark"] {
     flex-wrap: wrap;
     margin-top: 12px;
   }
-  .wb-composer-caption {
-    display: none;
-  }
   .wb-composer-wrap {
     margin-bottom: 12px;
   }
@@ -3212,8 +3247,8 @@ html[data-theme="dark"] {
   display: grid;
   place-items: center;
   flex: none;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border: 1px solid var(--wbk-209);
   border-radius: 50%;
   background: var(--wbk-62);
@@ -3280,16 +3315,16 @@ html[data-theme="dark"] {
 .wb-composer-agent {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   flex: none;
-  height: 34px;
-  padding: 0 11px 0 12px;
+  height: 30px;
+  padding: 0 9px;
   border: 1px solid var(--wbk-209);
   border-radius: 999px;
   background: var(--wbk-62);
   color: var(--wbk-216);
   font:
-    500 12px/1 PingFang SC,
+    500 11px/1 PingFang SC,
     Microsoft YaHei,
     sans-serif;
   cursor: pointer;
@@ -4147,8 +4182,8 @@ html[data-skin] .wb-root .wb-set-theme.is-active {
   color: var(--fn-text-primary);
   background: var(--fn-bg-secondary);
 }
-html[data-skin] .wb-root .wb-composer-model,
 html[data-skin] .wb-root .wb-composer-model-trigger,
+html[data-skin] .wb-root .wb-composer-reasoning,
 html[data-skin] .wb-root .wb-composer-agent,
 html[data-skin] .wb-root .wb-composer-project,
 html[data-skin] .wb-root .wb-composer-plus,
@@ -4160,6 +4195,11 @@ html[data-skin] .wb-root .wb-platform-stop {
   color: var(--fn-text-primary);
   background-color: color-mix(in srgb, var(--fn-bg-secondary) 88%, transparent);
   border-color: var(--fn-border-primary);
+}
+html[data-skin] .wb-root .wb-composer-reasoning.is-active {
+  color: var(--fn-color-brand);
+  background-color: color-mix(in srgb, var(--fn-color-brand) 12%, transparent);
+  border-color: color-mix(in srgb, var(--fn-color-brand) 35%, transparent);
 }
 html[data-skin] .wb-root input,
 html[data-skin] .wb-root select,
@@ -4175,7 +4215,6 @@ html[data-skin] .wb-root .wb-composer textarea {
 html[data-skin] .wb-root .wb-composer textarea::placeholder,
 html[data-skin] .wb-root .wb-composer-tip,
 html[data-skin] .wb-root .wb-composer-privacy,
-html[data-skin] .wb-root .wb-composer-caption,
 html[data-skin] .wb-root .wb-entry-card p,
 html[data-skin] .wb-root .wb-entry-meta,
 html[data-skin] .wb-root .wb-panel-caption,
@@ -4274,6 +4313,7 @@ html[data-skin] .wb-theme-popup .ant-select-item {
 .wb-project-group .wb-task-row {
   padding-left: 22px;
 }
-.wb-project-folder-row + .wb-task-row {
+.wb-project-folder-row + .wb-task-row,
+.wb-project-folder-content .wb-task-row {
   padding-left: 34px;
 }

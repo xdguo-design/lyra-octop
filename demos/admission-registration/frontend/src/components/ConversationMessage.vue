@@ -2,7 +2,10 @@
   <div
     v-if="message.role === 'assistant'"
     class="conversation-message-row"
-    :class="{ 'conversation-message-row--application': message.application }"
+    :class="{
+      'conversation-message-row--application': message.application,
+      'conversation-message-row--patient-info': message.patientInfo,
+    }"
   >
     <section
       v-if="message.application"
@@ -34,11 +37,21 @@
     >
       <header v-if="headerTitle" class="conversation-message__header">
         <strong>{{ headerTitle }}</strong>
-        <span v-if="message.patientInfo"
-          >必填（{{ requiredProgress.completed }}/{{
-            requiredProgress.total
-          }}）</span
-        >
+        <div v-if="message.patientInfo" class="conversation-message__header-actions">
+          <span>必填（{{ requiredProgress.completed }}/{{ requiredProgress.total }}）</span>
+          <button
+            class="conversation-message__speaker"
+            type="button"
+            aria-label="播放此回复"
+            :disabled="disabled"
+            @click="$emit('speak', message.text)"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 9v6h4l5 4V5L7 9H3z" />
+              <path d="M16 9a5 5 0 0 1 0 6M18.5 6.5a9 9 0 0 1 0 11" />
+            </svg>
+          </button>
+        </div>
       </header>
       <p class="conversation-message__body">
         <span v-if="message.modelName" class="conversation-message__model">
@@ -62,6 +75,7 @@
       </p>
     </div>
     <button
+      v-if="!message.patientInfo"
       class="conversation-message__speaker"
       type="button"
       aria-label="播放此回复"

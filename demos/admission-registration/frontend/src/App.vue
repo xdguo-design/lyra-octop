@@ -1650,6 +1650,7 @@ export default {
         this.regionOptions = regionResponse.items || [];
         validation.setRegions(this.regionOptions);
         this.validationReady = true;
+        this.conversationInputMode = "voice";
         this.conversationVisible = true;
         this.page = "form";
         this.step = 1;

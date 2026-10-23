@@ -54,6 +54,7 @@ def test_parse_profiles_matches_only_normalized_repository_url() -> None:
     assert (
         normalize_repository_url("https://github.com:8443/xdguo-design/data-upload-product") is None
     )
+    assert normalize_repository_url("https://github.com/../escape") is None
 
 
 def test_parse_profiles_rejects_shell_commands_and_invalid_relative_paths() -> None:
@@ -153,3 +154,76 @@ async def test_start_failure_cleans_started_processes(tmp_path: Path) -> None:
     assert manager.status(url)["status"] == "failed"
     assert manager._runtimes[url].processes == []
     await manager.close()
+
+
+@pytest.mark.asyncio
+async def test_github_project_clones_builds_and_manages_a_loopback_container(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    url = "https://github.com/xdguo-design/lyra-gateway"
+    manager = ProjectServiceManager(None, {}, tmp_path / "projects", "preview.example.com")
+    calls: list[tuple[str, ...]] = []
+    project_id = "project-1"
+
+    async def fake_command(*args: str, cwd: Path | None = None, **_kwargs: object) -> str:
+        calls.append(args)
+        if args[:2] == ("git", "clone"):
+            target = Path(args[-1])
+            target.mkdir()
+            (target / "Dockerfile").write_text("FROM scratch\nEXPOSE 8765\n", encoding="utf-8")
+        if args[:2] == ("docker", "port"):
+            return "127.0.0.1:49152"
+        if args[:3] == ("docker", "image", "inspect"):
+            return ""  # No cached image.
+        if args[:2] == ("docker", "inspect"):
+            return "running" if any(call[:2] == ("docker", "run") for call in calls) else ""
+        return "ok"
+
+    async def healthy(_url: str) -> None:
+        return None
+
+    monkeypatch.setattr(manager, "_docker_command", fake_command)
+    monkeypatch.setattr(manager, "_wait_docker_health", healthy)
+
+    assert manager.has_profile(url)
+    first = await manager.start(url, project_id)
+    second = await manager.start(url, project_id)
+    assert first["status"] == "running"
+    assert first["url"].startswith("https://")
+    assert second == first
+    preview_host = first["url"].removeprefix("https://")
+    assert manager.is_preview_host(preview_host)
+    assert manager.preview_upstream_for_host(preview_host) == "http://127.0.0.1:49152"
+    assert manager.preview_upstream_for_host("unknown.preview.example.com") is None
+    assert not manager.is_preview_host("random.preview.example.com.evil")
+    assert manager.thumbnail_origins(url, project_id) == ("http://127.0.0.1:49152",)
+    assert sum(call[:2] == ("git", "clone") for call in calls) == 1
+    assert sum(call[:2] == ("docker", "run") for call in calls) == 1
+    assert any("127.0.0.1::8765" in call for call in calls)
+
+    stopped = await manager.stop(url, project_id)
+    assert stopped["status"] == "stopped"
+    assert manager.preview_upstream_for_host(preview_host) is None
+    assert any(call[:2] == ("docker", "stop") for call in calls)
+    assert manager._docker_names(url, project_id)[1] != manager._docker_names(url, "project-2")[1]
+
+
+@pytest.mark.asyncio
+async def test_github_project_without_dockerfile_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    url = "https://github.com/example/no-image"
+    manager = ProjectServiceManager(None, {}, tmp_path / "projects")
+
+    async def fake_clone(_url: str, checkout: Path) -> None:
+        checkout.mkdir(parents=True)
+
+    async def fake_command(*_args: str, **_kwargs: object) -> str:
+        return "ok"
+
+    monkeypatch.setattr(manager, "_clone_project", fake_clone)
+    monkeypatch.setattr(manager, "_docker_command", fake_command)
+    with pytest.raises(RuntimeError, match="Dockerfile"):
+        await manager.start(url, "project-1")
+    assert manager.status(url, "project-1")["status"] == "failed"
+    assert manager.thumbnail_origins(url, "project-1") == ()
