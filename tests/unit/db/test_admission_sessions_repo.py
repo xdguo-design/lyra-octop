@@ -151,6 +151,40 @@ def test_patient_sessions_can_be_deleted_without_touching_other_scopes(repo) -> 
     assert sessions.get_owned(other_application.session_id, owner_id) is None
 
 
+def test_delete_expired_removes_sessions_and_cascades_turns(repo) -> None:
+    sessions, owner_id, _other_id = repo
+    expired = sessions.create(
+        session_id="admission-expired",
+        owner_user_id=owner_id,
+        patient_ref="patient-expired",
+        application_id="APP-DEMO-EXPIRED",
+        phase="form",
+        facts_json='{"phone":{"value":"13800138000"}}',
+        summary_json='{"phone":"13800138000"}',
+        expires_at=4_000_000_000,
+    )
+    assert sessions.append_turn(
+        session_id=expired.session_id,
+        owner_user_id=owner_id,
+        expected_revision=0,
+        turn_id="expired-turn",
+        previous_turn_id=None,
+        speaker="patient",
+        text="sensitive patient data",
+        response="private reply",
+        action="voice_turn",
+        fields_json='{"phone":"13800138000"}',
+        status="completed",
+        facts_json='{"phone":{"value":"13800138000"}}',
+        summary_json='{"phone":"13800138000"}',
+        phase="form",
+    )
+
+    assert sessions.delete_expired(now=4_000_000_001) == 1
+    assert sessions.get_owned(expired.session_id, owner_id) is None
+    assert sessions.list_turns(expired.session_id, owner_id) == []
+
+
 def test_create_or_get_is_idempotent_for_repeated_or_concurrent_selection(repo) -> None:
     from concurrent.futures import ThreadPoolExecutor
 
