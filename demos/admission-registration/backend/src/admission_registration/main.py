@@ -488,7 +488,8 @@ async def ai_candidates(
                     exc,
                 )
                 region_tree = REGIONS
-            pages = (1, 2) if body.page == 0 else (body.page,)
+            # The platform Skill supports page=0 for both field groups in one model call.
+            pages = (0,) if body.page == 0 else (body.page,)
             platform_responses = await asyncio.gather(
                 *(
                     client.post(
