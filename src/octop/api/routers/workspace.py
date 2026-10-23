@@ -524,4 +524,75 @@ async def grep_files(
     agent_id: str,
     pattern: str,
     path: str = "/",
-    from_workspace: bool = Query(defa
+    from_workspace: bool = Query(default=False, description=_FROM_WORKSPACE_DESC),
+    as_user: int | None = None,
+    user: Any = Depends(current_user),
+    server: Any = Depends(get_server),
+) -> list[dict[str, Any]]:
+    ws = await require_running_workspace(
+        agent_id, user=user, as_user=as_user, server=server, owner_only=True
+    )
+    result = await ws.agrep(pattern, _workspace_io_path(path, from_workspace=from_workspace))
+    if result is None:
+        raise OctopError(ErrorCode.NOT_FOUND, "grep failed")
+    matches = getattr(result, "matches", None) or []
+    return [dict(m) for m in matches]
+
+
+_MAX_WORKSPACE_ARCHIVE_BYTES = 200 * 1024 * 1024
+
+
+@router.get(
+    "/agents/{agent_id}/workspace/archive",
+    summary="Download workspace as zip",
+    response_class=StreamingResponse,
+)
+async def export_workspace_archive(
+    agent_id: str,
+    as_user: int | None = None,
+    user: Any = Depends(current_user),
+    server: Any = Depends(get_server),
+) -> StreamingResponse:
+    """Pack workspace files into a zip archive."""
+    ws = await require_running_workspace(
+        agent_id, user=user, as_user=as_user, server=server, owner_only=True
+    )
+    data = await export_workspace_zip(ws)
+    filename = f"workspace-{agent_id}.zip"
+    return StreamingResponse(
+        iter([data]),
+        media_type="application/zip",
+        headers={"Content-Disposition": content_disposition(filename)},
+    )
+
+
+@router.post(
+    "/agents/{agent_id}/workspace/archive",
+    summary="Import workspace zip",
+)
+async def import_workspace_archive(
+    agent_id: str,
+    file: UploadFile = File(...),  # noqa: B008
+    mode: Literal["merge", "replace"] = Query(default="merge"),
+    as_user: int | None = None,
+    user: Any = Depends(current_user),
+    server: Any = Depends(get_server),
+) -> dict[str, Any]:
+    """Import a zip archive into the workspace (merge or replace)."""
+    raw = await file.read()
+    if len(raw) > _MAX_WORKSPACE_ARCHIVE_BYTES:
+        raise OctopError(ErrorCode.SLASH_BAD_ARGS, "workspace archive too large (max 200MB)")
+    if not raw:
+        raise OctopError(ErrorCode.SLASH_BAD_ARGS, "empty archive")
+
+    ws = await require_running_workspace(
+        agent_id, user=user, as_user=as_user, server=server, owner_only=True
+    )
+    local_ws = resolve_agent_workspace_dir(server, agent_id)
+    result = await import_workspace_zip(
+        ws,
+        raw,
+        mode=mode,
+        local_workspace_dir=local_ws,
+    )
+    return {"ok": True, **result}

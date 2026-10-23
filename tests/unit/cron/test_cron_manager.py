@@ -658,4 +658,266 @@ async def test_run_now_fires_job(tmp_path: Path) -> None:
     mgr = _make_manager(services, gateway=gateway)
     cid = _cron_id()
     await mgr.create(
-        cro
+        cron_id=cid,
+        agent_id=aid,
+        user_id=uid,
+        trigger="interval:3600",
+        prompt="run",
+    )
+
+    with patch("octop.infra.cron.manager.asyncio.ensure_future") as mock_ef:
+        await mgr.run_now(cid)
+        mock_ef.assert_called_once()
+        coro = mock_ef.call_args[0][0]
+        coro.close()  # clean up without awaiting
+
+
+# ---------------------------------------------------------------------------
+# _schedule() edge cases
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_schedule_skips_invalid_trigger_gracefully(tmp_path: Path) -> None:
+    """_schedule() logs a warning but does not raise for bad trigger specs."""
+    services = _make_services(tmp_path)
+    aid, uid = _make_agent(services)
+    mgr = _make_manager(services)
+
+    cid = _cron_id()
+    services.repos.cron_repo.create(
+        cron_id=cid,
+        agent_id=aid,
+        user_id=uid,
+        trigger="garbage:???",
+        prompt="x",
+        session_key=_cron_session_key(aid, cid),
+    )
+    row = services.repos.cron_repo.get(cid)
+
+    mgr._schedule(row)  # must not raise
+
+    mgr._scheduler.add_job.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_schedule_replaces_existing_job(tmp_path: Path) -> None:
+    """_schedule() removes the old APScheduler job before adding the new one."""
+    services = _make_services(tmp_path)
+    aid, uid = _make_agent(services)
+    mgr = _make_manager(services)
+    mgr._scheduler.get_job = MagicMock(return_value=MagicMock())
+
+    cid = _cron_id()
+    services.repos.cron_repo.create(
+        cron_id=cid,
+        agent_id=aid,
+        user_id=uid,
+        trigger="interval:5",
+        prompt="x",
+        session_key=_cron_session_key(aid, cid),
+    )
+    row = services.repos.cron_repo.get(cid)
+    mgr._schedule(row)
+
+    mgr._scheduler.remove_job.assert_called_with(cid)
+    mgr._scheduler.add_job.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_fired_date_trigger_is_disabled_before_run_for_restart_safety(tmp_path: Path) -> None:
+    services = _make_services(tmp_path)
+    aid, uid = _make_agent(services)
+    mgr = _make_manager(services)
+    cid = _cron_id()
+    services.repos.cron_repo.create(
+        cron_id=cid,
+        agent_id=aid,
+        user_id=uid,
+        trigger="date:2099-01-01T00:00:00+00:00",
+        prompt="one shot",
+        session_key=_cron_session_key(aid, cid),
+    )
+    row = services.repos.cron_repo.get(cid)
+    assert row is not None
+    scheduled_job = AsyncMock()
+    mgr._make_job = MagicMock(return_value=MagicMock(run=scheduled_job))
+
+    mgr._schedule(row)
+    run_once = mgr._scheduler.add_job.call_args.args[0]
+    await run_once()
+
+    assert services.repos.cron_repo.get(cid).enabled == 0
+    scheduled_job.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_mail_trigger_validates_owner_delivers_context_and_can_be_disabled(
+    tmp_path, monkeypatch
+):
+    from octop.infra.connectors.crypto import encrypt_credentials
+    from octop.infra.cron import manager as cron_manager
+    from octop.infra.cron.trigger import AgentlyMailTrigger, build_trigger
+    from octop.infra.errors import OctopError
+
+    monkeypatch.setattr(
+        cron_manager,
+        "read_auth_status",
+        lambda creds: {"logged_in": True, "token_status": "ok"},
+    )
+    services = _make_services(tmp_path)
+    aid, uid = _make_agent(services)
+    _, stranger = _make_agent(services)
+    source_id = new_ulid()
+    services.repos.connector_repo.create(
+        instance_id=source_id,
+        user_id=uid,
+        kind="agently-cli",
+        display_name="mail",
+        mcp_server_name="mail_source",
+    )
+    services.repos.connector_repo.upsert_credentials(
+        instance_id=source_id,
+        blob=encrypt_credentials(services.secret_repo, {"cli_config_key": "mail"}),
+    )
+    mgr = _make_manager(services)
+    mgr._mail_watch = MagicMock()
+    mgr._mail_watch.unsubscribe = AsyncMock()
+    mgr._mail_watch.close = AsyncMock()
+    mgr._mail_watch.stop_instance = AsyncMock()
+    mgr._mail_watch.has_job = MagicMock(return_value=False)
+    cid = _cron_id()
+    trigger = f"agently:{source_id}"
+    assert isinstance(build_trigger(trigger), AgentlyMailTrigger)
+    with pytest.raises(OctopError):
+        await mgr.create(
+            cron_id=cid, agent_id=aid, user_id=stranger, trigger=trigger, prompt="Read new mail"
+        )
+    assert mgr.get(cid) is None
+    await mgr.create(
+        cron_id=cid,
+        agent_id=aid,
+        user_id=uid,
+        trigger=trigger,
+        prompt="Read new mail",
+        task_type="agent",
+    )
+    mgr._scheduler.add_job.assert_not_called()
+    assert mgr._mail_watch.subscribe.call_args.args[:2] == (source_id, cid)
+    delivered = []
+    mgr._make_job = lambda row: delivered.append(row) or MagicMock(run=AsyncMock())
+    await mgr._run_mail_event(cid, "msg_safe")
+    assert delivered[0].mcp_servers == ["mail_source"]
+    assert "msg_safe" in delivered[0].prompt
+    assert "mail_source_agently_read" in delivered[0].prompt
+    assert mgr.get(cid).prompt == "Read new mail"
+    await mgr.update(cid, enabled=0)
+    mgr._mail_watch.unsubscribe.assert_awaited_once_with(cid)
+    await mgr._run_mail_event(cid, "msg_next")
+    assert len(delivered) == 1
+    await mgr.shutdown()
+    mgr._mail_watch.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_mail_trigger_rejects_unauthorized_mailbox(tmp_path, monkeypatch):
+    from octop.infra.connectors.crypto import encrypt_credentials
+    from octop.infra.cron import manager as cron_manager
+    from octop.infra.errors import ErrorCode, OctopError
+
+    monkeypatch.setattr(
+        cron_manager,
+        "read_auth_status",
+        lambda creds: {"logged_in": False, "token_status": "expired"},
+    )
+    services = _make_services(tmp_path)
+    aid, uid = _make_agent(services)
+    source_id = new_ulid()
+    services.repos.connector_repo.create(
+        instance_id=source_id,
+        user_id=uid,
+        kind="agently-cli",
+        display_name="mail",
+        mcp_server_name="mail_source",
+    )
+    services.repos.connector_repo.upsert_credentials(
+        instance_id=source_id,
+        blob=encrypt_credentials(services.secret_repo, {"cli_config_key": "mail"}),
+    )
+    mgr = _make_manager(services)
+    with pytest.raises(OctopError) as exc:
+        await mgr.create(
+            cron_id=_cron_id(),
+            agent_id=aid,
+            user_id=uid,
+            trigger=f"agently:{source_id}",
+            prompt="Read new mail",
+        )
+    assert exc.value.code == ErrorCode.CRON_TRIGGER_INVALID
+    await mgr.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_sync_mail_watch_does_not_restart_other_mailboxes(tmp_path, monkeypatch):
+    from octop.infra.connectors.crypto import encrypt_credentials
+    from octop.infra.cron import manager as cron_manager
+
+    monkeypatch.setattr(
+        cron_manager,
+        "read_auth_status",
+        lambda creds: {"logged_in": True, "token_status": "ok"},
+    )
+    services = _make_services(tmp_path)
+    aid, uid = _make_agent(services)
+    first = new_ulid()
+    second = new_ulid()
+    for source_id, name in ((first, "mail_a"), (second, "mail_b")):
+        services.repos.connector_repo.create(
+            instance_id=source_id,
+            user_id=uid,
+            kind="agently-cli",
+            display_name=name,
+            mcp_server_name=name,
+        )
+        services.repos.connector_repo.upsert_credentials(
+            instance_id=source_id,
+            blob=encrypt_credentials(services.secret_repo, {"cli_config_key": name}),
+        )
+    mgr = _make_manager(services)
+    mgr._mail_watch = MagicMock()
+    mgr._mail_watch.unsubscribe = AsyncMock()
+    mgr._mail_watch.close = AsyncMock()
+    mgr._mail_watch.stop_instance = AsyncMock()
+    mgr._mail_watch.has_job = MagicMock(return_value=False)
+    await mgr.create(
+        cron_id=_cron_id(),
+        agent_id=aid,
+        user_id=uid,
+        trigger=f"agently:{first}",
+        prompt="A",
+        task_type="agent",
+    )
+    await mgr.create(
+        cron_id=_cron_id(),
+        agent_id=aid,
+        user_id=uid,
+        trigger=f"agently:{second}",
+        prompt="B",
+        task_type="agent",
+    )
+    assert mgr._mail_watch.subscribe.call_count == 2
+    mgr._mail_watch.close.reset_mock()
+    mgr._mail_watch.stop_instance.reset_mock()
+    await mgr.sync_mail_watch(second)
+    mgr._mail_watch.close.assert_not_awaited()
+    mgr._mail_watch.stop_instance.assert_not_awaited()
+    await mgr.shutdown()
+
+
+def test_system_job_rejects_agently_trigger(tmp_path):
+    from octop.infra.errors import ErrorCode, OctopError
+
+    mgr = _make_manager(_make_services(tmp_path))
+    with pytest.raises(OctopError) as exc:
+        mgr.schedule_system_job("sys", trigger="agently:mailbox", func=lambda: None)
+    assert exc.value.code == ErrorCode.CRON_TRIGGER_INVALID
