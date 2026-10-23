@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlparse
 
 REASONING_MODES = frozenset({"auto", "enabled", "disabled"})
 REASONING_ADAPTERS = frozenset(
@@ -42,11 +43,14 @@ def _string_list(value: Any) -> list[str]:
 def _legacy_adapter(model_id: str, *, base_url: str | None) -> str:
     """Choose a conservative adapter for legacy ``reasoning: true`` metadata."""
     url = (base_url or "").lower()
+    # Compare the parsed host, not a substring: "...?u=maas.aliyuncs.com" must
+    # not select the dashscope adapter (py/incomplete-url-substring-sanitization).
+    base_host = urlparse(url if "://" in url else f"https://{url}").hostname or ""
     if "modelscope.cn" in url and model_id.startswith("qwen/qwen3.5-"):
         return "chat_template"
     if "openrouter.ai" in url:
         return "openrouter"
-    if "dashscope" in url or "maas.aliyuncs.com" in url:
+    if "dashscope" in url or base_host == "maas.aliyuncs.com":
         return "dashscope"
     if model_id.startswith("deepseek-v4-") and any(
         host in url for host in ("lkeap.cloud.tencent.com", "tencentmaas.com")

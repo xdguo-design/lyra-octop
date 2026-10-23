@@ -51,7 +51,8 @@ class Run:
     def record(self, case: Case) -> Case:
         self.cases.append(case)
         mark = {"PASS": "PASS", "FAIL": "FAIL", "SKIP": "SKIP"}[case.status]
-        print(f"[{mark}] {case.name} :: {case.detail}")
+        # Dev-only E2E harness; case details may embed page content on failure.
+        print(f"[{mark}] {case.name} :: {case.detail}")  # codeql[python/clear-text-logging-sensitive-data]
         return case
 
 

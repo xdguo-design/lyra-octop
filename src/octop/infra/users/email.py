@@ -2,12 +2,7 @@
 
 from __future__ import annotations
 
-import re
-
 from octop.infra.errors import ErrorCode, OctopError
-
-# Practical address shape (not full RFC 5322).
-_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def normalize_email(raw: str | None) -> str | None:
@@ -19,8 +14,23 @@ def normalize_email(raw: str | None) -> str | None:
 
 
 def validate_email_format(email: str) -> None:
-    """Raise ``OctopError(EMAIL_INVALID)`` when *email* is not a plausible address."""
-    if not _EMAIL_RE.match(email):
+    """Raise ``OctopError(EMAIL_INVALID)`` when *email* is not a plausible address.
+
+    Practical address shape (``local@domain.tld``, not full RFC 5322), checked by
+    splitting instead of a backtracking regex so matching stays linear
+    (py/polynomial-redos).
+    """
+    local, sep, domain = email.partition("@")
+    stem, dot, tail = domain.rpartition(".")
+    if (
+        not sep
+        or not local
+        or not dot
+        or not stem
+        or not tail
+        or "@" in domain
+        or any(char.isspace() for char in email)
+    ):
         raise OctopError(ErrorCode.EMAIL_INVALID, "invalid email address", status=400)
 
 

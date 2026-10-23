@@ -548,6 +548,10 @@ def test_format_agent_start_error_unknown_passthrough() -> None:
     assert format_agent_start_error(exc) == "disk full"
 
 
+def test_memory_extract_settings_defaults_enabled_without_memory_config() -> None:
+    assert _memory_extract_settings({}) == {"memory_enabled": True}
+
+
 def test_memory_extract_settings_supports_legacy_harness(caplog: pytest.LogCaptureFixture) -> None:
     settings = _memory_extract_settings(
         {

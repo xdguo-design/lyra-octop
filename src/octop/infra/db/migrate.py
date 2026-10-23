@@ -2094,11 +2094,13 @@ def _apply_sqlite_migration(db: DatabasePool, version: int, path: Path) -> None:
         return
     if version == 27:
         _ensure_workbench_schema(db)
-        _ensure_column(db, "audit_log", "project_id", "TEXT")
+        if _table_exists(db, "audit_log"):
+            _ensure_column(db, "audit_log", "project_id", "TEXT")
+            with db.connect() as conn:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_audit_project_ts ON audit_log(project_id, ts)"
+                )
         with db.connect() as conn:
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_audit_project_ts ON audit_log(project_id, ts)"
-            )
             conn.execute("UPDATE _schema_version SET version = ?", (version,))
         return
     if version == 28:
