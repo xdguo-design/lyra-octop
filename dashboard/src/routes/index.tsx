@@ -17,6 +17,7 @@ const PersonalizationPage = lazy(
 const ACPPage = lazy(() => import("../pages/Agent/ACP"));
 const TokenUsagePage = lazy(() => import("../pages/Control/TokenUsage"));
 const CreationsPage = lazy(() => import("../pages/Creations"));
+const EhrWorkbenchPage = lazy(() => import("../pages/EhrWorkbench"));
 
 // Lazy-loaded pages — Control
 const RemoteDesktopPage = lazy(() => import("../pages/Control/RemoteDesktop"));
@@ -60,6 +61,7 @@ export const pathToKey: Record<string, string> = {
   "/skill-packages": "skill-packages",
   "/skill-packages/manage": "skill-packages",
   "/knowledge-bases": "knowledge-bases",
+  "/ehr": "ehr",
   "/bridge": "bridge",
   "/personalization": "personalization",
   "/personalization/skills": "personalization",
@@ -163,6 +165,7 @@ export const routeConfigs: RouteConfig[] = [
   { path: "/skill-packages", element: <ResourceMarketplacePage /> },
   { path: "/skill-packages/manage", element: <SkillPackagesPage /> },
   { path: "/knowledge-bases", element: <KnowledgeBasesPage /> },
+  { path: "/ehr", element: <EhrWorkbenchPage /> },
   { path: "/creations", element: <CreationsPage /> },
   { path: "/bridge", element: <BridgePage /> },
   {

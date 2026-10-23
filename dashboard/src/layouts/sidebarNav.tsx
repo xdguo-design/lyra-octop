@@ -20,6 +20,7 @@ import {
   Shield,
   PanelsTopLeft,
   ClipboardPlus,
+  Stethoscope,
 } from "lucide-react";
 import type { OctopUser } from "../api/modules/auth";
 import { navAllowed, userCan } from "../utils/permissions";
@@ -151,6 +152,12 @@ export function buildNavSections(
       path: "/admission-demo",
       icon: <ClipboardPlus size={iconSize} strokeWidth={iconStroke} />,
       labelKey: "nav.admissionDemo",
+    },
+    {
+      key: "ehr",
+      path: "/ehr",
+      icon: <Stethoscope size={iconSize} strokeWidth={iconStroke} />,
+      labelKey: "nav.ehrWorkbench",
     },
   ];
   if (navAllowed(user, "experts")) {
