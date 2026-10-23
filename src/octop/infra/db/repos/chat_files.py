@@ -101,7 +101,7 @@ class ChatFileRepo:
                 "AND thread_id IS NULL AND deleted_at IS NULL",
                 (deleted_at, deleted_at, file_id, user_id, agent_id),
             ).rowcount
-        return changed > 0
+        return int(changed or 0) > 0
 
     def get_revision(self, revision_id: str) -> ChatFileRevisionRow | None:
         with self._db.connect() as conn:

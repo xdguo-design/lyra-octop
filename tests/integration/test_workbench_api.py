@@ -209,9 +209,7 @@ async def test_code_browsing_is_explicit_and_admin_only(
     )
     assert enabled.status_code == 201
     project_id = enabled.json()["project_id"]
-    listing = await client.get(
-        f"/api/workbench/projects/{project_id}/code", headers=admin_auth
-    )
+    listing = await client.get(f"/api/workbench/projects/{project_id}/code", headers=admin_auth)
     assert listing.status_code == 200
     assert [item["name"] for item in listing.json()["entries"]] == ["main.py"]
     denied_legacy = await client.get(
