@@ -8,6 +8,7 @@ from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.date import DateTrigger
 
 from octop.i18n import tr
 from octop.infra.connectors.crypto import decrypt_credentials
@@ -272,8 +273,19 @@ class CronManager:
         job = self._make_job(row)
         if self._scheduler.get_job(row.cron_id):
             self._scheduler.remove_job(row.cron_id)
+        scheduled_callable = job.run
+        if isinstance(trigger, DateTrigger):
+
+            async def run_one_shot() -> None:
+                # Persist consumption before invoking user work. APScheduler removes
+                # DateTrigger jobs after firing, so leaving the row enabled would
+                # re-register an already-fired task after a process restart.
+                self._repos.cron_repo.update(row.cron_id, enabled=False)
+                await job.run()
+
+            scheduled_callable = run_one_shot
         self._scheduler.add_job(
-            job.run,
+            scheduled_callable,
             trigger=trigger,
             id=row.cron_id,
             replace_existing=True,

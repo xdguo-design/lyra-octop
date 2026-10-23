@@ -6,7 +6,10 @@ import pytest
 from octop_gateway.models import TextContent
 
 from octop.api.routers.chat.models import ChatTurnBody
-from octop.api.routers.chat.turn import _bind_file_attachments
+from octop.api.routers.chat.turn import (
+    _bind_file_attachments,
+    _mark_vision_attachment_status,
+)
 from octop.infra.errors import OctopError
 
 
@@ -18,6 +21,22 @@ class _FileRepo:
     def bind_thread(self, file_id: str, **kwargs: object) -> bool:
         self.calls.append((file_id, kwargs))
         return self.accepts
+
+
+def test_vision_status_marks_images_beyond_model_limit_as_not_sent() -> None:
+    attachments = [
+        {"media_type": "image/png", "filename": f"image-{index}.png"} for index in range(5)
+    ]
+
+    _mark_vision_attachment_status(attachments)
+
+    assert [item["read_status"] for item in attachments] == [
+        "vision",
+        "vision",
+        "vision",
+        "vision",
+        "not_sent",
+    ]
 
 
 @pytest.mark.asyncio

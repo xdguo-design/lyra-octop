@@ -37,4 +37,18 @@ describe("MessageFileCard", () => {
 
     expect(screen.getByText("Scanned pages need OCR")).toBeInTheDocument();
   });
+
+  it("shows when an image was omitted by the model image limit", () => {
+    render(
+      <MessageFileCard
+        url="/download"
+        filename="photo.png"
+        readStatus="not_sent"
+      />,
+    );
+
+    expect(
+      screen.getByText("Image limit reached; not sent to the model"),
+    ).toBeInTheDocument();
+  });
 });
