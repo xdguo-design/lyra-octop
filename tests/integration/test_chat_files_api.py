@@ -160,6 +160,48 @@ async def test_read_surface_rejects_unbound_draft(env_with_agent: Any) -> None:
         assert response.status_code == 404, response.text
 
 
+async def test_delete_draft_only_deletes_owned_unbound_files(env_with_agent: Any) -> None:
+    client, srv, auth, aid = env_with_agent
+    upload = await client.post(
+        f"/api/agents/{aid}/upload",
+        files={"file": ("draft.txt", b"draft body", "text/plain")},
+        headers=auth,
+    )
+    assert upload.status_code == 200, upload.text
+    draft_id = upload.json()["file_id"]
+    url = f"/api/agents/{aid}/files/{draft_id}/draft"
+
+    deleted = await client.delete(url, headers=auth)
+    assert deleted.status_code == 204
+    row = srv.services.chat_file_repo.get(draft_id)
+    assert row is not None and row.deleted_at is not None
+    assert (await client.delete(url, headers=auth)).status_code == 404
+    assert (
+        await client.get(f"/api/agents/{aid}/files/{draft_id}", headers=auth)
+    ).status_code == 404
+
+    bound = await _upload_and_bind(client, srv, auth, aid, filename="bound.txt")
+    bound_delete = await client.delete(
+        f"/api/agents/{aid}/files/{bound['file_id']}/draft", headers=auth
+    )
+    assert bound_delete.status_code == 404
+    bound_row = srv.services.chat_file_repo.get(bound["file_id"])
+    assert bound_row is not None and bound_row.deleted_at is None
+
+    foreign_upload = await client.post(
+        f"/api/agents/{aid}/upload",
+        files={"file": ("foreign.txt", b"owned by admin", "text/plain")},
+        headers=auth,
+    )
+    intruder = await create_user(client, auth, username="draft-delete-intruder")
+    foreign_url = f"/api/agents/{aid}/files/{foreign_upload.json()['file_id']}/draft"
+    foreign_delete = await client.delete(foreign_url, headers=intruder)
+    # The agent-level guard may reject this user before file ownership lookup.
+    assert foreign_delete.status_code in (403, 404)
+    foreign_row = srv.services.chat_file_repo.get(foreign_upload.json()["file_id"])
+    assert foreign_row is not None and foreign_row.deleted_at is None
+
+
 async def test_read_surface_hides_other_users_files(env_with_agent: Any) -> None:
     client, srv, auth, aid = env_with_agent
     body = await _upload_and_bind(client, srv, auth, aid)

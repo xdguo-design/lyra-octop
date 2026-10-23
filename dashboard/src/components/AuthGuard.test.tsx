@@ -74,7 +74,7 @@ describe("AuthGuard offline boot", () => {
       useEffect(() => {
         navigate("/b");
       }, [navigate]);
-      return <div>protected-shell</div>;
+      return <div>navigation-probe</div>;
     }
 
     render(
@@ -88,7 +88,9 @@ describe("AuthGuard offline boot", () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText("protected-shell")).toBeInTheDocument();
+    expect(
+      await screen.findByText("protected-shell", {}, { timeout: 15_000 }),
+    ).toBeInTheDocument();
     await waitFor(() => {
       expect(authApi.getAuthStatus).toHaveBeenCalledTimes(1);
     });

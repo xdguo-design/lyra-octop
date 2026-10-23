@@ -2115,6 +2115,7 @@
     "fileWorkspaceHint": "专家已生成或编辑文件",
     "fileSwitch": "切换文件",
     "citations": "来源",
+    "webSources": { "label": "网页来源" },
     "citationPreview": "文档预览",
     "citationViewInKnowledgeBase": "在知识库中查看",
     "citationPreviewFailed": "打开文档预览失败",

@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { DragEvent } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { message } from "@/utils/antdMessage";
+import { deleteChatFileDraft } from "../../../api/modules/files";
 import { uploadFile } from "../../../api/modules/upload";
 import { DESKTOP_FILE_DROP_EVENT } from "../../../utils/desktopFileDrop";
 import { useChatAttachments } from "./useChatAttachments";
@@ -12,6 +13,10 @@ vi.mock("../../../hooks/useServerUploadLimit", () => ({
 
 vi.mock("../../../api/modules/upload", () => ({
   uploadFile: vi.fn(),
+}));
+
+vi.mock("../../../api/modules/files", () => ({
+  deleteChatFileDraft: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/utils/antdMessage", () => ({
@@ -33,6 +38,8 @@ function dragEvent(
 describe("useChatAttachments drop", () => {
   beforeEach(() => {
     vi.mocked(uploadFile).mockReset();
+    vi.mocked(deleteChatFileDraft).mockReset();
+    vi.mocked(deleteChatFileDraft).mockResolvedValue(undefined);
     vi.mocked(message.error).mockReset();
     vi.mocked(message.warning).mockReset();
     vi.mocked(uploadFile).mockImplementation(async (_agentId, file) => ({
@@ -42,6 +49,8 @@ describe("useChatAttachments drop", () => {
       media_type: file.type || "application/octet-stream",
       url: "",
       access_url: `/files/${file.name}`,
+      file_id: `id-${file.name}`,
+      revision_id: `rev-${file.name}`,
     }));
   });
 
@@ -117,6 +126,8 @@ describe("useChatAttachments drop", () => {
             media_type: file.type || "application/octet-stream",
             url: "",
             access_url: `/files/${file.name}`,
+            file_id: `id-${file.name}`,
+            revision_id: `rev-${file.name}`,
           }),
         );
       });
@@ -167,6 +178,8 @@ describe("useChatAttachments drop", () => {
             media_type: file.type || "application/octet-stream",
             url: "",
             access_url: `/files/${file.name}`,
+            file_id: `id-${file.name}`,
+            revision_id: `rev-${file.name}`,
           });
       });
     });
@@ -189,6 +202,7 @@ describe("useChatAttachments drop", () => {
     });
     expect(result.current.items).toEqual([]);
     expect(result.current.attachments).toEqual([]);
+    expect(deleteChatFileDraft).toHaveBeenCalledWith("agent-1", "id-a.txt");
   });
 
   it("drops attachments when the agent changes", async () => {
@@ -206,6 +220,59 @@ describe("useChatAttachments drop", () => {
     rerender({ agentId: "agent-2" });
     expect(result.current.items).toEqual([]);
     expect(result.current.attachments).toEqual([]);
+    expect(deleteChatFileDraft).not.toHaveBeenCalled();
+  });
+
+  it("cleans up a late upload after switching agents", async () => {
+    let release: (() => void) | undefined;
+    vi.mocked(uploadFile).mockImplementation((_agentId, file) => {
+      return new Promise((resolve) => {
+        release = () =>
+          resolve({
+            path: `inbound/${file.name}`,
+            workspace_path: `inbound/${file.name}`,
+            filename: file.name,
+            media_type: file.type || "application/octet-stream",
+            url: "",
+            access_url: `/files/${file.name}`,
+            file_id: "late-file",
+            revision_id: "late-revision",
+          });
+      });
+    });
+    const { result, rerender } = renderHook(
+      ({ agentId }: { agentId: string }) => useChatAttachments(agentId),
+      { initialProps: { agentId: "agent-1" } },
+    );
+    const file = new File(["a"], "a.txt", { type: "text/plain" });
+
+    await act(async () => {
+      void result.current.processFiles([file]);
+      await Promise.resolve();
+    });
+    rerender({ agentId: "agent-2" });
+    await act(async () => {
+      release?.();
+      await Promise.resolve();
+    });
+
+    expect(result.current.items).toEqual([]);
+    expect(deleteChatFileDraft).toHaveBeenCalledWith("agent-1", "late-file");
+  });
+
+  it("deletes a completed draft only when the user explicitly removes it", async () => {
+    const { result } = renderHook(() => useChatAttachments("agent-1"));
+    await act(async () => {
+      await result.current.processFiles([
+        new File(["a"], "a.txt", { type: "text/plain" }),
+      ]);
+    });
+    const key = result.current.items[0].key;
+
+    act(() => result.current.removeUpload(key));
+
+    expect(deleteChatFileDraft).toHaveBeenCalledWith("agent-1", "id-a.txt");
+    expect(result.current.items).toEqual([]);
   });
 
   it("retries a failed upload", async () => {

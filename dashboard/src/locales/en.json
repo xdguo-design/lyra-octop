@@ -2115,6 +2115,7 @@
     "fileWorkspaceHint": "Agent created or edited a file",
     "fileSwitch": "Switch file",
     "citations": "Sources",
+    "webSources": { "label": "Web sources" },
     "citationPreview": "Document preview",
     "citationViewInKnowledgeBase": "View in knowledge base",
     "citationPreviewFailed": "Failed to open document preview",

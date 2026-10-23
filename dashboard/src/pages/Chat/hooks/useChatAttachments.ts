@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ClipboardEvent, DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { uploadFile } from "../../../api/modules/upload";
+import { deleteChatFileDraft } from "../../../api/modules/files";
 import { agentAttachmentAccessUrl } from "../../../utils/toolMediaBlocks";
 import type { ChatAttachment } from "./useChat";
 import { message as antMessage } from "@/utils/antdMessage";
@@ -30,6 +31,7 @@ export type ChatUploadStatus = "pending" | "uploading" | "done" | "failed";
 export interface ChatUploadItem {
   key: string;
   file: File;
+  uploadAgentId: string;
   status: ChatUploadStatus;
   attachment?: ChatAttachment;
   error?: unknown;
@@ -71,6 +73,7 @@ export function useChatAttachments(agentId: string | null | undefined) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const agentIdRef = useRef(agentId);
+  const removedUploadKeysRef = useRef(new Set<string>());
 
   useEffect(() => {
     agentIdRef.current = agentId;
@@ -79,7 +82,14 @@ export function useChatAttachments(agentId: string | null | undefined) {
   // Attachments belong to the agent they were uploaded for: switching agents
   // must not carry them (or in-flight completions) into the new agent.
   useEffect(() => {
-    setItems([]);
+    setItems((prev) => {
+      for (const item of prev) {
+        if (item.status === "pending" || item.status === "uploading") {
+          removedUploadKeysRef.current.add(item.key);
+        }
+      }
+      return [];
+    });
   }, [agentId]);
 
   const attachments = useMemo(
@@ -129,6 +139,18 @@ export function useChatAttachments(agentId: string | null | undefined) {
           revisionId: res.revision_id,
           kind: inferAttachmentKind(file, res.media_type),
         };
+        if (
+          agentIdRef.current !== uploadAgentId ||
+          removedUploadKeysRef.current.has(key)
+        ) {
+          removedUploadKeysRef.current.delete(key);
+          if (res.file_id) {
+            void deleteChatFileDraft(uploadAgentId, res.file_id).catch(
+              () => undefined,
+            );
+          }
+          return { ok: true };
+        }
         // A late completion must not resurrect an item removed mid-flight or
         // land in the list after the user switched agents.
         setItems((prev) =>
@@ -142,6 +164,7 @@ export function useChatAttachments(agentId: string | null | undefined) {
         );
         return { ok: true };
       } catch (err: unknown) {
+        removedUploadKeysRef.current.delete(key);
         setItems((prev) =>
           agentIdRef.current !== uploadAgentId
             ? prev
@@ -167,6 +190,7 @@ export function useChatAttachments(agentId: string | null | undefined) {
       const fresh: ChatUploadItem[] = files.map((file) => ({
         key: nextUploadKey(),
         file,
+        uploadAgentId,
         status: "pending",
       }));
       setItems((prev) => [...prev, ...fresh]);
@@ -242,8 +266,17 @@ export function useChatAttachments(agentId: string | null | undefined) {
   );
 
   const removeUpload = useCallback((key: string) => {
+    const item = items.find((candidate) => candidate.key === key);
+    if (!item) return;
+    if (item.status === "done" && item.attachment?.fileId) {
+      void deleteChatFileDraft(item.uploadAgentId, item.attachment.fileId).catch(
+        () => undefined,
+      );
+    } else if (item.status === "pending" || item.status === "uploading") {
+      removedUploadKeysRef.current.add(key);
+    }
     setItems((prev) => prev.filter((item) => item.key !== key));
-  }, []);
+  }, [items]);
 
   const removeAttachment = useCallback(
     (index: number) => {
@@ -256,8 +289,13 @@ export function useChatAttachments(agentId: string | null | undefined) {
   );
 
   const clearAttachments = useCallback(() => {
+    for (const item of items) {
+      if (item.status === "pending" || item.status === "uploading") {
+        removedUploadKeysRef.current.add(item.key);
+      }
+    }
     setItems([]);
-  }, []);
+  }, [items]);
 
   const restoreAttachments = useCallback((next: ChatAttachment[]) => {
     const placeholder = new File([], "restored");
@@ -265,6 +303,7 @@ export function useChatAttachments(agentId: string | null | undefined) {
       next.map((attachment) => ({
         key: nextUploadKey(),
         file: placeholder,
+        uploadAgentId: agentIdRef.current || "",
         status: "done" as const,
         attachment,
       })),

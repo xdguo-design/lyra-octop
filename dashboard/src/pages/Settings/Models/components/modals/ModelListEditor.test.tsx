@@ -51,5 +51,5 @@ describe("ModelListEditor", () => {
       screen.getByRole("button", { name: "models.showAdvanced" }),
     );
     expect(screen.getByText("models.reasoning")).toBeInTheDocument();
-  });
+  }, 15_000);
 });

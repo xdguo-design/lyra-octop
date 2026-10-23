@@ -23,6 +23,7 @@ SIDEBAR_NAV_KEYS = frozenset(
     {
         "chat",
         "admission-demo",
+        "ehr",
         "experts",
         "tasks",
         "token-usage",

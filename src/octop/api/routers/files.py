@@ -185,6 +185,34 @@ async def get_chat_file(
     return FileDetailResponse.model_validate(detail)
 
 
+@router.delete(
+    "/agents/{agent_id}/files/{file_id}/draft",
+    status_code=204,
+    summary="Soft-delete an unbound chat attachment draft",
+    description=(
+        "Deletes only the current user's unbound upload draft. Files already attached to a "
+        "conversation cannot be deleted through this endpoint."
+    ),
+)
+async def delete_chat_file_draft(
+    agent_id: str,
+    file_id: str,
+    user: Any = Depends(current_user),
+    server: Any = Depends(get_server),
+) -> Response:
+    require_agent_row(agent_id, user=user, as_user=None, server=server)
+    if server.services is None:
+        raise OctopError(ErrorCode.INTERNAL_ERROR, "file service is unavailable")
+    deleted = server.services.chat_file_repo.delete_draft(
+        file_id,
+        user_id=int(user.id),
+        agent_id=agent_id,
+    )
+    if not deleted:
+        raise OctopError.localized(ErrorCode.NOT_FOUND)
+    return Response(status_code=204)
+
+
 @router.get(
     "/agents/{agent_id}/files/{file_id}/segments",
     response_model=FileSegmentsResponse,

@@ -36,6 +36,8 @@ describe("sidebarNavLayout", () => {
     const editor = editorFromCatalog(sections, null);
     expect(editor.ungrouped).toEqual([
       "chat",
+      "admission-demo",
+      "ehr",
       "experts",
       "tasks",
       "token-usage",

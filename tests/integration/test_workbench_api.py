@@ -22,7 +22,9 @@ async def test_projects_folders_and_thread_assignments_are_account_scoped(
     )
 
     project_response = await client.post(
-        "/api/workbench/projects", headers=admin_auth, json={"name": "星球", "icon": "🌍"}
+        "/api/workbench/projects",
+        headers=admin_auth,
+        json={"name": "星球", "icon": "🌍", "code_enabled": True},
     )
     assert project_response.status_code == 201
     project = project_response.json()
@@ -163,6 +165,58 @@ async def test_local_project_import_is_idempotent(env: Any) -> None:
     ).status_code == 204
     index = (await client.get("/api/workbench", headers=admin_auth)).json()
     assert [project["name"] for project in index["projects"]] == ["星球"]
+    assert index["projects"][0]["code_enabled"] is False
+
+
+async def test_code_browsing_is_explicit_and_admin_only(
+    env_with_main_agent: Any, tmp_path: Path
+) -> None:
+    client, server, admin_auth, _agent_id = env_with_main_agent
+    source_root = tmp_path / "code-root"
+    source_root.mkdir()
+    (source_root / "main.py").write_text("print('safe')", encoding="utf-8")
+    object.__setattr__(server.services.config, "workbench_code_root", str(source_root))
+
+    admin_default = await client.post(
+        "/api/workbench/projects", headers=admin_auth, json={"name": "星球"}
+    )
+    assert admin_default.status_code == 201
+    assert admin_default.json()["code_enabled"] is False
+
+    ordinary_auth = await create_user(client, admin_auth, username="code-ordinary")
+    ordinary_project = await client.post(
+        "/api/workbench/projects", headers=ordinary_auth, json={"name": "星球"}
+    )
+    assert ordinary_project.status_code == 201
+    assert ordinary_project.json()["code_enabled"] is False
+    denied_create = await client.post(
+        "/api/workbench/projects",
+        headers=ordinary_auth,
+        json={"name": "普通项目", "code_enabled": True},
+    )
+    assert denied_create.status_code == 403
+    denied_update = await client.put(
+        f"/api/workbench/projects/{ordinary_project.json()['project_id']}",
+        headers=ordinary_auth,
+        json={"name": "普通项目", "code_enabled": True},
+    )
+    assert denied_update.status_code == 403
+
+    enabled = await client.post(
+        "/api/workbench/projects",
+        headers=admin_auth,
+        json={"name": "授权项目", "code_enabled": True},
+    )
+    assert enabled.status_code == 201
+    project_id = enabled.json()["project_id"]
+    listing = await client.get(f"/api/workbench/projects/{project_id}/code", headers=admin_auth)
+    assert listing.status_code == 200
+    assert [item["name"] for item in listing.json()["entries"]] == ["main.py"]
+    denied_legacy = await client.get(
+        f"/api/workbench/projects/{ordinary_project.json()['project_id']}/code",
+        headers=ordinary_auth,
+    )
+    assert denied_legacy.status_code == 404
 
 
 async def test_planet_code_route_is_root_bounded_and_owner_scoped(
@@ -177,7 +231,9 @@ async def test_planet_code_route_is_root_bounded_and_owner_scoped(
     object.__setattr__(server.services.config, "workbench_code_root", str(source_root))
     project = (
         await client.post(
-            "/api/workbench/projects", headers=admin_auth, json={"name": "星球", "icon": "🌍"}
+            "/api/workbench/projects",
+            headers=admin_auth,
+            json={"name": "星球", "icon": "🌍", "code_enabled": True},
         )
     ).json()
 

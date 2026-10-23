@@ -53,6 +53,7 @@ export interface NavSection {
 export const SIDEBAR_NAV_KEYS = [
   "chat",
   "admission-demo",
+  "ehr",
   "experts",
   "tasks",
   "token-usage",

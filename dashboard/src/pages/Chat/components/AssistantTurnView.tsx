@@ -28,6 +28,8 @@ import {
 import { collectTurnToolMedia } from "../../../utils/collectTurnToolMedia";
 import { collectTurnKnowledgeCitations } from "../../../utils/collectTurnKnowledgeCitations";
 import { KnowledgeCitationsStrip } from "./KnowledgeCitationsStrip";
+import { collectTurnWebSearchSources } from "../../../utils/collectTurnWebSearchSources";
+import { WebSearchSourcesStrip } from "./WebSearchSourcesStrip";
 import { messageSpeakerId } from "../utils/messageGrouping";
 import styles from "../index.module.less";
 
@@ -142,6 +144,10 @@ export default function AssistantTurnView({
   );
   const knowledgeCitations = useMemo(
     () => collectTurnKnowledgeCitations(fullSplit),
+    [fullSplit],
+  );
+  const webSearchSources = useMemo(
+    () => collectTurnWebSearchSources(fullSplit),
     [fullSplit],
   );
 
@@ -307,6 +313,11 @@ export default function AssistantTurnView({
       {knowledgeCitations.length > 0 ? (
         <div className={styles.turnInset}>
           <KnowledgeCitationsStrip citations={knowledgeCitations} />
+        </div>
+      ) : null}
+      {webSearchSources.length > 0 ? (
+        <div className={styles.turnInset}>
+          <WebSearchSourcesStrip sources={webSearchSources} />
         </div>
       ) : null}
       {showOpenBrowser && (
