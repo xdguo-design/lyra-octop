@@ -79,7 +79,8 @@ async def test_admission_ai_endpoint_rejects_oversized_input(env: Any) -> None:
     assert response.status_code == 422
 
 
-async def test_admission_ai_uses_the_bound_expert_model_and_effort(env: Any, monkeypatch) -> None:
+@pytest.mark.parametrize("page", [0, 2])
+async def test_admission_ai_uses_the_bound_expert_model_and_effort(env: Any, monkeypatch, page: int) -> None:
     client, server, auth = env
     factory = Mock()
     manager = server.app_runtime.agent_registry.harness_manager
@@ -102,7 +103,7 @@ async def test_admission_ai_uses_the_bound_expert_model_and_effort(env: Any, mon
     response = await client.post(
         "/api/admission-demo/extract",
         headers=auth,
-        json={"text": "我是王晓梅，患者的女儿。", "page": 2},
+        json={"text": "我是王晓梅，患者的女儿。", "page": page},
     )
 
     assert response.status_code == 200, response.text
