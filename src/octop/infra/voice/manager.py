@@ -148,6 +148,10 @@ class VoiceManager:
             if row is None:
                 raise OctopError(ErrorCode.NOT_FOUND, "Mimo voice provider is not configured")
             return await adapters.transcribe_mimo(row, audio, mime=mime, language=language)
+        if kind == "doubao":
+            if row is None:
+                raise OctopError(ErrorCode.NOT_FOUND, "Doubao voice provider is not configured")
+            return await adapters.transcribe_doubao(row, audio, mime=mime, language=language)
         raise OctopError(ErrorCode.VOICE_KIND_UNSUPPORTED, f"unsupported STT kind {kind!r}")
 
     async def synthesize(
@@ -207,6 +211,14 @@ class VoiceManager:
             if row is None:
                 raise OctopError(ErrorCode.NOT_FOUND, "Mimo voice provider is not configured")
             async for chunk in adapters.synthesize_mimo(row, text, voice_id=voice_id, speed=speed):
+                yield chunk
+            return
+        if kind == "doubao":
+            if row is None:
+                raise OctopError(ErrorCode.NOT_FOUND, "Doubao voice provider is not configured")
+            async for chunk in adapters.synthesize_doubao(
+                row, text, voice_id=voice_id, speed=speed
+            ):
                 yield chunk
             return
         raise OctopError(ErrorCode.VOICE_KIND_UNSUPPORTED, f"unsupported TTS kind {kind!r}")

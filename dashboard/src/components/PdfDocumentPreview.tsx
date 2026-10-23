@@ -177,11 +177,6 @@ function PdfLoadingBar({ percent }: { percent?: number | null }) {
   );
 }
 
-/** Clean paper placeholder (no fake text lines) shared by skeletons. */
-function SkelPage() {
-  return <div className={styles.skelPage} aria-hidden />;
-}
-
 /** In-slot page placeholder for unmounted pages and Page loading. */
 function PdfPageSkeletonBlock() {
   return <div className={styles.pdfPageSkeleton} aria-hidden />;
@@ -209,21 +204,6 @@ function samePageSet(a: ReadonlySet<number>, b: ReadonlySet<number>): boolean {
     if (!b.has(pageNo)) return false;
   }
   return true;
-}
-
-/** Full viewer skeleton + real download percent, shown while the blob loads. */
-export function PdfViewerSkeleton({ percent }: { percent?: number | null }) {
-  return (
-    <div className={styles.pdfPreview} aria-busy="true">
-      <div className={styles.pdfToolbar}>
-        <PdfLoadingBar percent={percent} />
-      </div>
-      <div className={styles.pdfScroll}>
-        <SkelPage />
-        <SkelPage />
-      </div>
-    </div>
-  );
 }
 
 export default function PdfDocumentPreview({

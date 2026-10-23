@@ -1,0 +1,14 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="/node_modules/element-ui/lib/theme-chalk/index.css">
+<script src="/node_modules/vue/dist/vue.js"></script>
+<script src="/node_modules/element-ui/lib/index.js"></script>
+</head><body>
+<div id="app"><el-cascader v-model="value" :options="options" :props="props" clearable placeholder="test"></el-cascader>
+<div>value={{ JSON.stringify(value) }}</div></div>
+<script>
+new Vue({
+  el: '#app',
+  data: { value: [], options: [{"code": "440000", "label": "广东省", "children": [{"code": "440300", "label": "深圳市", "children": [{"code": "440303", "label": "罗湖区", "children": []}]}]}], props: { value: 'value', label: 'label', children: 'children', emitPath: true } }
+});
+</script></body></html>

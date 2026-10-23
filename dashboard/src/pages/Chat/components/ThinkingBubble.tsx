@@ -12,7 +12,8 @@ export default function ThinkingBubble({
   startedAt,
 }: ThinkingBubbleProps) {
   const { t } = useTranslation();
-  const typingSrc = `${import.meta.env.BASE_URL}octop-mascot-type.webp`;
+  // LYRA 统一品牌：思考中的头像与小恐龙空状态同源，不再使用章鱼动画。
+  const typingSrc = `${import.meta.env.BASE_URL}lyra-dino.svg`;
   const elapsed = useElapsedSince(startedAt);
 
   return (

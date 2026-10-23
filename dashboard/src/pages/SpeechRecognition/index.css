@@ -1,0 +1,195 @@
+.speech-page {
+  min-height: 100vh;
+  overflow-y: auto;
+  background: var(--fn-bg-page, #f5f6f8);
+  color: var(--fn-text-primary, #20242c);
+}
+
+.speech-header {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  border-bottom: 1px solid var(--fn-border-primary, #e6e8ed);
+  background: var(--fn-bg-container, #fff);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.speech-content {
+  width: min(760px, calc(100% - 32px));
+  margin: 56px auto 72px;
+}
+
+.speech-heading {
+  margin-bottom: 28px;
+  text-align: center;
+}
+
+.speech-eyebrow {
+  color: var(--fn-color-brand, #3b82f6);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.speech-heading h1.octop-typography {
+  margin: 8px 0;
+  font-size: clamp(28px, 5vw, 40px);
+}
+
+.speech-heading .octop-typography:last-child {
+  color: var(--fn-text-secondary, #687080);
+}
+
+.speech-recorder-card,
+.speech-result-card {
+  border-radius: 18px;
+  box-shadow: 0 8px 32px rgb(32 36 44 / 6%);
+}
+
+.speech-recorder-card .octop-card-body {
+  min-height: 380px;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  padding: 32px 24px;
+}
+
+.speech-provider-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 22px;
+}
+
+.speech-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.speech-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #98a2b3;
+}
+
+.speech-status-dot.is-live {
+  background: #e5484d;
+  box-shadow: 0 0 0 4px rgb(229 72 77 / 13%);
+}
+
+.speech-meter {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 22px 0 4px;
+}
+
+.speech-meter i {
+  width: 4px;
+  min-height: 4px;
+  border-radius: 4px;
+  background: #9aa4b2;
+  transition:
+    height 100ms ease,
+    background 150ms ease;
+}
+
+.speech-meter.is-recording i {
+  background: #4987ef;
+}
+
+.speech-hint {
+  min-height: 22px;
+  margin: 4px 0 20px;
+  color: var(--fn-text-secondary, #687080);
+  text-align: center;
+  font-size: 13px;
+}
+
+.speech-browser-note {
+  display: flex;
+  height: 64px;
+  align-items: center;
+  margin: 22px 0 4px;
+  color: var(--fn-text-secondary, #687080);
+  font-size: 13px;
+}
+
+.speech-mic-button.octop-btn {
+  width: 76px;
+  height: 76px;
+  box-shadow: 0 8px 22px rgb(59 130 246 / 24%);
+}
+
+.speech-mic-button.is-recording.octop-btn {
+  background: #e5484d;
+  border-color: #e5484d;
+  box-shadow: 0 8px 22px rgb(229 72 77 / 24%);
+}
+
+.speech-action-label {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--fn-text-secondary, #687080);
+}
+
+.speech-result-card {
+  margin-top: 18px;
+}
+
+.speech-result-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.speech-result-heading h4.octop-typography {
+  margin: 0;
+}
+
+.speech-transcript {
+  min-height: 116px;
+  padding: 18px;
+  border-radius: 12px;
+  background: var(--fn-bg-page, #f5f6f8);
+  font-size: 17px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.speech-placeholder,
+.speech-interim {
+  color: var(--fn-text-tertiary, #9299a5);
+}
+
+@media (max-width: 600px) {
+  .speech-header {
+    height: 56px;
+    padding: 0 12px;
+  }
+
+  .speech-content {
+    margin: 32px auto 48px;
+  }
+
+  .speech-recorder-card .octop-card-body {
+    min-height: 340px;
+    padding: 24px 16px;
+  }
+
+  .speech-meter {
+    gap: 2px;
+  }
+}

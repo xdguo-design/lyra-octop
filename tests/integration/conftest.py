@@ -99,7 +99,9 @@ async def env_with_main_agent(
     client, srv, auth = env
     agents = (await client.get("/api/agents", headers=auth)).json()
     assert agents, "bootstrap should have created the main agent"
-    yield client, srv, auth, agents[0]["agent_id"]
+    main = next((agent for agent in agents if agent["agent_id"] == "main"), None)
+    assert main is not None, "bootstrap should have created the main agent"
+    yield client, srv, auth, main["agent_id"]
 
 
 @pytest.fixture

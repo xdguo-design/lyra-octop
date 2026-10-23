@@ -58,6 +58,19 @@ def test_merge_knowledge_base_ids_unions_visible_extra_ids() -> None:
     )
 
 
+def test_merge_knowledge_base_ids_always_adds_visible_project_ids() -> None:
+    visible = [
+        SimpleNamespace(id="selected", owner_user_id=1, default_open=False, shared=False),
+        SimpleNamespace(id="project", owner_user_id=1, default_open=False, shared=False),
+    ]
+    assert merge_knowledge_base_ids(
+        visible,
+        ["selected"],
+        owner_user_id=1,
+        required_ids=["project", "hidden"],
+    ) == ["selected", "project"]
+
+
 def test_stamp_turn_knowledge_config_writes_catalog() -> None:
     visible = [
         SimpleNamespace(

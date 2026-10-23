@@ -1,0 +1,6 @@
+Tool: built-in imagegen
+Mode: background-extraction; transparent_background=true
+Input: frontend/src/assets/nurse-bot.png
+Output: frontend/src/assets/nurse-bot-transparent.png
+
+Use case: background-extraction. Edit target: the provided original pink nurse robot PNG used in a hospital self-service webpage. Remove ONLY the pale blue / almost white rectangular background and turn it into actual alpha transparency. Keep the exact same robot identity, face, pink and white colors, nurse cap with pink cross, headset antennae, waving hand, body, pose, proportions, lighting and 3D texture. Preserve the robot's opaque white surfaces; do not turn the white parts of the robot transparent. Clean antialiased contour, no blue halo, no new shadow or backdrop, no checkerboard drawn into the pixels, no text, no redesign. Output a transparent PNG cutout, tightly framed around the existing robot with modest transparent padding.

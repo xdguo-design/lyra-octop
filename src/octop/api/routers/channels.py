@@ -21,6 +21,7 @@ from pydantic import BaseModel, ValidationError
 
 from octop.api.common.agent import require_agent_owner_row
 from octop.api.deps import get_server, require_permission
+from octop.i18n import tr
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.gateway.bot_creators.feishu_runner import extract_feishu_credentials
 from octop.infra.gateway.channels import dingtalk_registration, qr_bind
@@ -454,11 +455,13 @@ def _prune_dingtalk_registration_sessions(now: float) -> None:
 @router.post("/agents/{agent_id}/channels/dingtalk/qrcode/generate")
 async def dingtalk_qrcode_generate(
     agent_id: str,
+    request: Request,
     as_user: int | None = None,
     user: Any = Depends(require_permission("channels")),
     server: Any = Depends(get_server),
 ) -> dict[str, Any]:
     """Start DingTalk Device Flow while retaining the device code server-side."""
+    locale = resolve_request_locale(request)
     _require_agent_access(agent_id, user=user, as_user=as_user, server=server)
     try:
         result = await dingtalk_registration.generate()
@@ -466,7 +469,7 @@ async def dingtalk_qrcode_generate(
         logger.exception("Failed to start DingTalk application registration")
         raise HTTPException(
             status_code=502,
-            detail="Failed to start DingTalk application registration.",
+            detail=tr("api.channels.dingtalk_registration_start_failed", locale),
         ) from exc
 
     expires_in = max(
@@ -503,12 +506,16 @@ async def dingtalk_qrcode_poll(
     server: Any = Depends(get_server),
 ) -> dict[str, Any]:
     """Poll DingTalk registration and create the channel without exposing secrets."""
+    locale = resolve_request_locale(request)
     _require_agent_access(agent_id, user=user, as_user=as_user, server=server)
     registration_id = _sanitize_token(body.registration_id, "registration_id")
     session = _dingtalk_registration_sessions.get(registration_id)
     actor_id = str(as_user if as_user is not None else user.id)
     if session is None or session.agent_id != agent_id or session.actor_id != actor_id:
-        raise HTTPException(status_code=404, detail="DingTalk registration session not found.")
+        raise HTTPException(
+            status_code=404,
+            detail=tr("api.channels.dingtalk_registration_not_found", locale),
+        )
 
     async with session.lock:
         if session.channel_id is not None:
@@ -524,7 +531,7 @@ async def dingtalk_qrcode_poll(
                 logger.exception("Failed to poll DingTalk application registration")
                 raise HTTPException(
                     status_code=502,
-                    detail="Failed to poll DingTalk application registration.",
+                    detail=tr("api.channels.dingtalk_registration_poll_failed", locale),
                 ) from exc
 
             status = str(result.get("status") or "").upper()
@@ -537,21 +544,28 @@ async def dingtalk_qrcode_poll(
                 _dingtalk_registration_sessions.pop(registration_id, None)
                 return {
                     "status": "failed",
-                    "message": str(result.get("fail_reason") or "DingTalk authorization failed."),
+                    "message": str(
+                        result.get("fail_reason")
+                        or tr("api.channels.dingtalk_authorization_failed", locale)
+                    ),
                 }
             if status != "SUCCESS":
                 raise HTTPException(
                     status_code=502,
-                    detail="DingTalk returned an unknown registration status.",
+                    detail=tr("api.channels.dingtalk_unknown_registration_status", locale),
                 )
 
             client_id = result.get("client_id")
             client_secret = result.get("client_secret")
             if not isinstance(client_id, str) or not client_id:
-                raise HTTPException(status_code=502, detail="DingTalk did not return client_id.")
+                raise HTTPException(
+                    status_code=502,
+                    detail=tr("api.channels.dingtalk_missing_client_id", locale),
+                )
             if not isinstance(client_secret, str) or not client_secret:
                 raise HTTPException(
-                    status_code=502, detail="DingTalk did not return client_secret."
+                    status_code=502,
+                    detail=tr("api.channels.dingtalk_missing_client_secret", locale),
                 )
             session.credentials = (client_id, client_secret)
 
@@ -567,12 +581,15 @@ async def dingtalk_qrcode_poll(
             agent_id=agent_id,
             kind="dingtalk",
             config=config,
-            locale=resolve_request_locale(request),
+            locale=locale,
         )
         if not probe.get("ok"):
             return {
                 "status": "failed",
-                "message": str(probe.get("error") or "DingTalk connection check failed."),
+                "message": str(
+                    probe.get("error")
+                    or tr("api.channels.dingtalk_connection_check_failed", locale)
+                ),
             }
 
         from octop.infra.gateway.gateway import ChannelCreateSpec  # noqa: PLC0415

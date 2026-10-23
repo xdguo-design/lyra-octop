@@ -33,6 +33,7 @@ export interface ReasoningCapability {
     | "anthropic_adaptive"
     | "anthropic_budget"
     | "dashscope"
+    | "chat_template"
     | "openrouter";
 }
 

@@ -63,7 +63,9 @@ async def test_invite_create_list_redeem_and_one_time(env) -> None:
         headers={"Authorization": f"Bearer {body['access_token']}"},
     )
     assert agents.status_code == 200, agents.text
-    bob_agents = agents.json()
+    # Platform-shared agents (user_id NULL) may also be listed; the invitee
+    # owns exactly one bootstrap-created agent.
+    bob_agents = [a for a in agents.json() if a.get("user_id") is not None]
     assert len(bob_agents) == 1
     assert bob_agents[0]["template_name"] == "general-assistant"
     assert bob_agents[0]["agent_id"] != "main"

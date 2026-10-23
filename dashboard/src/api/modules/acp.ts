@@ -1,5 +1,5 @@
 import { request } from "../request";
-import type { ACPConfig, ACPRunnerConfig } from "../types/acp";
+import type { ACPConfig, ACPModelOption, ACPRunnerConfig } from "../types/acp";
 
 function agentPath(agentId: string, suffix = ""): string {
   return `/agents/${encodeURIComponent(agentId)}/acp${suffix}`;
@@ -47,7 +47,22 @@ export const acpApi = {
   /** Combined view: global runners + per-agent tool toggle. */
   getConfig: (agentId: string) => request<ACPConfig>(agentPath(agentId)),
 
-  updateConfig: (agentId: string, body: ACPConfig) =>
+  getOpenCodeModels: (agentId: string) =>
+    request<{ models: ACPModelOption[] }>(
+      `${agentPath(agentId)}/opencode/models`,
+    ),
+
+  installOpenCode: () =>
+    request<{ command: string; runner: ACPRunnerConfig }>(
+      "/acp/opencode/install",
+      { method: "POST" },
+    ),
+
+  updateConfig: (
+    agentId: string,
+    body: Pick<ACPConfig, "tool_enabled"> &
+      Partial<Pick<ACPConfig, "default_model" | "runners">>,
+  ) =>
     request<ACPConfig>(agentPath(agentId), {
       method: "PUT",
       body: JSON.stringify(body),

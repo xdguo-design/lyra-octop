@@ -280,6 +280,15 @@ export function extractAttachmentsFromContent(
           filename: filename || "image",
           mediaType,
           workspacePath: path || undefined,
+          fileId:
+            String(anyBlock.file_id || anyBlock.fileId || "") || undefined,
+          revisionId:
+            String(anyBlock.revision_id || anyBlock.revisionId || "") ||
+            undefined,
+          readStatus:
+            typeof anyBlock.read_status === "string"
+              ? (anyBlock.read_status as ChatAttachment["readStatus"])
+              : undefined,
           kind: "image",
         } satisfies ChatAttachment;
       }
@@ -314,6 +323,14 @@ export function extractAttachmentsFromContent(
         filename,
         mediaType,
         workspacePath: workspacePath || undefined,
+        fileId: String(anyBlock.file_id || anyBlock.fileId || "") || undefined,
+        revisionId:
+          String(anyBlock.revision_id || anyBlock.revisionId || "") ||
+          undefined,
+        readStatus:
+          typeof anyBlock.read_status === "string"
+            ? (anyBlock.read_status as ChatAttachment["readStatus"])
+            : undefined,
         kind:
           type === "image" || mediaType?.startsWith("image/")
             ? "image"

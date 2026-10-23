@@ -62,6 +62,7 @@ function lastSocket(): FakeSocket {
 
 describe("RealtimeSttClient", () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -170,6 +171,37 @@ describe("RealtimeSttClient", () => {
     lastSocket().emitError();
 
     await expect(connected).rejects.toThrow();
+  });
+
+  it("fails a connection that never becomes ready", async () => {
+    vi.useFakeTimers();
+    const { client, handlers } = setup();
+    const connected = client.connect();
+    const rejected = expect(connected).rejects.toThrow("timed out");
+
+    await vi.advanceTimersByTimeAsync(15000);
+
+    await rejected;
+    expect(handlers.onError).toHaveBeenCalledWith(null);
+    expect(lastSocket().closed).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it("reports an error when final results stall", async () => {
+    vi.useFakeTimers();
+    const { client, handlers } = setup();
+    const connected = client.connect();
+    const socket = lastSocket();
+    socket.emitMessage({ type: "ready" });
+    await connected;
+
+    client.end();
+    await vi.advanceTimersByTimeAsync(15000);
+
+    expect(handlers.onError).toHaveBeenCalledWith(null);
+    expect(handlers.onDone).not.toHaveBeenCalled();
+    expect(socket.closed).toBe(true);
+    vi.useRealTimers();
   });
 
   it("stops sending once closed", async () => {

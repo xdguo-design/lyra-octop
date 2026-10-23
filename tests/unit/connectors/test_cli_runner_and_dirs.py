@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -28,6 +29,18 @@ def test_format_cli_error_strips_cli_hints() -> None:
     )
     assert "missing scope" in err
     assert "lark-cli" not in err
+
+
+def test_run_cli_can_decode_utf8_output() -> None:
+    output = cli_runner.run_cli(
+        [
+            sys.executable,
+            "-c",
+            "import sys; sys.stdout.buffer.write('邮件'.encode('utf-8'))",
+        ],
+        encoding="utf-8",
+    )
+    assert output == "邮件"
 
 
 def test_cleanup_removes_instance_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

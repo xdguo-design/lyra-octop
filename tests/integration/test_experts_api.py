@@ -78,6 +78,39 @@ async def test_create_agent_from_expert(env: Any) -> None:
     assert detail_row.get("system_prompt") in (None, "")
 
 
+async def test_create_agent_from_expert_persists_reasoning_mode(env: Any) -> None:
+    c, _srv, auth = env
+
+    created = await c.post(
+        "/api/agents/from-expert/default",
+        headers=auth,
+        json={
+            "name": "reasoning-disabled-bot",
+            "reasoning_mode": "disabled",
+            "reasoning_effort": "high",
+        },
+    )
+    assert created.status_code == 201, created.text
+    agent_id = created.json()["agent_id"]
+
+    detail = await c.get(f"/api/agents/{agent_id}", headers=auth)
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["config"]["reasoning"] == {
+        "mode": "disabled",
+        "effort": "high",
+    }
+
+
+async def test_create_agent_from_expert_rejects_invalid_reasoning_mode(env: Any) -> None:
+    c, _srv, auth = env
+    response = await c.post(
+        "/api/agents/from-expert/default",
+        headers=auth,
+        json={"name": "invalid-reasoning-bot", "reasoning_mode": "sometimes"},
+    )
+    assert response.status_code == 422
+
+
 async def test_create_agent_from_expert_applies_file_overrides(env: Any) -> None:
     c, srv, auth = env
     created = await c.post(

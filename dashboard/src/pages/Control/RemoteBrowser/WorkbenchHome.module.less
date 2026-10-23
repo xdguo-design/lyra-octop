@@ -95,7 +95,9 @@ html[data-theme="dark"] .askBox:focus-within {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
 }
 .askSend svg {
   width: 17px;
@@ -148,15 +150,6 @@ html[data-theme="dark"] .askBox:focus-within {
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
   transform: translateY(-2px);
 }
-.cardSoon {
-  cursor: default;
-}
-.cardSoon:hover {
-  transform: none;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  border-color: var(--fn-border-primary);
-}
-
 /* ---- mini browser window (page thumbnail) ---- */
 .thumbFrame {
   display: flex;
@@ -237,6 +230,14 @@ html[data-theme="dark"] .askBox:focus-within {
   width: 15px;
   height: 15px;
 }
+.creationIcon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-primary);
+  border-color: var(--fn-border-primary);
+}
 .thumbSoonText {
   font-size: 12px;
   color: var(--fn-text-tertiary);
@@ -251,6 +252,60 @@ html[data-theme="dark"] .askBox:focus-within {
 .cardDesc {
   font-size: 12.5px;
   color: var(--fn-text-secondary);
+}
+
+.creationTaskList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.creationTask {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--fn-border-primary);
+  border-radius: 10px;
+  background: var(--fn-bg-primary);
+  color: var(--fn-text-primary);
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+.creationTask:hover {
+  border-color: var(--fn-border-strong);
+  background: var(--fn-bg-secondary);
+}
+.creationTask:focus-visible {
+  outline: 2px solid var(--fn-text-primary);
+  outline-offset: 2px;
+}
+.creationTaskIcon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: var(--fn-bg-secondary);
+  color: var(--fn-text-secondary);
+}
+.creationTaskCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.creationTaskCopy strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.creationTaskCopy small {
+  color: var(--fn-text-secondary);
+  font-size: 12px;
 }
 
 /* ---- start browser link ---- */

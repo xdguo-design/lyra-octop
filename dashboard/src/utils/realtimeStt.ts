@@ -27,6 +27,8 @@ interface ServerFrame {
 
 /** Sentence id used when committing a trailing interim sentence at ``done``. */
 const TRAILING_SENTENCE_ID = Number.MAX_SAFE_INTEGER;
+const CONNECT_TIMEOUT_MS = 15000;
+const FINISH_TIMEOUT_MS = 15000;
 
 export class RealtimeSttClient {
   private socket: WebSocket | null = null;
@@ -37,6 +39,8 @@ export class RealtimeSttClient {
   private finished = false;
   private endRequested = false;
   private closed = false;
+  private connectTimer: ReturnType<typeof setTimeout> | null = null;
+  private finishTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly url: string;
   private readonly handlers: RealtimeSttHandlers;
 
@@ -51,6 +55,10 @@ export class RealtimeSttClient {
       const socket = new WebSocket(this.url);
       socket.binaryType = "arraybuffer";
       this.socket = socket;
+      this.connectTimer = setTimeout(() => {
+        failConnect(new Error("realtime STT connection timed out"));
+        this.fail(null);
+      }, CONNECT_TIMEOUT_MS);
 
       const failConnect = (error: unknown) => reject(error);
 
@@ -62,6 +70,8 @@ export class RealtimeSttClient {
         if (!frame) return;
         if (frame.type === "ready") {
           this.ready = true;
+          if (this.connectTimer) clearTimeout(this.connectTimer);
+          this.connectTimer = null;
           this.flushPending();
           resolve();
           return;
@@ -95,12 +105,20 @@ export class RealtimeSttClient {
   end(): void {
     if (this.closed) return;
     this.endRequested = true;
-    if (this.ready) this.socket?.send(JSON.stringify({ type: "end" }));
+    if (this.ready) {
+      if (this.finishTimer) clearTimeout(this.finishTimer);
+      this.socket?.send(JSON.stringify({ type: "end" }));
+      this.finishTimer = setTimeout(() => this.fail(null), FINISH_TIMEOUT_MS);
+    }
   }
 
   /** Tear down without reporting an error (user cancelled). */
   close(): void {
     this.closed = true;
+    if (this.connectTimer) clearTimeout(this.connectTimer);
+    if (this.finishTimer) clearTimeout(this.finishTimer);
+    this.connectTimer = null;
+    this.finishTimer = null;
     this.pending = [];
     this.socket?.close();
     this.socket = null;

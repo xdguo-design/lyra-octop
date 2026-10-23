@@ -23,6 +23,7 @@ import {
   Bot,
   Plus,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Route,
@@ -214,6 +215,7 @@ export default function ChatInputActionsRow({
   contextMaxTokens = 128_000,
   availableModels,
   selectedModel,
+  defaultModel,
   onModelChange,
   reasoningMode = "auto",
   reasoningEffort = null,
@@ -280,6 +282,8 @@ export default function ChatInputActionsRow({
   };
   /** Plus-button menu (model / skills / …). */
   const [overflowPopoverOpen, setOverflowPopoverOpen] = useState(false);
+  /** Dedicated always-visible model trigger (desktop composer). */
+  const [modelTriggerOpen, setModelTriggerOpen] = useState(false);
   /** Picker panel opened from a plus-menu item. */
   const [compactPicker, setCompactPicker] = useState<CompactPickerKey | null>(
     null,
@@ -376,9 +380,12 @@ export default function ChatInputActionsRow({
   );
   const activeSkillSlugs = parseSkillSlugsInText(text, skillTokenRefs);
   const showModePicker = Boolean(onConversationModeChange);
+  // Desktop uses the dedicated model trigger; the plus menu only lists the
+  // model entry in compact/mobile layouts.
+  const showPlusModelEntry = showModelPicker && useCompactControls;
   const showOverflowMenu =
     showModePicker ||
-    showModelPicker ||
+    showPlusModelEntry ||
     showConnectorPicker ||
     showKnowledgePicker ||
     showSkillPicker ||
@@ -400,6 +407,7 @@ export default function ChatInputActionsRow({
 
   const closePlusMenu = () => {
     setOverflowPopoverOpen(false);
+    setModelTriggerOpen(false);
     closeCompactPicker();
   };
 
@@ -484,6 +492,30 @@ export default function ChatInputActionsRow({
   const openModelReasoning = (modelRef: string) => {
     if (selectedModel !== modelRef) onModelChange?.(modelRef);
     setReasoningModelRef(modelRef);
+  };
+
+  // Quick deep-thinking chip next to the model trigger: resolve the
+  // capability of the model that will actually serve the turn (explicit
+  // pick → agent default), same fallback order as useChatContextWindow.
+  const effectiveModelRef = selectedModel ?? defaultModel ?? null;
+  const effectiveReasoningCapability = (availableModels ?? []).find(
+    (model) => modelOptionValue(model) === effectiveModelRef,
+  )?.reasoning_config;
+  const showReasoningToggle = Boolean(
+    onReasoningChange &&
+      effectiveReasoningCapability?.toggle &&
+      effectiveReasoningCapability.adapter !== "status_only",
+  );
+  // "auto" lights the chip when the provider default is thinking-on.
+  const reasoningToggleActive =
+    reasoningMode === "enabled" ||
+    (reasoningMode === "auto" &&
+      effectiveReasoningCapability?.default_mode === "enabled");
+  const handleReasoningToggle = () => {
+    onReasoningChange?.(
+      reasoningToggleActive ? "disabled" : "enabled",
+      reasoningEffort,
+    );
   };
 
   const reasoningMenu = reasoningModelCapability ? (
@@ -749,7 +781,9 @@ export default function ChatInputActionsRow({
           </span>
         </button>
       )}
-      {showModelPicker && (
+      {/* Desktop has the dedicated always-visible model trigger; the plus
+          menu keeps the model entry only in compact/mobile layouts. */}
+      {showModelPicker && useCompactControls && (
         <button
           type="button"
           className={`${styles.mobileOverflowItem} ${
@@ -960,6 +994,64 @@ export default function ChatInputActionsRow({
 
     return (
       <>
+        {showModelPicker && !useCompactControls && (
+          <Popover
+            trigger="click"
+            placement="topLeft"
+            arrow={false}
+            open={modelTriggerOpen}
+            onOpenChange={setModelTriggerOpen}
+            overlayClassName={styles.modelPopover}
+            content={modelMenu}
+          >
+            <Tooltip
+              title={t("chat.selectModel", "模型")}
+              mouseEnterDelay={0.4}
+            >
+              <button
+                type="button"
+                aria-label={t("chat.selectModel", "模型")}
+                data-testid="composer-model-trigger"
+                className={`${styles.modelTriggerBtn} ${
+                  modelTriggerOpen || selectedModel
+                    ? styles.modelTriggerBtnActive
+                    : ""
+                }`}
+              >
+                <Cpu size={15} />
+                <span className={styles.modelTriggerLabel}>
+                  {selectedModelTriggerLabel}
+                </span>
+                <ChevronDown size={13} />
+              </button>
+            </Tooltip>
+          </Popover>
+        )}
+        {showReasoningToggle && !useCompactControls && (
+          <Tooltip
+            title={
+              reasoningToggleActive
+                ? t("chat.reasoningEnabled", "开启")
+                : t("chat.reasoningDisabled", "关闭")
+            }
+            mouseEnterDelay={0.4}
+          >
+            <button
+              type="button"
+              aria-pressed={reasoningToggleActive}
+              data-testid="composer-reasoning-toggle"
+              className={`${styles.modelTriggerBtn} ${
+                reasoningToggleActive ? styles.modelTriggerBtnActive : ""
+              }`}
+              onClick={handleReasoningToggle}
+            >
+              <Brain size={15} />
+              <span className={styles.modelTriggerLabel}>
+                {t("chat.deepThinking", "深度思考")}
+              </span>
+            </button>
+          </Tooltip>
+        )}
         {showOverflowMenu && (
           <Popover
             trigger="click"

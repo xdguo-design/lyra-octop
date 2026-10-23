@@ -2,6 +2,10 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { createRef } from "react";
 
+const mocks = vi.hoisted(() => ({
+  voiceStart: vi.fn(),
+}));
+
 vi.mock("../../../hooks/useIsMobile", () => ({
   useIsMobile: () => false,
 }));
@@ -18,7 +22,7 @@ vi.mock("../../../hooks/useVoiceInput", () => ({
     recording: false,
     transcribing: false,
     realtime: false,
-    start: vi.fn(),
+    start: mocks.voiceStart,
     stop: vi.fn(),
     toggle: vi.fn(),
   }),
@@ -288,5 +292,23 @@ describe("ChatInput prefill clear-on-send", () => {
     fireEvent.click(screen.getByRole("button", { name: "send" }));
     expect(onSend).toHaveBeenCalledWith("second question", undefined);
     expect(onQueue).not.toHaveBeenCalled();
+  });
+
+  it("starts composer dictation via startVoiceInput", () => {
+    const inputRef = createRef<ChatInputHandle>();
+    render(
+      <ChatInput
+        ref={inputRef}
+        onSend={vi.fn()}
+        onCancel={vi.fn()}
+        onNewChat={vi.fn()}
+        isStreaming={false}
+        agentId="agent-1"
+      />,
+    );
+    act(() => {
+      inputRef.current?.startVoiceInput();
+    });
+    expect(mocks.voiceStart).toHaveBeenCalledOnce();
   });
 });

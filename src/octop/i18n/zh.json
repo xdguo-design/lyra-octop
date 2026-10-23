@@ -1,4 +1,9 @@
 {
+    "email_registration": {
+        "subject": "Octop 邮箱验证码",
+        "body": "你的验证码是 {code}，10 分钟内有效。如非本人操作，请忽略此邮件。",
+        "pending_message": "注册申请已提交，管理员审批通过后即可登录。"
+    },
     "slash": {
         "error": {
             "unknown_command": "未知指令：/{name}。输入 /help 查看可用指令。"
@@ -400,6 +405,9 @@
         "USERNAME_TAKEN": "用户名已被占用。",
         "EMAIL_TAKEN": "邮箱已被占用。",
         "EMAIL_INVALID": "邮箱格式不正确。",
+        "EMAIL_VERIFICATION_FAILED": "邮箱验证码无效或已过期。",
+        "EMAIL_DELIVERY_UNAVAILABLE": "此服务器尚未配置邮箱验证服务。",
+        "EMAIL_DELIVERY_FAILED": "验证码邮件发送失败，请稍后重试。",
         "PASSWORD_SAME_AS_OLD": "新密码不能与当前密码相同。",
         "PASSWORD_NOT_SET": "该账号通过目录服务登录，没有可修改的本地密码。",
         "PASSWORD_TOO_WEAK": "密码过弱：至少 8 位，且同时包含字母和数字。",
@@ -452,6 +460,10 @@
         "SLASH_BAD_ARGS": "参数无效。",
         "ATTACHMENT_UNSUPPORTED_TYPE": "不支持此文件类型。",
         "ATTACHMENT_TOO_LARGE": "附件超过 {max_mb} MB 大小限制。",
+        "FILE_READ_BUSY": "文件读取服务繁忙，请稍后重试。",
+        "FILE_READ_TOO_LARGE": "文件超过自动读取大小限制。",
+        "FILE_INTEGRITY_FAILED": "文件上传后内容已变化，无法按此版本读取。",
+        "FILE_READ_FAILED": "无法安全读取此文件。",
         "VOICE_BROWSER_ONLY": "语音输入仅在浏览器中可用。",
         "VOICE_KIND_UNSUPPORTED": "不支持的语音提供商。",
         "VOICE_CAPABILITY_MISMATCH": "语音能力不匹配。",
@@ -741,7 +753,8 @@
         "model_call_failed": "模型调用多次重试后仍失败。请稍后重试；若持续失败，请检查模型配置或更换模型。",
         "model_call_failed_detail": "模型调用失败：{detail}",
         "model_retry_prompt": "模型接口调用失败，不要假装任务已经完成。\n\n原因：{guidance}\n\n请用用户的语言说明情况并给出下一步建议。不要用同样的请求再试一次。\n\n技术细节：{detail}",
-        "path_outside_root": "文件路径超出当前专家的存储根目录，无法读写。请改用存储根目录内的路径，或在专家设置中扩大存储根目录（Windows 上请显式指定盘符路径，例如 D:/octop-data）。"
+        "path_outside_root": "该文件不在当前专家的授权工作区内。请将文件作为聊天附件上传，Agent 就能读取并返回修改后的副本；本机原文件不会被改动。",
+        "path_outside_root_recovery": "请求的本机路径超出授权工作区。不要搜索主机文件系统、猜测虚拟路径或建议扩大访问范围。如果文件已作为本次对话的附件上传，请使用附件提供的工作区相对路径；否则请用户通过聊天上传或拖入文件。根据文件格式使用可用工具处理，将修改结果另存到 outbound/，并通过 send_file_to_user 提供下载。不要覆盖来源文件，也不要在工具确认成功前声称已读取或修改文件。"
     },
     "attachment": {
         "header": "[附件] {filename}",
@@ -927,6 +940,42 @@
         "version_unavailable": "安装程序已结束，但无法确认已安装的 Octop 版本。",
         "version_mismatch": "安装程序已结束，但已安装版本 {actual} 与目标版本 {expected} 不一致。",
         "version_not_newer": "安装程序已结束，但已安装版本 {actual} 不高于原版本 {previous}。"
+    },
+    "api": {
+        "channels": {
+            "dingtalk_authorization_failed": "钉钉授权失败。",
+            "dingtalk_connection_check_failed": "钉钉连接检查失败。",
+            "dingtalk_missing_client_id": "钉钉未返回客户端 ID。",
+            "dingtalk_missing_client_secret": "钉钉未返回客户端密钥。",
+            "dingtalk_registration_not_found": "未找到钉钉注册会话。",
+            "dingtalk_registration_poll_failed": "查询钉钉应用注册状态失败。",
+            "dingtalk_registration_start_failed": "启动钉钉应用注册失败。",
+            "dingtalk_unknown_registration_status": "钉钉返回了未知的注册状态。"
+        },
+        "validation": {
+            "skill_name_invalid": "技能名称为必填项，且不能包含路径分隔符或以 . 开头。",
+            "skill_display_name_too_long": "技能显示名称过长。",
+            "skill_label_too_long": "本地化技能标签过长。",
+            "skill_summary_too_long": "本地化技能摘要过长。",
+            "skill_icon_url_invalid": "技能图标地址必须使用 HTTP 或 HTTPS。",
+            "plugin_id_required": "插件工具必须提供 plugin_id。",
+            "subagent_slug_invalid": "子 Agent 标识为必填项，且不能包含 / 或以 . 开头。",
+            "team_host_tools_fixed": "团队主控 Agent 的工具固定为成员调度工具。",
+            "tool_name_required": "必须提供工具名称。",
+            "mobile_device_required": "必须提供设备标识。",
+            "mobile_device_required_when_enabling": "启用移动设备控制时必须提供设备标识。",
+            "mobile_device_not_connected": "ADB 设备未连接：{device}",
+            "critical_tool_cannot_be_disabled": "关键工具 {tool} 不能停用。",
+            "memory_aux_model_unavailable": "辅助模型 {model} 未在可用服务商中启用。",
+            "memory_extract_extra_body_object": "extract_extra_body 必须是 JSON 对象。",
+            "memory_extract_trigger_mode_invalid": "记忆提取触发模式必须为 idle 或 interval。"
+        }
+    },
+    "admission_proxy": {
+        "request_too_large": "登记请求过大，请减少本次输入内容。",
+        "timeout": "登记服务响应超时，请稍后重试。",
+        "unavailable": "登记服务暂不可用，请检查独立 Demo 后端。",
+        "invalid_response": "登记服务返回异常，请检查独立 Demo 后端。"
     },
     "ldap": {
         "test": {

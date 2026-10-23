@@ -89,9 +89,9 @@ export interface CaptchaChallenge {
 }
 
 export interface RegisterBody {
-  username: string;
+  email: string;
+  email_code: string;
   password: string;
-  captcha_token?: string;
   display_name?: string | null;
 }
 
@@ -99,6 +99,11 @@ export interface RegisterResponse {
   registered: boolean;
   user: { id: number; username: string };
   message: string;
+}
+
+export interface RegistrationCodeResponse {
+  sent: boolean;
+  cooldown_seconds: number;
 }
 
 export interface OidcStatus {
@@ -215,6 +220,13 @@ export const authApi = {
     request<RegisterResponse>("/auth/register", {
       method: "POST",
       body: JSON.stringify(body),
+    }),
+
+  /** Send a one-time registration code after the configured captcha passes. */
+  sendRegistrationCode: (email: string, captchaToken?: string) =>
+    request<RegistrationCodeResponse>("/auth/register/code", {
+      method: "POST",
+      body: JSON.stringify({ email, captcha_token: captchaToken }),
     }),
 
   /** Login — octop uses username + password. */

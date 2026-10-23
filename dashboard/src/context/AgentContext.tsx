@@ -35,6 +35,8 @@ export interface OctopAgent {
   owner_username?: string | null;
   /** Whether the owner has shared this expert with other users. */
   is_shared?: boolean;
+  /** Whether this expert is available in chat pickers and the chat sidebar. */
+  chat_visible?: boolean;
   /** Whether the current user owns this expert. */
   is_owner?: boolean;
   name: string;
@@ -130,12 +132,13 @@ export function selectEnabledExperts(
   options: EnabledExpertsOptions = {},
 ): OctopAgent[] {
   const { pinActive = false } = options;
-  const enabled = agents.filter(
+  const visible = agents.filter((a) => a.chat_visible !== false);
+  const enabled = visible.filter(
     (a) => a.state === "running" || Boolean(a.bridge_disconnected),
   );
   if (!pinActive || !resolvedAgentId) return enabled;
   if (enabled.some((a) => a.agent_id === resolvedAgentId)) return enabled;
-  const pinnedActive = agents.find((a) => a.agent_id === resolvedAgentId);
+  const pinnedActive = visible.find((a) => a.agent_id === resolvedAgentId);
   if (!pinnedActive) return enabled;
   return [pinnedActive, ...enabled];
 }
@@ -413,7 +416,10 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         if (haveStored) {
           persistAndApply(stored);
         } else if (merged.length > 0) {
-          persistAndApply(merged[0].agent_id);
+          // Default to an owned agent — the list may lead with a shared
+          // expert the user cannot manage (e.g. cron jobs on it are denied).
+          const owned = merged.find((a) => a.is_owner);
+          persistAndApply((owned ?? merged[0]).agent_id);
         } else {
           persistAndApply(null);
         }

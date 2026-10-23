@@ -5,10 +5,26 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 
 from octop.api.deps import get_server, require_permission
 
 router = APIRouter()
+
+
+class AuditLogItem(BaseModel):
+    id: int
+    ts: int
+    actor: str | None
+    action: str
+    target: str | None
+    payload: str | None
+    project_id: str | None
+
+
+class AuditLogProject(BaseModel):
+    project_id: str
+    name: str
 
 
 @router.get("/overview")
@@ -48,11 +64,17 @@ async def overview(
 AUDIT_LOG_MAX_LIMIT = 500
 
 
-@router.get("/audit-log")
+@router.get(
+    "/audit-log",
+    summary="Query audit log entries",
+    response_model=list[AuditLogItem],
+)
 async def audit_log(
     since: int | None = None,
+    until: int | None = None,
     actor: str | None = None,
     action: str | None = None,
+    project_id: str | None = None,
     limit: int = Query(
         default=100,
         ge=1,
@@ -62,7 +84,14 @@ async def audit_log(
     _: Any = Depends(require_permission("admin_console")),
     server: Any = Depends(get_server),
 ) -> list[dict[str, Any]]:
-    rows = server.services.audit_repo.query(since=since, actor=actor, action=action, limit=limit)
+    rows = server.services.audit_repo.query(
+        since=since,
+        until=until,
+        actor=actor,
+        action=action,
+        project_id=project_id,
+        limit=limit,
+    )
     return [
         {
             "id": r.id,
@@ -71,9 +100,23 @@ async def audit_log(
             "action": r.action,
             "target": r.target,
             "payload": r.payload,
+            "project_id": r.project_id,
         }
         for r in rows
     ]
+
+
+@router.get(
+    "/audit-log/projects",
+    summary="List projects with audit activity",
+    response_model=list[AuditLogProject],
+)
+async def audit_log_projects(
+    _: Any = Depends(require_permission("admin_console")),
+    server: Any = Depends(get_server),
+) -> list[dict[str, str]]:
+    projects: list[dict[str, str]] = server.services.audit_repo.list_projects()
+    return projects
 
 
 @router.get("/metrics")

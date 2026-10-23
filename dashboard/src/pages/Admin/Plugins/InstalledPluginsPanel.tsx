@@ -53,6 +53,11 @@ import { notifyPluginsChanged, PLUGINS_CHANGED_EVENT } from "./pluginsEvents";
 
 const { Text, Paragraph } = Typography;
 
+/** 内置平台引擎插件：星球乐园是产品内的独立工作台，不是插件。
+ *  这个插件只承担后台管道（自动拉起 8130 服务 + open_planet 工具），
+ *  不在插件管理列表里以"插件"身份露出；工具注册仍使用全量数据。 */
+const INTERNAL_PLUGIN_IDS = new Set(["lyra-planet"]);
+
 async function syncPluginUis(rows: InstalledPlugin[]): Promise<void> {
   ensureBuiltinToolRenderers();
   updateToolPluginIndex(rows);
@@ -100,7 +105,7 @@ export function InstalledPluginsPanel() {
     setLoading(true);
     try {
       const rows = await pluginsApi.list();
-      setPlugins(rows);
+      setPlugins(rows.filter((row) => !INTERNAL_PLUGIN_IDS.has(row.id)));
       void syncPluginUis(rows).catch((err) =>
         console.warn("[plugin-ui] sync after list failed:", err),
       );

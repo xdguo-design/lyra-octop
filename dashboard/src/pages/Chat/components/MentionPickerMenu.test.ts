@@ -2,6 +2,17 @@ import { describe, expect, it } from "vitest";
 import { buildMentionItems, firstFileMentionIndex } from "./MentionPickerMenu";
 
 describe("buildMentionItems", () => {
+  it("lists every available expert for an empty @ query", () => {
+    const agents = [
+      { agent_id: "A1", name: "主Agent" },
+      { agent_id: "A2", name: "研究员" },
+    ];
+    expect(buildMentionItems("", [], agents)).toEqual([
+      { kind: "agent", agent_id: "A1", label: "主Agent" },
+      { kind: "agent", agent_id: "A2", label: "研究员" },
+    ]);
+  });
+
   it("includes installed subagents as @slug picks", () => {
     const items = buildMentionItems(
       "",

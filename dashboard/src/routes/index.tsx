@@ -6,6 +6,9 @@ const ExpertsPage = lazy(() => import("../pages/Experts"));
 const CronJobsPage = lazy(() => import("../pages/Control/CronJobs"));
 const ConnectorsPage = lazy(() => import("../pages/Agent/Connectors"));
 const SkillPackagesPage = lazy(() => import("../pages/SkillPackages"));
+const ResourceMarketplacePage = lazy(
+  () => import("../pages/ResourceMarketplace"),
+);
 const KnowledgeBasesPage = lazy(() => import("../pages/KnowledgeBases"));
 const BridgePage = lazy(() => import("../pages/Settings/Bridge"));
 const PersonalizationPage = lazy(
@@ -13,6 +16,8 @@ const PersonalizationPage = lazy(
 );
 const ACPPage = lazy(() => import("../pages/Agent/ACP"));
 const TokenUsagePage = lazy(() => import("../pages/Control/TokenUsage"));
+const CreationsPage = lazy(() => import("../pages/Creations"));
+const EhrWorkbenchPage = lazy(() => import("../pages/EhrWorkbench"));
 
 // Lazy-loaded pages — Control
 const RemoteDesktopPage = lazy(() => import("../pages/Control/RemoteDesktop"));
@@ -23,6 +28,7 @@ const ModelsPage = lazy(() => import("../pages/Settings/Models"));
 // Lazy-loaded pages — Admin
 const OctopAdminUsersPage = lazy(() => import("../pages/Admin/Users"));
 const AdminSecurityPage = lazy(() => import("../pages/Settings/Security"));
+const AdminAuditLogPage = lazy(() => import("../pages/Admin/AuditLog"));
 const AdvancedSettingsPage = lazy(
   () => import("../pages/Settings/AdvancedSettings"),
 );
@@ -53,7 +59,9 @@ export const pathToKey: Record<string, string> = {
   "/tasks": "tasks",
   "/connectors": "connectors",
   "/skill-packages": "skill-packages",
+  "/skill-packages/manage": "skill-packages",
   "/knowledge-bases": "knowledge-bases",
+  "/ehr": "ehr",
   "/bridge": "bridge",
   "/personalization": "personalization",
   "/personalization/skills": "personalization",
@@ -92,6 +100,7 @@ export const pathToKey: Record<string, string> = {
   "/admin/plugins": "admin-plugins",
   "/admin/advanced": "admin-advanced",
   "/admin/security": "admin-security",
+  "/admin/audit-log": "admin-audit-log",
 };
 
 /**
@@ -153,8 +162,11 @@ export const routeConfigs: RouteConfig[] = [
   { path: "/experts", element: <ExpertsPage /> },
   { path: "/tasks", element: <CronJobsPage /> },
   { path: "/connectors", element: <ConnectorsPage /> },
-  { path: "/skill-packages", element: <SkillPackagesPage /> },
+  { path: "/skill-packages", element: <ResourceMarketplacePage /> },
+  { path: "/skill-packages/manage", element: <SkillPackagesPage /> },
   { path: "/knowledge-bases", element: <KnowledgeBasesPage /> },
+  { path: "/ehr", element: <EhrWorkbenchPage /> },
+  { path: "/creations", element: <CreationsPage /> },
   { path: "/bridge", element: <BridgePage /> },
   {
     path: "/personalization/acp",
@@ -229,12 +241,13 @@ export const routeConfigs: RouteConfig[] = [
   { path: "/admin/backend", element: <AdminStoragePage /> },
   {
     path: "/admin/audit",
-    element: <Navigate to="/admin/security?tab=audit" replace />,
+    element: <Navigate to="/admin/audit-log" replace />,
   },
   { path: "/admin/agents", element: <Navigate to="/admin/users" replace /> },
   { path: "/admin/plugins", element: <AdminPluginsPage /> },
   { path: "/admin/advanced", element: <AdvancedSettingsPage /> },
   { path: "/admin/security", element: <AdminSecurityPage /> },
+  { path: "/admin/audit-log", element: <AdminAuditLogPage /> },
   {
     path: "/admin/voice",
     element: <Navigate to="/admin/models?tab=voice" replace />,
@@ -254,7 +267,7 @@ export const routeConfigs: RouteConfig[] = [
   },
   {
     path: "/orca/admin/audit",
-    element: <Navigate to="/admin/security?tab=audit" replace />,
+    element: <Navigate to="/admin/audit-log" replace />,
   },
   { path: "/octop/cron", element: <Navigate to="/tasks" replace /> },
   { path: "/octop/channels", element: <Navigate to="/channels" replace /> },
@@ -264,7 +277,7 @@ export const routeConfigs: RouteConfig[] = [
   },
   {
     path: "/octop/admin/audit",
-    element: <Navigate to="/admin/security?tab=audit" replace />,
+    element: <Navigate to="/admin/audit-log" replace />,
   },
   {
     path: "/advanced-settings",

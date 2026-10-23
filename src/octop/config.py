@@ -143,6 +143,10 @@ class OctopConfig:
     capabilities: CapabilitiesConfig = field(default_factory=CapabilitiesConfig)
     max_upload_mb: int = DEFAULT_MAX_UPLOAD_MB
     browser_idle_timeout_minutes: int = DEFAULT_BROWSER_IDLE_TIMEOUT_MINUTES
+    workbench_code_root: str | None = None
+    workbench_launch_root: str | None = None
+    workbench_launch_profiles: list[dict[str, Any]] = field(default_factory=list)
+    workbench_preview_domain: str | None = None
 
     @property
     def max_upload_bytes(self) -> int:
@@ -514,6 +518,12 @@ def load_config(path: Path) -> OctopConfig:
                 )
             ),
         )
+    if v := os.environ.get("OCTOP_WORKBENCH_CODE_ROOT"):
+        merged["workbench_code_root"] = v.strip() or None
+    if v := os.environ.get("OCTOP_WORKBENCH_LAUNCH_ROOT"):
+        merged["workbench_launch_root"] = v.strip() or None
+    if v := os.environ.get("OCTOP_WORKBENCH_PREVIEW_DOMAIN"):
+        merged["workbench_preview_domain"] = v.strip() or None
 
     capabilities = _parse_capabilities_section(raw.get("capabilities"))
     if v := os.environ.get("OCTOP_ENABLE_MOBILE"):
@@ -629,5 +639,21 @@ def load_config(path: Path) -> OctopConfig:
                     DEFAULT_BROWSER_IDLE_TIMEOUT_MINUTES,
                 )
             ),
+        ),
+        workbench_code_root=(
+            str(merged["workbench_code_root"]).strip()
+            if merged.get("workbench_code_root")
+            else None
+        ),
+        workbench_launch_root=(
+            str(merged["workbench_launch_root"]).strip()
+            if merged.get("workbench_launch_root")
+            else None
+        ),
+        workbench_launch_profiles=merged.get("workbench_launch_profiles") or [],
+        workbench_preview_domain=(
+            str(merged["workbench_preview_domain"]).strip()
+            if merged.get("workbench_preview_domain")
+            else None
         ),
     )

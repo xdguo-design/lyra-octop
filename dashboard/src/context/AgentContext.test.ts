@@ -41,6 +41,21 @@ describe("selectEnabledExperts", () => {
     ]);
   });
 
+  it("excludes agents marked as platform or team only", () => {
+    const agents = [
+      agent("chat", "running"),
+      agent("platform-only", "running", { chat_visible: false }),
+    ];
+    expect(selectEnabledExperts(agents, null).map((a) => a.agent_id)).toEqual([
+      "chat",
+    ]);
+    expect(
+      selectEnabledExperts(agents, "platform-only", { pinActive: true }).map(
+        (a) => a.agent_id,
+      ),
+    ).toEqual(["chat"]);
+  });
+
   it("hides general-assistant and system-doctor style experts once they are stopped", () => {
     // User's two scenarios from the bug report.
     const agents = [

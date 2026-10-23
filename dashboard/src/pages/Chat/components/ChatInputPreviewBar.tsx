@@ -1,8 +1,9 @@
 import { Image } from "antd";
-import { X, FileText, Cpu } from "lucide-react";
+import { X, FileText, Cpu, AlertCircle, RotateCcw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAuthImageSrc } from "../../../hooks/useAuthImageSrc";
 import type { ChatAttachment } from "../hooks/useChat";
+import type { ChatUploadItem } from "../hooks/useChatAttachments";
 import type { KnowledgeBase } from "../../../api/modules/knowledgeBases";
 import { ConnectorLogo } from "../../Agent/Connectors/connectorDefs";
 import { knowledgeIconForName } from "../../KnowledgeBases/knowledgeIcons";
@@ -15,6 +16,9 @@ import styles from "../index.module.less";
 interface ChatInputPreviewBarProps {
   attachments: ChatAttachment[];
   uploading: boolean;
+  uploadItems?: ChatUploadItem[];
+  onRemoveUpload?: (key: string) => void;
+  onRetryUpload?: (key: string) => void;
   selectedConnectors: string[];
   selectedKnowledgeBaseIds: string[];
   selectedModel?: string | null;
@@ -90,6 +94,9 @@ function ComposerImagePreview({
 export default function ChatInputPreviewBar({
   attachments,
   uploading,
+  uploadItems,
+  onRemoveUpload,
+  onRetryUpload,
   selectedConnectors,
   selectedKnowledgeBaseIds,
   availableConnectors,
@@ -100,6 +107,7 @@ export default function ChatInputPreviewBar({
   selectedModel,
   onModelChange,
 }: ChatInputPreviewBarProps) {
+  const { t } = useTranslation();
   // Show the chip whenever a model is explicitly selected, mirroring how
   // connectors behave — not only when it differs from the
   // agent default (that was the old "override" behavior).
@@ -211,13 +219,55 @@ export default function ChatInputPreviewBar({
           </div>
         );
       })}
-      {uploading && (
-        <div className={styles.imagePreviewItem}>
-          <div className={styles.imagePreviewLoading}>
-            <div className={styles.uploadSpinner} />
-          </div>
-        </div>
-      )}
+      {uploadItems && onRemoveUpload && onRetryUpload
+        ? uploadItems
+            .filter((item) => item.status !== "done")
+            .map((item) => (
+              <div
+                key={item.key}
+                className={styles.attachmentPreviewCard}
+                data-upload-status={item.status}
+              >
+                <div className={styles.attachmentPreviewMeta}>
+                  {item.status === "failed" ? (
+                    <AlertCircle
+                      size={14}
+                      className={styles.attachmentPreviewIcon}
+                    />
+                  ) : (
+                    <div className={styles.uploadSpinner} />
+                  )}
+                  <span className={styles.attachmentPreviewName}>
+                    {item.file.name}
+                  </span>
+                </div>
+                {item.status === "failed" && (
+                  <button
+                    className={styles.imagePreviewRemove}
+                    onClick={() => onRetryUpload(item.key)}
+                    aria-label={t("upload.retry", "Retry")}
+                    type="button"
+                  >
+                    <RotateCcw size={12} />
+                  </button>
+                )}
+                <button
+                  className={styles.imagePreviewRemove}
+                  onClick={() => onRemoveUpload(item.key)}
+                  aria-label={t("chat.removeAttachment", "Remove attachment")}
+                  type="button"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))
+        : uploading && (
+            <div className={styles.imagePreviewItem}>
+              <div className={styles.imagePreviewLoading}>
+                <div className={styles.uploadSpinner} />
+              </div>
+            </div>
+          )}
       {availableConnectors &&
         onConnectorsChange &&
         selectedConnectors.map((name) => {

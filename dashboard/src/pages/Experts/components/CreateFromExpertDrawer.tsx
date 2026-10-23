@@ -72,6 +72,7 @@ import {
 import AgentBackendFields from "./AgentBackendFields";
 import ExpertAvatarPicker from "./ExpertAvatarPicker";
 import ExpertComposerDefaultsFields from "./ExpertComposerDefaultsFields";
+import AgentModelReasoningFields from "./AgentModelReasoningFields";
 import WelcomeConfig, { type WelcomeConfigRef } from "./WelcomeConfig";
 import {
   normalizeQuickPrompts,
@@ -225,6 +226,8 @@ export default function CreateFromExpertDrawer({
       agent_id?: string;
       welcome_message?: string;
       default_model: string;
+      reasoning_mode?: "auto" | "enabled" | "disabled";
+      reasoning_effort?: string;
       conversation_mode: ConversationMode;
       backend_choice: string;
       composite_default: string;
@@ -269,6 +272,7 @@ export default function CreateFromExpertDrawer({
 
   const backendChoice =
     Form.useWatch("backend_choice", form) ?? DEFAULT_BACKEND;
+  const selectedModel = Form.useWatch("default_model", form);
   const watchedRootDir = Form.useWatch("root_dir", form);
   const skillPackagesSupported = supportsHostSkillPackages({
     backendChoice,
@@ -314,6 +318,8 @@ export default function CreateFromExpertDrawer({
       agent_id: undefined,
       welcome_message: defaults.welcome_message,
       default_model: MODEL_AUTO_VALUE,
+      reasoning_mode: "auto",
+      reasoning_effort: undefined,
       conversation_mode: DEFAULT_CONVERSATION_MODE,
       backend_choice: DEFAULT_BACKEND,
       composite_default: DEFAULT_BACKEND,
@@ -395,6 +401,8 @@ export default function CreateFromExpertDrawer({
     const values = await form.validateFields();
     const stored = form.getFieldsValue(true) as {
       welcome_message?: string;
+      reasoning_mode?: "auto" | "enabled" | "disabled";
+      reasoning_effort?: string;
     };
     if (values.backend_choice === "composite") {
       const pathError = validatePathMappings(pathMappings, t);
@@ -448,6 +456,8 @@ export default function CreateFromExpertDrawer({
         description: values.description || undefined,
         agent_id: values.agent_id?.trim() || undefined,
         default_model: defaultModelFromForm(values.default_model) ?? undefined,
+        reasoning_mode: stored.reasoning_mode,
+        reasoning_effort: stored.reasoning_effort,
         backend: backendSpec,
         skill_package_ids: skillPackagesSupported
           ? values.skill_package_ids ?? []
@@ -786,6 +796,15 @@ export default function CreateFromExpertDrawer({
           <Select
             loading={modelsLoading}
             options={modelOptions}
+            onChange={(value: string) => {
+              const capability = models.find(
+                (model) => `${model.provider_name}/${model.model}` === value,
+              )?.reasoning_config;
+              form.setFieldsValue({
+                reasoning_mode: capability?.default_mode ?? "auto",
+                reasoning_effort: capability?.default_effort ?? undefined,
+              });
+            }}
             placeholder={t("experts.defaultModelPlaceholder")}
             showSearch
             filterOption={(input, opt) =>
@@ -795,6 +814,14 @@ export default function CreateFromExpertDrawer({
             }
           />
         </Form.Item>
+        <AgentModelReasoningFields
+          capability={
+            models.find(
+              (model) =>
+                `${model.provider_name}/${model.model}` === selectedModel,
+            )?.reasoning_config
+          }
+        />
 
         <AgentBackendFields
           backends={backends}

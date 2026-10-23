@@ -130,12 +130,14 @@ def build_app(server: OctopServer) -> FastAPI:
         )
 
     from octop.api.middleware.bridge_proxy import install as install_bridge_proxy
+    from octop.api.middleware.project_preview_proxy import install as install_project_preview_proxy
 
     # Bridge proxy must sit inside JWT auth so ``request.state.octop_user`` is set
     # (Starlette runs the last-added middleware first).
     install_bridge_proxy(app, server)
     install_jwt_auth(app, server)
     install_setup_lockdown(app, server)
+    install_project_preview_proxy(app, server)
 
     if server.app_runtime is not None and server.app_runtime.bridge_manager is not None:
         from octop.api.bridge_peer import prepare_peer_dashboard_turn
@@ -159,6 +161,9 @@ def build_app(server: OctopServer) -> FastAPI:
     from octop.api.routers import (
         acp,
         admin,
+        admission_demo,
+        admission_demo_proxy,
+        admission_registration,
         agent_files,
         agent_tools,
         agents,
@@ -172,10 +177,12 @@ def build_app(server: OctopServer) -> FastAPI:
         channels,
         chat,
         connectors,
+        creations,
         cron,
         desktop,
         envs,
         experts,
+        files,
         health,
         i18n,
         internal_mcp,
@@ -207,6 +214,7 @@ def build_app(server: OctopServer) -> FastAPI:
         user_roles,
         users,
         voice,
+        workbench,
         workspace,
     )
     from octop.api.routers.filesystem import router as filesystem_router
@@ -234,13 +242,19 @@ def build_app(server: OctopServer) -> FastAPI:
             _RouterMount(user_roles.router, "/api/users/roles", ["users"]),
             _RouterMount(users.router, "/api/users", ["users"]),
             _RouterMount(agents.router, "/api/agents", ["agents"]),
+            _RouterMount(admission_demo.router, "/api", ["admission-demo"]),
+            _RouterMount(admission_registration.router, "/api", ["admission-registration"]),
+            _RouterMount(admission_demo_proxy.router, "", ["admission-registration"]),
             _RouterMount(agent_tools.router, "/api", ["agents"]),
             _RouterMount(acp.router, "/api", ["agents"]),
             _RouterMount(chat.router, "/api", ["chat"]),
             _RouterMount(slash.router, "/api", ["slash"]),
             _RouterMount(connectors.router, "/api", ["connectors"]),
+            _RouterMount(creations.router, "/api", ["creations"]),
+            _RouterMount(workbench.router, "/api", ["workbench"]),
             _RouterMount(bridge.router, "/api", ["bridge"]),
             _RouterMount(knowledge_bases.router, "/api", ["knowledge"]),
+            _RouterMount(files.router, "/api", ["files"]),
             _RouterMount(internal_mcp.router, "/api", ["internal-mcp"]),
             _RouterMount(channels.router, "/api", ["channels"]),
             _RouterMount(cron.router, "/api", ["cron"]),
@@ -330,6 +344,11 @@ def build_app(server: OctopServer) -> FastAPI:
                         return _dashboard_fallback(index_file, full_path)
                     if candidate.is_file():
                         return _dashboard_response(candidate, full_path)
+                    # Embedded sub-apps (e.g. admission-registration/) ship their
+                    # own index.html; serve it for their bare directory URLs.
+                    dir_index = candidate / "index.html"
+                    if dir_index.is_file():
+                        return _dashboard_response(dir_index, f"{full_path.rstrip('/')}/index.html")
                 return _dashboard_fallback(index_file, full_path)
 
     return app

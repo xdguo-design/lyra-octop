@@ -25,7 +25,9 @@ export const VALID_PALETTES: ThemePalette[] = [
 /** Curated palettes only — "custom" is handled separately via a hex value. */
 export const CURATED_PALETTES: ThemePalette[] = [...VALID_PALETTES];
 
-export const DEFAULT_PALETTE: ThemePalette = "rose";
+/** LYRA 私有部署默认品牌色：tech 蓝（与 LYRA 恐龙标识、侧栏主按钮同族）。
+ *  rose 是 Octop 上游默认，与 LYRA 品牌冲突；仅保留在调色板选择器中。 */
+export const DEFAULT_PALETTE: ThemePalette = "tech";
 export const DEFAULT_CUSTOM_COLOR = "#4B74FA";
 
 /** True when the value is one of the curated palette keys (not "custom"/hex). */

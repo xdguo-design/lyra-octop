@@ -74,6 +74,14 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         "description": "Dashboard chat: WebSocket streaming, threads, conversation history, trajectory ledger, and text-push toasts.",
     },
     {
+        "name": "admission-demo",
+        "description": "Authenticated demo assistant that extracts candidate registration fields using the active platform model.",
+    },
+    {
+        "name": "admission-registration",
+        "description": "Authenticated mock identity, region, validation, and submission API for the Vue admission-registration prototype.",
+    },
+    {
         "name": "slash",
         "description": "Slash command metadata for composer menus and inline help.",
     },
@@ -82,12 +90,24 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         "description": "Third-party integrations (Notion, Figma, …) exposed as MCP servers.",
     },
     {
+        "name": "creations",
+        "description": "Account-owned platform plans, deployed service links, and folders.",
+    },
+    {
+        "name": "workbench",
+        "description": "Account-owned workbench projects, folders, thread grouping, and read-only code browsing.",
+    },
+    {
         "name": "bridge",
         "description": "Link this Octop to remote Octop instances (HTTP tunnel + remote chat).",
     },
     {
         "name": "knowledge",
         "description": "Private, shareable document knowledge bases and their indexing capability.",
+    },
+    {
+        "name": "files",
+        "description": "Conversation file reads with ownership checks, bounded parsing, and source locations.",
     },
     {
         "name": "internal-mcp",

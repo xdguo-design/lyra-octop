@@ -1,32 +1,42 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Drawer, Form, Input, Select, Spin, Switch, Alert } from "antd";
+import {
+  Button,
+  Drawer,
+  Form,
+  Input,
+  Modal,
+  Select,
+  Spin,
+  Switch,
+  Alert,
+  Tag,
+  Typography,
+} from "antd";
 import { message } from "@/utils/antdMessage";
 
 import {
   Activity,
-  Blocks,
+  BookOpen,
   CheckCircle2,
   ClipboardPaste,
   Copy,
   Download,
   ExternalLink,
-  Link2,
-  Plug,
+  GraduationCap,
   Plus,
   RefreshCw,
   Sparkles,
   Wrench,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import PageShell from "../../../layouts/PageShell";
-import TabBar, { type TabBarItem } from "../../../components/TabLabel/TabBar";
-import StreamSetupGuide from "../../../components/StreamSetupGuide/StreamSetupGuide";
-import { OctopEmptyMascot } from "../../../components/EmptyState/OctopEmptyMascot";
 import { useCurrentUser } from "../../../hooks/useCurrentUser";
+import { useAgent } from "../../../context/AgentContext";
 import { userCan } from "../../../utils/permissions";
 import { apiErrorMessage } from "../../../utils/apiError";
+import { pickLocale } from "../../../utils/localizedText";
 import { copyText } from "../../../utils/copyText";
 import {
   clearFormDraft,
@@ -43,6 +53,15 @@ import {
   type ConnectorInstanceDetail,
   type FeishuUserAuthStartResult,
 } from "../../../api/modules/connectors";
+import {
+  expertMarketApi,
+  type MarketExpert,
+} from "../../../api/modules/expertMarket";
+import { skillPackagesApi } from "../../../api/modules/skillPackages";
+import type { SkillPackage } from "../../../api/types/skillPackage";
+import { request } from "../../../api/request";
+import { UnifiedResourceBrowser } from "./UnifiedResourceBrowser";
+import type { ResourceKind, UnifiedResource } from "./resourceCatalog";
 import { ConnectorCard } from "./ConnectorCard";
 import { AgentlyAuth } from "./AgentlyAuth";
 import { ConnectorInstanceCard } from "./ConnectorInstanceCard";
@@ -68,6 +87,36 @@ import {
 } from "./openAuthWindow";
 import { useConnectorInstances } from "./useConnectors";
 import styles from "./index.module.less";
+
+interface FreeLLMSkill {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  status: "verified";
+  github_url: string;
+  content_path: string;
+  last_checked_at: string;
+}
+
+interface FreeLLMCatalog {
+  items: FreeLLMSkill[];
+}
+
+interface FreeLLMPreview extends FreeLLMSkill {
+  markdown: string;
+  content_bytes: number;
+}
+
+type ConnectorResourceItem =
+  | {
+      type: "instance";
+      instance: ConnectorInstance;
+      entry?: ConnectorCatalogEntry;
+    }
+  | { type: "catalog"; entry: ConnectorCatalogEntry };
+
+type UnifiedResourceItem = MarketExpert | FreeLLMSkill | ConnectorResourceItem;
 
 function buildCredentials(
   entry: ConnectorCatalogEntry,
@@ -2246,18 +2295,31 @@ function ConnectorConfigDrawer({
   );
 }
 
-type ConnectorTab = "enabled" | "builtin" | "custom";
-
-const CONNECTOR_TABS: TabBarItem<ConnectorTab>[] = [
-  { key: "enabled", labelKey: "connectors.tabEnabled", icon: Link2 },
-  { key: "builtin", labelKey: "connectors.tabBuiltin", icon: Blocks },
-  { key: "custom", labelKey: "connectors.tabCustom", icon: Wrench },
-];
-
 export default function ConnectorsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<ConnectorTab>("enabled");
+  const navigate = useNavigate();
+  const user = useCurrentUser();
+  const { agents } = useAgent();
+  const canReadExperts = userCan(user, "experts");
+  const canReadSkills = userCan(user, "skill_packages");
+  const [showCustomMcp, setShowCustomMcp] = useState(false);
+  const [experts, setExperts] = useState<MarketExpert[]>([]);
+  const [skills, setSkills] = useState<FreeLLMSkill[]>([]);
+  const [installedSkillSlugs, setInstalledSkillSlugs] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [skillPackages, setSkillPackages] = useState<SkillPackage[]>([]);
+  const [skillPreview, setSkillPreview] = useState<FreeLLMPreview | null>(null);
+  const [skillPreviewBusy, setSkillPreviewBusy] = useState(false);
+  const [skillImportBusy, setSkillImportBusy] = useState(false);
+  const [skillPackageId, setSkillPackageId] = useState("");
+  const [directoryLoading, setDirectoryLoading] = useState<Set<ResourceKind>>(
+    () => new Set(),
+  );
+  const [directoryErrors, setDirectoryErrors] = useState<
+    Partial<Record<ResourceKind, string>>
+  >({});
   const [drawerEntry, setDrawerEntry] = useState<ConnectorCatalogEntry | null>(
     null,
   );
@@ -2266,11 +2328,65 @@ export default function ConnectorsPage() {
   const [customFocusServerName, setCustomFocusServerName] = useState<
     string | null
   >(null);
-  const { catalog, instances, loading, refresh } = useConnectorInstances();
+  const {
+    catalog,
+    instances,
+    loading: connectorLoading,
+    refresh,
+  } = useConnectorInstances();
 
-  const configuredCount = useMemo(() => {
-    return instances.filter((instance) => instance.has_credentials).length;
-  }, [instances]);
+  const loadDirectory = useCallback(
+    async (kind: ResourceKind) => {
+      if (
+        (kind === "expert" && !canReadExperts) ||
+        (kind === "skill" && !canReadSkills)
+      ) {
+        return;
+      }
+      setDirectoryLoading((current) => new Set(current).add(kind));
+      setDirectoryErrors((current) => {
+        const next = { ...current };
+        delete next[kind];
+        return next;
+      });
+      try {
+        if (kind === "expert") {
+          const result = await expertMarketApi.list("");
+          setExperts(result.items);
+        } else if (kind === "skill") {
+          const [result, installed, packages] = await Promise.all([
+            request<FreeLLMCatalog>("/skill-packages/freellm/catalog"),
+            skillPackagesApi.listInstalledSlugs(),
+            skillPackagesApi.listWritable(),
+          ]);
+          setSkills(result.items);
+          setInstalledSkillSlugs(new Set(installed));
+          setSkillPackages(packages);
+        }
+      } catch (error) {
+        const fallback =
+          kind === "expert"
+            ? t("connectors.unified.expertsLoadFailed", "专家目录加载失败")
+            : t("connectors.unified.skillsLoadFailed", "技能目录加载失败");
+        setDirectoryErrors((current) => ({
+          ...current,
+          [kind]: apiErrorMessage(error, fallback, t),
+        }));
+      } finally {
+        setDirectoryLoading((current) => {
+          const next = new Set(current);
+          next.delete(kind);
+          return next;
+        });
+      }
+    },
+    [canReadExperts, canReadSkills, t],
+  );
+
+  useEffect(() => {
+    if (canReadExperts) void loadDirectory("expert");
+    if (canReadSkills) void loadDirectory("skill");
+  }, [canReadExperts, canReadSkills, loadDirectory]);
 
   useEffect(() => {
     const oauthState = searchParams.get("oauth_state");
@@ -2328,147 +2444,286 @@ export default function ConnectorsPage() {
     notifyConnectorsChanged();
   }, [refresh]);
 
+  const installedExpertIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const agent of agents) {
+      if (agent.kind === "team") continue;
+      const template = agent.template_name?.trim();
+      if (template) {
+        ids.add(template);
+        continue;
+      }
+      const legacy = agent.config?.expert_id;
+      if (typeof legacy === "string" && legacy.trim()) ids.add(legacy.trim());
+    }
+    return ids;
+  }, [agents]);
+
+  const unifiedResources = useMemo<
+    UnifiedResource<UnifiedResourceItem>[]
+  >(() => {
+    const lang: "zh" | "en" = i18n.language.startsWith("zh") ? "zh" : "en";
+    const connectedKinds = new Set(instances.map((instance) => instance.kind));
+    return [
+      ...(canReadExperts
+        ? experts.map((expert) => ({
+            key: `expert:${expert.slug}`,
+            kind: "expert" as const,
+            name: pickLocale(expert.label, lang) || expert.slug,
+            description: pickLocale(expert.description, lang),
+            category: expert.scene || "",
+            enabled: installedExpertIds.has(expert.id),
+            statusLabel: t("connectors.unified.expertInstalled", "已安装"),
+            item: expert,
+          }))
+        : []),
+      ...(canReadSkills
+        ? skills.map((skill) => ({
+            key: `skill:${skill.id}`,
+            kind: "skill" as const,
+            name: skill.name,
+            description: skill.description,
+            category: skill.category,
+            enabled: installedSkillSlugs.has(skill.id),
+            statusLabel: t("connectors.unified.skillImported", "已导入"),
+            item: skill,
+          }))
+        : []),
+      ...instances.map((instance) => ({
+        key: `connector-instance:${instance.instance_id}`,
+        kind: "connector" as const,
+        name: instance.display_name,
+        description: instance.description || "",
+        category:
+          catalog.find((entry) => entry.kind === instance.kind)?.category ||
+          "self_hosted",
+        enabled: instance.status === "active" && instance.has_credentials,
+        statusLabel: t("connectors.unified.connectorEnabled", "已启用"),
+        item: {
+          type: "instance" as const,
+          instance,
+          entry: catalog.find((entry) => entry.kind === instance.kind),
+        },
+      })),
+      ...catalog
+        .filter((entry) => !connectedKinds.has(entry.kind))
+        .map((entry) => ({
+          key: `connector-catalog:${entry.kind}`,
+          kind: "connector" as const,
+          name: entry.name,
+          description: entry.description,
+          category: entry.category,
+          enabled: false,
+          item: { type: "catalog" as const, entry },
+        })),
+    ];
+  }, [
+    canReadExperts,
+    canReadSkills,
+    catalog,
+    experts,
+    i18n.language,
+    installedExpertIds,
+    installedSkillSlugs,
+    instances,
+    skills,
+    t,
+  ]);
+
+  const availableKinds = useMemo(
+    () => [
+      ...(canReadExperts ? (["expert"] as const) : []),
+      ...(canReadSkills ? (["skill"] as const) : []),
+      "connector" as const,
+    ],
+    [canReadExperts, canReadSkills],
+  );
+
+  const handleEditInstance = useCallback(
+    (instance: ConnectorInstance) => {
+      if (instance.kind === "custom-mcp") {
+        setCustomFocusServerName(instance.mcp_server_name);
+        setShowCustomMcp(true);
+        return;
+      }
+      const entry = catalog.find((row) => row.kind === instance.kind);
+      if (entry) handleConfigure(entry, instance);
+    },
+    [catalog, handleConfigure],
+  );
+
+  const openSkill = async (skill: FreeLLMSkill) => {
+    setSkillPreviewBusy(true);
+    setSkillPreview(null);
+    setSkillPackageId("");
+    try {
+      setSkillPreview(
+        await request<FreeLLMPreview>(
+          `/skill-packages/freellm/${encodeURIComponent(skill.id)}/preview`,
+        ),
+      );
+    } catch (error) {
+      message.error(
+        apiErrorMessage(
+          error,
+          t("connectors.unified.skillPreviewFailed", "技能预览失败"),
+          t,
+        ),
+      );
+    } finally {
+      setSkillPreviewBusy(false);
+    }
+  };
+
+  const importSkill = async () => {
+    if (!skillPreview || !skillPackageId || skillImportBusy) return;
+    setSkillImportBusy(true);
+    try {
+      await request(
+        `/skill-packages/${encodeURIComponent(
+          skillPackageId,
+        )}/skills/freellm/import`,
+        {
+          method: "POST",
+          body: JSON.stringify({ skill_id: skillPreview.id, overwrite: false }),
+        },
+      );
+      message.success(t("connectors.unified.importSuccess", "技能已导入"));
+      setSkillPreview(null);
+      await loadDirectory("skill");
+    } catch (error) {
+      message.error(
+        apiErrorMessage(
+          error,
+          t("connectors.unified.skillImportFailed", "技能导入失败"),
+          t,
+        ),
+      );
+    } finally {
+      setSkillImportBusy(false);
+    }
+  };
+
+  const renderResource = (resource: UnifiedResource<UnifiedResourceItem>) => {
+    if (resource.kind === "connector") {
+      const connector = resource.item as ConnectorResourceItem;
+      return connector.type === "instance" ? (
+        <ConnectorInstanceCard
+          instance={connector.instance}
+          catalogEntry={connector.entry}
+          onEdit={handleEditInstance}
+          onChanged={handleSaved}
+        />
+      ) : (
+        <ConnectorCard
+          entry={connector.entry}
+          onConfigure={(entry, instance) => handleConfigure(entry, instance)}
+        />
+      );
+    }
+
+    const isExpert = resource.kind === "expert";
+    const icon = isExpert ? (
+      <GraduationCap size={20} />
+    ) : (
+      <BookOpen size={20} />
+    );
+    const action = isExpert
+      ? () => navigate("/experts")
+      : () => void openSkill(resource.item as FreeLLMSkill);
+    return (
+      <article className={styles.unifiedResourceCard}>
+        <div className={styles.unifiedResourceHead}>
+          <span className={styles.unifiedResourceIcon}>{icon}</span>
+          <div className={styles.unifiedResourceTitle}>{resource.name}</div>
+          <Button
+            type="text"
+            icon={<Plus size={16} />}
+            aria-label={
+              isExpert
+                ? t("connectors.unified.openExpert", "打开专家")
+                : t("connectors.unified.previewSkill", "预览技能")
+            }
+            onClick={action}
+          />
+        </div>
+        <p className={styles.unifiedResourceDescription}>
+          {resource.description}
+        </p>
+        <div className={styles.unifiedResourceFooter}>
+          <Tag>
+            {isExpert
+              ? t("connectors.unified.experts", "专家")
+              : t("connectors.unified.skills", "技能")}
+          </Tag>
+          <span>{resource.category}</span>
+          {resource.enabled ? (
+            <Tag color="success">{resource.statusLabel}</Tag>
+          ) : (
+            <Button size="small" onClick={action}>
+              {isExpert
+                ? t("connectors.unified.openExpert", "查看")
+                : t("connectors.unified.previewSkill", "预览")}
+            </Button>
+          )}
+        </div>
+      </article>
+    );
+  };
+
   const handleCloseDrawer = useCallback(() => {
     setDrawerEntry(null);
     setDrawerInstance(null);
   }, []);
 
   return (
-    <PageShell.Tabbed
+    <PageShell
       title={t("pageShell.connectors.title")}
       subtitle={t("pageShell.connectors.subtitle")}
-      tabBar={
-        <TabBar
-          tabs={CONNECTOR_TABS}
-          activeKey={activeTab}
-          onChange={(key) => {
-            if (key === "custom") setCustomFocusServerName(null);
-            setActiveTab(key);
+      fill
+      actions={
+        <Button
+          icon={<Wrench size={14} />}
+          onClick={() => {
+            setCustomFocusServerName(null);
+            setShowCustomMcp((value) => !value);
           }}
-        />
+        >
+          {showCustomMcp
+            ? t("connectors.unified.backToResources", "返回资源列表")
+            : t("connectors.unified.manageCustomMcp", "管理自定义 MCP")}
+        </Button>
       }
     >
-      {activeTab === "custom" ? (
+      {showCustomMcp ? (
         <CustomMcpTab focusServerName={customFocusServerName} />
-      ) : activeTab === "enabled" ? (
-        loading ? (
-          <div className={styles.loadingState}>
-            <Spin />
-          </div>
-        ) : instances.length === 0 ? (
-          <div className={styles.emptyLayout}>
-            <StreamSetupGuide
-              className={styles.emptyGuide}
-              wide
-              plain
-              icon={<OctopEmptyMascot />}
-              title={t("connectors.emptyGuideTitle")}
-              description={t("connectors.emptyGuideDesc")}
-              steps={[
-                {
-                  label: t("connectors.emptyGuideStepWhat"),
-                  detail: t("connectors.emptyGuideStepWhatDetail"),
-                },
-                {
-                  label: t("connectors.emptyGuideStepHow"),
-                  detail: t("connectors.emptyGuideStepHowDetail"),
-                },
-                {
-                  label: t("connectors.emptyGuideStepShare"),
-                  detail: t("connectors.emptyGuideStepShareDetail"),
-                },
-              ]}
-              primaryAction={{
-                label: t("connectors.emptyGuideBrowseBuiltin"),
-                onClick: () => setActiveTab("builtin"),
-                icon: <Plug size={14} />,
-              }}
-              secondaryAction={{
-                label: t("connectors.emptyGuideAddCustom"),
-                onClick: () => {
-                  setCustomFocusServerName(null);
-                  setActiveTab("custom");
-                },
-                icon: <Plus size={14} />,
-                type: "default",
-              }}
-            />
-          </div>
-        ) : (
-          <>
-            <div className={styles.listToolbar}>
-              <span className={styles.listToolbarMeta}>
-                {t("connectors.enabledSummary", {
-                  count: instances.length,
-                  defaultValue: "已启用 {{count}} 个连接器实例",
-                })}
-              </span>
-              <Button
-                icon={<RefreshCw size={14} />}
-                loading={loading}
-                onClick={() => void refresh()}
-              >
-                {t("common.refresh")}
-              </Button>
-            </div>
-            <div className={styles.typeGrid}>
-              {instances.map((instance) => (
-                <ConnectorInstanceCard
-                  key={instance.instance_id}
-                  instance={instance}
-                  catalogEntry={catalog.find(
-                    (entry) => entry.kind === instance.kind,
-                  )}
-                  onEdit={(item) => {
-                    if (item.kind === "custom-mcp") {
-                      setCustomFocusServerName(item.mcp_server_name);
-                      setActiveTab("custom");
-                      return;
-                    }
-                    const entry = catalog.find((row) => row.kind === item.kind);
-                    if (entry) handleConfigure(entry, item);
-                  }}
-                  onChanged={handleSaved}
-                />
-              ))}
-            </div>
-          </>
-        )
       ) : (
-        <>
-          <div className={styles.listToolbar}>
-            <span className={styles.listToolbarMeta}>
-              {t("connectors.listSummary", {
-                total: catalog.length,
-                configured: configuredCount,
-                defaultValue:
-                  "当前支持 {{total}} 个连接器，已配置 {{configured}} 个",
-              })}
-            </span>
+        <UnifiedResourceBrowser
+          resources={unifiedResources}
+          availableKinds={availableKinds}
+          loading={connectorLoading || directoryLoading.size > 0}
+          errors={directoryErrors}
+          onRetry={(kind) => {
+            if (kind === "connector") void refresh();
+            else void loadDirectory(kind);
+          }}
+          renderResource={(resource) =>
+            renderResource(resource as UnifiedResource<UnifiedResourceItem>)
+          }
+          toolbarAction={
             <Button
               icon={<RefreshCw size={14} />}
-              loading={loading}
-              onClick={() => void refresh()}
+              loading={connectorLoading || directoryLoading.size > 0}
+              onClick={() => {
+                void refresh();
+                if (canReadExperts) void loadDirectory("expert");
+                if (canReadSkills) void loadDirectory("skill");
+              }}
             >
               {t("common.refresh")}
             </Button>
-          </div>
-          {loading ? (
-            <div className={styles.loadingState}>
-              <Spin />
-            </div>
-          ) : (
-            <div className={styles.typeGrid}>
-              {catalog.map((entry) => (
-                <ConnectorCard
-                  key={entry.kind}
-                  entry={entry}
-                  onConfigure={handleConfigure}
-                />
-              ))}
-            </div>
-          )}
-        </>
+          }
+        />
       )}
 
       <ConnectorConfigDrawer
@@ -2481,6 +2736,84 @@ export default function ConnectorsPage() {
           void handleSaved();
         }}
       />
-    </PageShell.Tabbed>
+      <Modal
+        title={t("connectors.unified.skillPreviewTitle", "预览并导入技能")}
+        open={Boolean(skillPreview) || skillPreviewBusy}
+        onCancel={() => {
+          if (!skillImportBusy) {
+            setSkillPreview(null);
+            setSkillPreviewBusy(false);
+          }
+        }}
+        footer={
+          <div className={styles.unifiedModalActions}>
+            <Button
+              onClick={() => setSkillPreview(null)}
+              disabled={skillImportBusy}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="primary"
+              icon={<Download size={15} />}
+              disabled={!skillPreview || !skillPackageId || skillImportBusy}
+              loading={skillImportBusy}
+              onClick={() => void importSkill()}
+            >
+              {t("connectors.unified.confirmImport", "确认导入")}
+            </Button>
+          </div>
+        }
+        width={820}
+        destroyOnHidden
+      >
+        {skillPreviewBusy ? (
+          <Spin />
+        ) : skillPreview ? (
+          <>
+            <Typography.Paragraph>
+              {skillPreview.description}
+            </Typography.Paragraph>
+            <Typography.Text type="secondary">
+              {t("connectors.unified.skillSource", "来源")}:{" "}
+              <a
+                href={skillPreview.github_url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {skillPreview.github_url}
+              </a>
+            </Typography.Text>
+            <pre className={styles.unifiedSkillPreview}>
+              {skillPreview.markdown}
+            </pre>
+            <Typography.Paragraph type="warning">
+              {t(
+                "connectors.unified.skillUntrustedWarning",
+                "请审阅外部技能内容后再导入",
+              )}
+            </Typography.Paragraph>
+            <Select
+              className={styles.packageSelect}
+              placeholder={t(
+                "connectors.unified.choosePackage",
+                "选择目标技能包",
+              )}
+              value={skillPackageId || undefined}
+              onChange={setSkillPackageId}
+              options={skillPackages.map((pkg) => ({
+                label: pkg.name,
+                value: pkg.id,
+              }))}
+            />
+            {skillPackages.length === 0 ? (
+              <Button onClick={() => navigate("/skill-packages/manage")}>
+                {t("connectors.unified.createPackageFirst", "先创建技能包")}
+              </Button>
+            ) : null}
+          </>
+        ) : null}
+      </Modal>
+    </PageShell>
   );
 }

@@ -1,570 +1,4319 @@
-/* ============================================================
-   手绘蜡笔风 AI 工作台 · /home
-   布局 = Manus 任务式双栏：左栏（新建任务/导航/任务历史/用户）
-   + 中央（居中 hero / 入口卡 / 底部大输入框）。
-   风格基因：奶油纸张底 + 深棕蜡笔描边 + 荧光笔高亮 + 贴纸卡片。
-   本页固定暖色纸张风，不随全站明暗主题切换。
-   ============================================================ */
+/* ===================================================================
+   WB dark-theme layer (generated): every literal color in this file
+   is mapped to a --wbk-* token; html[data-theme="dark"] flips them.
+   `color: #fff` on colored surfaces intentionally stays literal.
+   =================================================================== */
+:root {
+  --wbk-0: #242b32;
+  --wbk-1: #747b80;
+  --wbk-2: #f8f7f3;
+  --wbk-3: #fffefa;
+  --wbk-4: #e7e5df;
+  --wbk-5: #e6ac53;
+  --wbk-6: #d5e7ed;
+  --wbk-7: #4d806c;
+  --wbk-8: #f9d99f;
+  --wbk-9: #f1f0eb;
+  --wbk-10: #dedfdc;
+  --wbk-11: #f6d89d;
+  --wbk-12: #d4d2ca;
+  --wbk-13: #dbd9d2;
+  --wbk-14: #d0cec6;
+  --wbk-15: #cfcec8;
+  --wbk-16: #515b5e;
+  --wbk-17: #e6e6e0;
+  --wbk-18: #e1e8e4;
+  --wbk-19: #273f37;
+  --wbk-20: #8b8c86;
+  --wbk-21: #9a9b96;
+  --wbk-22: #666d6b;
+  --wbk-23: #e2e2db;
+  --wbk-24: #9c9e99;
+  --wbk-25: #737c79;
+  --wbk-26: #5d977c;
+  --wbk-27: #dbeadf;
+  --wbk-28: #c2c6bf;
+  --wbk-29: #2d4840;
+  --wbk-30: #d9e9db;
+  --wbk-31: #fbfaf7;
+  --wbk-32: #bdbdb6;
+  --wbk-33: #eeeae2;
+  --wbk-34: #a0a3a0;
+  --wbk-35: #333b3a;
+  --wbk-36: #667571;
+  --wbk-37: #ae9d85;
+  --wbk-38: #eae4da;
+  --wbk-39: #e0e0d9;
+  --wbk-40: #8b9691;
+  --wbk-41: #d4a45e;
+  --wbk-42: #293b3b;
+  --wbk-43: #e0ebed;
+  --wbk-44: #29383b;
+  --wbk-45: #e9dcbf;
+  --wbk-46: #f5cf86;
+  --wbk-47: #858d8b;
+  --wbk-48: #d3d1c9;
+  --wbk-49: #ede9df;
+  --wbk-50: #e7e0d3;
+  --wbk-51: #fffdf8;
+  --wbk-52: #e8f0ee;
+  --wbk-53: #c7d9d2;
+  --wbk-54: #e3eae7;
+  --wbk-55: #f8dfac;
+  --wbk-56: #bddedb;
+  --wbk-57: #91938d;
+  --wbk-58: #7b827f;
+  --wbk-59: #5a7067;
+  --wbk-60: #84928b;
+  --wbk-61: #364c52;
+  --wbk-62: #fff;
+  --wbk-63: #5f6c68;
+  --wbk-64: #c69954;
+  --wbk-65: #e5e2dc;
+  --wbk-66: #fffdf9;
+  --wbk-67: #e5e2d9;
+  --wbk-68: #f8f1e3;
+  --wbk-69: #d9c5a4;
+  --wbk-70: #92968f;
+  --wbk-71: #bfaa87;
+  --wbk-72: #8a8e87;
+  --wbk-73: #496d62;
+  --wbk-74: #d5e1d8;
+  --wbk-75: #3e6357;
+  --wbk-76: #f3dfb8;
+  --wbk-77: #8b6530;
+  --wbk-78: #d5dfea;
+  --wbk-79: #4f7288;
+  --wbk-80: #d3d3cb;
+  --wbk-81: #8fa9a3;
+  --wbk-82: #a6aaa3;
+  --wbk-83: #eff2ed;
+  --wbk-84: #547366;
+  --wbk-85: #9a9e99;
+  --wbk-86: #a1a49d;
+  --wbk-87: #303d3b;
+  --wbk-88: #4b6961;
+  --wbk-89: #8d6148;
+  --wbk-90: #aaa9a2;
+  --wbk-91: #e3c6a0;
+  --wbk-92: #fff6e7;
+  --wbk-93: #865f3b;
+  --wbk-94: #e7e4de;
+  --wbk-95: #e3efed;
+  --wbk-96: #354b4b;
+  --wbk-97: #8d9690;
+  --wbk-98: #deded5;
+  --wbk-99: #f4eee2;
+  --wbk-100: #d2dcd9;
+  --wbk-101: #e5efed;
+  --wbk-102: #386052;
+  --wbk-103: #efe0c9;
+  --wbk-104: #e5d2b4;
+  --wbk-105: #7c603c;
+  --wbk-106: #5a6b65;
+  --wbk-107: #a5a69e;
+  --wbk-108: #ebe6dd;
+  --wbk-109: #343c3c;
+  --wbk-110: #e6f0e9;
+  --wbk-111: #d5e5d8;
+  --wbk-112: #f0f1ee;
+  --wbk-113: #346d70;
+  --wbk-114: #8b8d83;
+  --wbk-115: #b8894a;
+  --wbk-116: #fff2df;
+  --wbk-117: #e6cba1;
+  --wbk-118: #906c38;
+  --wbk-119: #f7dfa9;
+  --wbk-120: #f8f8f5;
+  --wbk-121: #dcded8;
+  --wbk-122: #347261;
+  --wbk-123: #919994;
+  --wbk-124: #daeae5;
+  --wbk-125: #e0e4de;
+  --wbk-126: #e6eee9;
+  --wbk-127: #e1e5df;
+  --wbk-128: #eef4f0;
+  --wbk-129: #cad3cd;
+  --wbk-130: #334a42;
+  --wbk-131: #747e78;
+  --wbk-132: #8b958d;
+  --wbk-133: #293a36;
+  --wbk-134: #e5e8e6;
+  --wbk-135: #f1f3f1;
+  --wbk-136: #7c8984;
+  --wbk-137: #e7ece9;
+  --wbk-138: #334d42;
+  --wbk-139: #31584c;
+  --wbk-140: #e7ebe7;
+  --wbk-141: #f6f7f5;
+  --wbk-142: #e4e8e3;
+  --wbk-143: #cbd9d2;
+  --wbk-144: #e9f2ef;
+  --wbk-145: #38685a;
+  --wbk-146: #899791;
+  --wbk-147: #a76c41;
+  --wbk-148: #fcf0e8;
+  --wbk-149: #397d58;
+  --wbk-150: #e9f6ec;
+  --wbk-151: #78877f;
+  --wbk-152: #456d5e;
+  --wbk-153: #638c81;
+  --wbk-154: #f0f3f0;
+  --wbk-155: #718077;
+  --wbk-156: #87978b;
+  --wbk-157: #698779;
+  --wbk-158: #dbe6dc;
+  --wbk-159: #f5faf6;
+  --wbk-160: #41715e;
+  --wbk-161: #f1f2ee;
+  --wbk-162: #eff2f1;
+  --wbk-163: #77918a;
+  --wbk-164: #586861;
+  --wbk-165: #acaca7;
+  --wbk-166: #4c9b72;
+  --wbk-167: #e9eeea;
+  --wbk-168: #8b9790;
+  --wbk-169: #a6b2a7;
+  --wbk-170: #5a9c76;
+  --wbk-171: #e2efe7;
+  --wbk-172: #dce8e3;
+  --wbk-173: #f5faf9;
+  --wbk-174: #e8f4f0;
+  --wbk-175: #b7d7cc;
+  --wbk-176: #7b938b;
+  --wbk-177: #6c9184;
+  --wbk-178: #dcece8;
+  --wbk-179: #376f70;
+  --wbk-180: #44675b;
+  --wbk-181: #eaf4ef;
+  --wbk-182: #768a7f;
+  --wbk-183: #f7f8f6;
+  --wbk-184: #85918a;
+  --wbk-185: #dce6df;
+  --wbk-186: #425f53;
+  --wbk-187: #f9fbf9;
+  --wbk-188: #f7f8fa;
+  --wbk-189: #ffffff;
+  --wbk-190: #202b37;
+  --wbk-191: #e8ebf0;
+  --wbk-192: #7ca8e8;
+  --wbk-193: #3b8a74;
+  --wbk-194: #f8f9fb;
+  --wbk-195: #e9edf2;
+  --wbk-196: #cad5e0;
+  --wbk-197: #f0f6fb;
+  --wbk-198: #dce8f1;
+  --wbk-199: #dce9ff;
+  --wbk-200: #315cbd;
+  --wbk-201: #42554e;
+  --wbk-202: #eef3f0;
+  --wbk-203: #cfcfc8;
+  --wbk-204: #e9ece9;
+  --wbk-205: #357cf4;
+  --wbk-206: #286cdb;
+  --wbk-207: #2367e1;
+  --wbk-208: #657485;
+  --wbk-209: #e3eaf1;
+  --wbk-210: #f8fafc;
+  --wbk-211: #eaf3ff;
+  --wbk-212: #b4ccea;
+  --wbk-213: #6087ab;
+  --wbk-214: #3a6e9d;
+  --wbk-215: #dcecff;
+  --wbk-216: #273847;
+  --wbk-217: #798a97;
+  --wbk-218: #e6eff9;
+  --wbk-219: #4979a1;
+  --wbk-220: #e2e8f1;
+  --wbk-221: #3177d6;
+  --wbk-222: rgba(68, 117, 141, 0.42);
+  --wbk-223: rgba(251, 250, 247, 0.93);
+  --wbk-224: rgba(56, 50, 40, 0.055);
+  --wbk-225: rgba(108, 157, 145, 0.12);
+  --wbk-226: rgba(20, 40, 32, 0.09);
+  --wbk-227: rgba(37, 50, 43, 0.025);
+  --wbk-228: rgba(20, 45, 75, 0.08);
+  --wbk-229: rgba(30, 50, 70, 0.035);
+  --wbk-230: rgba(49, 108, 224, 0.22);
+  --wbk-231: rgba(22, 33, 50, 0.12);
+  --wbk-232: rgba(25, 36, 47, 0.43);
+  --wbk-233: #f3f8ff;
+  --wbk-234: #5a6b7a;
+  --wbk-235: #d5493f;
+  --wbk-236: #eec4c0;
+  --wbk-237: #fdf1f0;
+  --wbk-238: #9aa7b3;
+  --wbk-239: #eef1f4;
+  --wbk-240: #8a97a3;
+  --wbk-241: #33424f;
+  --wbk-242: #eef4fa;
+  --wbk-243: #e7effa;
+  --wbk-244: #1f3b57;
+  --wbk-245: #5c7d99;
+  --wbk-246: #6b7a87;
+  --wbk-247: #45566a;
+  --wbk-248: #2f6bc4;
+  --wbk-249: #2f6bc429;
+  --wbk-250: #7a8a97;
+  --wbk-251: #e8eef5;
+  --wbk-252: #2f5f96;
+  --wbk-253: #2a5fb3;
+}
 
-.wb-root {
-  /* palette */
-  --wb-paper: #faf3e4;
-  --wb-paper-deep: #f5ecd7;
-  --wb-ink: #3b3a36;
-  --wb-ink-soft: rgba(59, 58, 54, 0.62);
-  --wb-yellow: #ffd43b;
-  --wb-yellow-soft: #ffe066;
-  --wb-blue: #4dabf7;
-  --wb-blue-soft: #a5d8ff;
-  --wb-green: #69db7c;
-  --wb-green-soft: #b2f2bb;
-  --wb-orange: #ffa94d;
-  --wb-pink: #f783ac;
-  --wb-card: #fffdf6;
-  --wb-wood: #e7b96a;
-  --wb-wood-deep: #c98f3f;
-
-  --wb-hand: "ZCOOL KuaiLe", "PingFang SC", "Hiragino Sans GB",
-    "Microsoft YaHei", sans-serif;
-  --wb-brush: "Ma Shan Zheng", "ZCOOL KuaiLe", "KaiTi", serif;
-
-  position: fixed;
-  inset: 0;
+/* Project folders, collaboration portraits, and the read-only source browser. */
+.wb-project-group {
+  width: 100%;
+}
+.wb-project-icon {
+  width: 16px;
+  flex: none;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1;
+}
+.wb-project-folder-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding-left: 12px;
+}
+.wb-project-folder-toggle {
+  position: absolute;
+  left: 12px;
   z-index: 1;
   display: grid;
-  grid-template-columns: 264px minmax(0, 1fr);
-  gap: 14px;
+  place-items: center;
+  width: 18px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--wbk-250);
+}
+.wb-project-folder-toggle svg {
+  transition: transform 0.15s ease;
+}
+.wb-project-folder-toggle.is-collapsed svg {
+  transform: rotate(-90deg);
+}
+.wb-project-folder-row .wb-nav-item {
+  flex: 1;
+  min-width: 0;
+  padding-left: 22px;
+}
+.wb-project-folder-row .wb-project-actions {
+  right: 4px;
+}
+.wb-project-folder-row:hover .wb-project-actions {
+  display: inline-flex;
+}
+.wb-project-row.is-editing .wb-project-actions,
+.wb-project-folder-row.is-editing .wb-project-actions {
+  display: none;
+}
+.wb-project-folder-row:hover .wb-nav-item small {
+  visibility: hidden;
+}
+.wb-agent-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 150px;
+}
+.wb-code-browser {
+  display: grid;
+  grid-template-columns: minmax(190px, 250px) minmax(0, 1fr);
+  height: calc(100vh - 130px);
+  min-height: 350px;
+  border: 1px solid var(--wbk-209);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.wb-code-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  overflow: auto;
+  border-right: 1px solid var(--wbk-209);
+  background: var(--wbk-251);
+}
+.wb-code-tree-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--wbk-209);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.wb-code-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 31px;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wbk-216);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+.wb-code-entry:hover,
+.wb-code-entry.is-selected {
+  background: var(--wbk-62);
+  color: var(--wbk-212);
+}
+.wb-code-entry span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wb-code-preview {
+  min-width: 0;
+  overflow: auto;
+  background: var(--wbk-62);
+}
+.wb-code-file-path {
+  position: sticky;
+  top: 0;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--wbk-209);
+  background: var(--wbk-62);
+  color: var(--wbk-240);
+  font-size: 12px;
+}
+.wb-code-preview pre {
+  margin: 0;
   padding: 14px;
+  color: var(--wbk-216);
+  font:
+    12px/1.65 Consolas,
+    Monaco,
+    monospace;
+  white-space: pre;
+}
+.wb-code-error {
+  margin: 8px;
+  color: #b42318;
+  font-size: 12px;
+}
+
+html[data-theme="dark"] {
+  --wbk-0: #ced5dc;
+  --wbk-1: #828688;
+  --wbk-2: #2a2618;
+  --wbk-3: #1f1e18;
+  --wbk-4: #373329;
+  --wbk-5: #dbaa5e;
+  --wbk-6: #203a43;
+  --wbk-7: #8ca59b;
+  --wbk-8: #e4ab44;
+  --wbk-9: #2e2c20;
+  --wbk-10: #353732;
+  --wbk-11: #e4ae44;
+  --wbk-12: #474439;
+  --wbk-13: #403d33;
+  --wbk-14: #4a473d;
+  --wbk-15: #47463e;
+  --wbk-16: #a4a9ab;
+  --wbk-17: #35352b;
+  --wbk-18: #29352e;
+  --wbk-19: #c9ded7;
+  --wbk-20: #777774;
+  --wbk-21: #676865;
+  --wbk-22: #949796;
+  --wbk-23: #39392e;
+  --wbk-24: #646562;
+  --wbk-25: #858a88;
+  --wbk-26: #779386;
+  --wbk-27: #243d2a;
+  --wbk-28: #494e46;
+  --wbk-29: #c8ddd7;
+  --wbk-30: #243f28;
+  --wbk-31: #272315;
+  --wbk-32: #474744;
+  --wbk-33: #373020;
+  --wbk-34: #5d5e5d;
+  --wbk-35: #d0d6d5;
+  --wbk-36: #8e9593;
+  --wbk-37: #70675b;
+  --wbk-38: #3e3423;
+  --wbk-39: #3a3a30;
+  --wbk-40: #6c716f;
+  --wbk-41: #cba267;
+  --wbk-42: #ccdcdc;
+  --wbk-43: #213539;
+  --wbk-44: #ccd9dc;
+  --wbk-45: #c8a860;
+  --wbk-46: #e8c073;
+  --wbk-47: #747877;
+  --wbk-48: #47453a;
+  --wbk-49: #3a3321;
+  --wbk-50: #443925;
+  --wbk-51: #201e18;
+  --wbk-52: #20312d;
+  --wbk-53: #334b42;
+  --wbk-54: #27342e;
+  --wbk-55: #e4af44;
+  --wbk-56: #2b5753;
+  --wbk-57: #70706e;
+  --wbk-58: #7f8281;
+  --wbk-59: #949f9b;
+  --wbk-60: #707774;
+  --wbk-61: #c8d6db;
+  --wbk-62: #191919;
+  --wbk-63: #969d9b;
+  --wbk-64: #bd975d;
+  --wbk-65: #39342b;
+  --wbk-66: #201d18;
+  --wbk-67: #3d382a;
+  --wbk-68: #2d2922;
+  --wbk-69: #4e4433;
+  --wbk-70: #6c6e6b;
+  --wbk-71: #6a604e;
+  --wbk-72: #747673;
+  --wbk-73: #9bada8;
+  --wbk-74: #2d3f32;
+  --wbk-75: #a5b8b2;
+  --wbk-76: #e0ac48;
+  --wbk-77: #97723f;
+  --wbk-78: #223244;
+  --wbk-79: #8597a2;
+  --wbk-80: #45453b;
+  --wbk-81: #5c6966;
+  --wbk-82: #585a57;
+  --wbk-83: #252c20;
+  --wbk-84: #94a39d;
+  --wbk-85: #636562;
+  --wbk-86: #5f605d;
+  --wbk-87: #ced8d7;
+  --wbk-88: #9eaca9;
+  --wbk-89: #a69083;
+  --wbk-90: #5b5b57;
+  --wbk-91: #654e31;
+  --wbk-92: #2e2619;
+  --wbk-93: #b19e8c;
+  --wbk-94: #383329;
+  --wbk-95: #1f3733;
+  --wbk-96: #cad9d9;
+  --wbk-97: #6b706d;
+  --wbk-98: #3e3e31;
+  --wbk-99: #2f2b24;
+  --wbk-100: #32413c;
+  --wbk-101: #203430;
+  --wbk-102: #a9bdb6;
+  --wbk-103: #483923;
+  --wbk-104: #59472b;
+  --wbk-105: #b3a593;
+  --wbk-106: #98a19e;
+  --wbk-107: #5e5f5b;
+  --wbk-108: #3b3323;
+  --wbk-109: #d0d6d6;
+  --wbk-110: #1f3425;
+  --wbk-111: #28412d;
+  --wbk-112: #272a22;
+  --wbk-113: #9ebbbc;
+  --wbk-114: #797a74;
+  --wbk-115: #9a8262;
+  --wbk-116: #32281b;
+  --wbk-117: #634f30;
+  --wbk-118: #b19f85;
+  --wbk-119: #e4b344;
+  --wbk-120: #26261b;
+  --wbk-121: #383b32;
+  --wbk-122: #9cbcb3;
+  --wbk-123: #686c6a;
+  --wbk-124: #233e36;
+  --wbk-125: #30362d;
+  --wbk-126: #223228;
+  --wbk-127: #2f362c;
+  --wbk-128: #1d2d22;
+  --wbk-129: #3a463e;
+  --wbk-130: #cadad4;
+  --wbk-131: #848986;
+  --wbk-132: #6c726e;
+  --wbk-133: #ccdbd8;
+  --wbk-134: #2a302c;
+  --wbk-135: #212721;
+  --wbk-136: #79807d;
+  --wbk-137: #26302a;
+  --wbk-138: #c8dbd3;
+  --wbk-139: #c4ded6;
+  --wbk-140: #272f27;
+  --wbk-141: #21241d;
+  --wbk-142: #2b3229;
+  --wbk-143: #34473e;
+  --wbk-144: #1d322b;
+  --wbk-145: #a3bbb4;
+  --wbk-146: #6b7370;
+  --wbk-147: #a48772;
+  --wbk-148: #2f2219;
+  --wbk-149: #93b5a2;
+  --wbk-150: #1b3120;
+  --wbk-151: #7c837f;
+  --wbk-152: #9cb0a9;
+  --wbk-153: #7d928c;
+  --wbk-154: #202820;
+  --wbk-155: #838a86;
+  --wbk-156: #6c746e;
+  --wbk-157: #808e88;
+  --wbk-158: #293b2b;
+  --wbk-159: #16291a;
+  --wbk-160: #9ab2a9;
+  --wbk-161: #282a21;
+  --wbk-162: #212926;
+  --wbk-163: #75827e;
+  --wbk-164: #9ba3a0;
+  --wbk-165: #575754;
+  --wbk-166: #789f8b;
+  --wbk-167: #242e26;
+  --wbk-168: #6b716e;
+  --wbk-169: #505650;
+  --wbk-170: #739482;
+  --wbk-171: #1f3829;
+  --wbk-172: #273b32;
+  --wbk-173: #162925;
+  --wbk-174: #1b332b;
+  --wbk-175: #325a4d;
+  --wbk-176: #727e7a;
+  --wbk-177: #778a83;
+  --wbk-178: #213d36;
+  --wbk-179: #9db9ba;
+  --wbk-180: #a1b2ac;
+  --wbk-181: #1b3226;
+  --wbk-182: #7a847e;
+  --wbk-183: #20241c;
+  --wbk-184: #717773;
+  --wbk-185: #293a2e;
+  --wbk-186: #a7b6b0;
+  --wbk-187: #182318;
+  --wbk-188: #181c26;
+  --wbk-189: #191919;
+  --wbk-190: #cad4e0;
+  --wbk-191: #202731;
+  --wbk-192: #7da4de;
+  --wbk-193: #89b0a5;
+  --wbk-194: #161b26;
+  --wbk-195: #1d2632;
+  --wbk-196: #2c3b4b;
+  --wbk-197: #17222b;
+  --wbk-198: #202f3b;
+  --wbk-199: #1c2433;
+  --wbk-200: #3c60b2;
+  --wbk-201: #afb8b5;
+  --wbk-202: #1f2b24;
+  --wbk-203: #47473e;
+  --wbk-204: #272d27;
+  --wbk-205: #4380e6;
+  --wbk-206: #356fce;
+  --wbk-207: #316bd3;
+  --wbk-208: #828a92;
+  --wbk-209: #1e2a37;
+  --wbk-210: #151d26;
+  --wbk-211: #18202c;
+  --wbk-212: #2a3d56;
+  --wbk-213: #677a8c;
+  --wbk-214: #416e96;
+  --wbk-215: #1c2633;
+  --wbk-216: #c6d4e0;
+  --wbk-217: #70787e;
+  --wbk-218: #1b2531;
+  --wbk-219: #748ca0;
+  --wbk-220: #1e2838;
+  --wbk-221: #3d79ca;
+  --wbk-222: rgba(132, 157, 169, 0.42);
+  --wbk-223: rgba(39, 35, 21, 0.93);
+  --wbk-224: rgba(219, 214, 205, 0.055);
+  --wbk-225: rgba(110, 135, 129, 0.12);
+  --wbk-226: rgba(203, 227, 217, 0.09);
+  --wbk-227: rgba(206, 219, 212, 0.025);
+  --wbk-228: rgba(199, 211, 225, 0.08);
+  --wbk-229: rgba(199, 212, 225, 0.035);
+  --wbk-230: rgba(62, 112, 211, 0.22);
+  --wbk-231: rgba(202, 211, 226, 0.12);
+  --wbk-232: rgba(202, 214, 226, 0.43);
+  --wbk-233: #151d27;
+  --wbk-234: #8d959d;
+  --wbk-235: #ca534a;
+  --wbk-236: #4e2925;
+  --wbk-237: #2a1817;
+  --wbk-238: #52595f;
+  --wbk-239: #1d252d;
+  --wbk-240: #62696f;
+  --wbk-241: #c8d2db;
+  --wbk-242: #18222d;
+  --wbk-243: #1a2330;
+  --wbk-244: #c5d2e0;
+  --wbk-245: #758694;
+  --wbk-246: #7f868d;
+  --wbk-247: #9ea7b1;
+  --wbk-248: #3a6db9;
+  --wbk-249: #3a6db9;
+  --wbk-250: #6f777e;
+  --wbk-251: #1b2632;
+  --wbk-252: #3c689b;
+  --wbk-253: #3461a9;
+}
+
+/* LYRA private-cloud workbench
+   Manus-inspired structure with an original paper / editorial design language.
+   This route deliberately does not inherit the global admin-page chrome. */
+
+.wb-root {
+  --wb-ink: var(--wbk-0);
+  --wb-muted: var(--wbk-1);
+  --wb-paper: var(--wbk-2);
+  --wb-white: var(--wbk-3);
+  --wb-line: var(--wbk-4);
+  --wb-accent: var(--wbk-5);
+  --wb-blue: var(--wbk-6);
+  --wb-green: var(--wbk-7);
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: 256px minmax(0, 1fr);
+  min-width: 0;
   overflow: hidden;
   color: var(--wb-ink);
-  background-color: var(--wb-paper);
-  background-image: radial-gradient(
-    rgba(59, 58, 54, 0.05) 1px,
-    transparent 1.4px
-  );
-  background-size: 24px 24px;
-  font-family: var(--wb-hand);
+  background: var(--wb-paper);
+  font-family: "ZCOOL KuaiLe", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
 }
-
+.wb-root,
+.wb-root * {
+  box-sizing: border-box;
+}
+.wb-side button,
+.wb-main:not(.wb-feature-main) button,
+.wb-platform-shell button,
+.wb-feature-main > .wb-topbar button,
+.wb-side input,
+.wb-main:not(.wb-feature-main) input,
+.wb-platform-shell input,
+.wb-main:not(.wb-feature-main) textarea {
+  font: inherit;
+}
+.wb-side button,
+.wb-main:not(.wb-feature-main) button,
+.wb-platform-shell button,
+.wb-feature-main > .wb-topbar button {
+  cursor: pointer;
+  color: inherit;
+}
+/* UA 按钮底色清除：只给确实需要透明的裸图标钮显式声明（其余按钮自带背景） */
+.wb-task-more,
+.wb-project-actions button,
+.wb-brand,
+.wb-nav-item,
+.wb-sidebar-footer {
+  background: transparent;
+}
+.wb-side button:focus-visible,
+.wb-side input:focus-visible,
+.wb-main:not(.wb-feature-main) button:focus-visible,
+.wb-main:not(.wb-feature-main) textarea:focus-visible,
+.wb-platform-shell button:focus-visible,
+.wb-platform-shell input:focus-visible,
+.wb-feature-main > .wb-topbar button:focus-visible {
+  outline: 3px solid var(--wbk-222);
+  outline-offset: 3px;
+}
+.wb-side button:disabled,
+.wb-main:not(.wb-feature-main) button:disabled,
+.wb-platform-shell button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .wb-root ::selection {
-  background: var(--wb-yellow-soft);
+  background: var(--wbk-8);
 }
-
-/* 手绘 wobble 圆角（不规则半径轮换，模拟手画框） */
-.wb-wobble {
-  border: 2.5px solid var(--wb-ink);
-  border-radius: 14px 255px 15px 225px / 225px 15px 255px 15px;
-  background: var(--wb-card);
-  box-shadow: 3px 4px 0 rgba(59, 58, 54, 0.16);
-}
-.wb-wobble-sm {
-  border: 2px solid var(--wb-ink);
-  border-radius: 10px 155px 12px 145px / 145px 12px 165px 12px;
-  background: var(--wb-card);
-}
-
-/* ============ 左栏 ============ */
 .wb-side {
   display: flex;
   flex-direction: column;
-  gap: 12px;
   min-height: 0;
-  padding: 8px 6px 4px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  gap: 0;
+  padding: 26px 16px 15px;
+  background: var(--wbk-9);
+  border-right: 1px solid var(--wbk-10);
 }
-
-.wb-logo {
+.wb-brand {
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 2px 4px 10px;
-  font-family: var(--wb-hand);
-  color: var(--wb-ink);
+  width: 100%;
+  gap: 11px;
+  padding: 0 9px 28px;
+  border: 0;
+  background: transparent;
   text-align: left;
-  cursor: pointer;
-  background: none;
-  border: none;
-  border-bottom: 2.5px dashed rgba(59, 58, 54, 0.35);
 }
-.wb-logo-img {
-  width: 78px;
-  height: 78px;
-  object-fit: contain;
-  mix-blend-mode: multiply;
-  transform: rotate(-4deg);
-}
-.wb-logo-text {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-}
-.wb-logo-title {
-  font-family: var(--wb-brush);
-  font-size: 26px;
-  line-height: 1;
-  letter-spacing: 1px;
-  white-space: nowrap;
-}
-.wb-logo-tape {
-  padding: 3px 10px;
-  font-size: 12.5px;
-  color: var(--wb-ink);
-  background: var(--wb-yellow);
+.wb-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 43px;
+  height: 43px;
+  flex: none;
+  background: var(--wbk-11);
   border: 2px solid var(--wb-ink);
-  border-radius: 3px 18px 4px 16px / 16px 4px 18px 3px;
-  transform: rotate(-2deg);
-  box-shadow: 2px 2px 0 rgba(59, 58, 54, 0.18);
+  border-radius: 16px 15px 17px 14px;
+  transform: rotate(-6deg);
+  box-shadow: 3px 3px 0 var(--wbk-12);
 }
-
-.wb-newtask {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 11px 12px;
-  font-family: var(--wb-hand);
-  font-size: 16.5px;
-  letter-spacing: 1px;
-  color: var(--wb-ink);
-  cursor: pointer;
-  background: var(--wb-yellow);
-  border: 2.5px solid var(--wb-ink);
-  border-radius: 12px 130px 14px 120px / 120px 14px 140px 12px;
-  box-shadow: 2.5px 3.5px 0 rgba(59, 58, 54, 0.22);
-  transition: transform 0.13s ease, box-shadow 0.13s ease;
-}
-.wb-newtask:hover {
-  transform: translate(-1px, -2px) rotate(-0.6deg);
-  box-shadow: 4px 6px 0 rgba(59, 58, 54, 0.24);
-}
-.wb-newtask:active {
-  transform: translate(1px, 1px);
-  box-shadow: 1px 2px 0 rgba(59, 58, 54, 0.2);
-}
-
-.wb-nav {
+.wb-brand-copy {
   display: flex;
   flex-direction: column;
   gap: 5px;
+  min-width: 0;
+}
+.wb-brand-copy strong {
+  font:
+    800 22px/1 "ZCOOL KuaiLe",
+    sans-serif;
+  letter-spacing: -0.04em;
+}
+.wb-brand-copy i {
+  font:
+    italic 400 16px/1 Georgia,
+    serif;
+  letter-spacing: -0.03em;
+}
+.wb-brand-copy small {
+  font: 600 9px/1 sans-serif;
+  color: var(--wb-muted);
+  letter-spacing: 0.19em;
+}
+.wb-newtask {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 45px;
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid var(--wb-ink);
+  border-radius: 11px;
+  background: var(--wb-white);
+  font-weight: 700 !important;
+  box-shadow: 3px 4px 0 var(--wbk-13);
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease;
+}
+.wb-newtask:hover {
+  transform: translateY(-2px);
+  box-shadow: 4px 6px 0 var(--wbk-14);
+}
+.wb-newtask-shortcut {
+  margin-left: auto;
+  opacity: 0.45;
+  font-size: 18px;
+}
+.wb-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 26px;
+  padding-bottom: 19px;
+  border-bottom: 1px dashed var(--wbk-15);
 }
 .wb-nav-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  font-family: var(--wb-hand);
-  font-size: 15.5px;
-  color: var(--wb-ink);
-  text-align: left;
-  cursor: pointer;
+  gap: 12px;
+  width: 100%;
+  min-height: 41px;
+  padding: 9px 11px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: var(--wbk-16) !important;
   background: transparent;
-  border: 2.5px solid transparent;
-  border-radius: 12px 120px 12px 110px / 110px 12px 130px 12px;
-  transition: background 0.15s ease, transform 0.15s ease;
+  text-align: left;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.wb-nav-item svg {
+  flex: none;
 }
 .wb-nav-item:hover {
-  background: rgba(255, 224, 102, 0.45);
-  transform: translateX(2px) rotate(-0.4deg);
+  background: var(--wbk-17);
 }
-
-.wb-side-section {
+.wb-nav-item.is-active {
+  background: var(--wbk-18);
+  color: var(--wbk-19) !important;
+  font-weight: 700;
+}
+.wb-nav-chevron,
+.wb-active-dot {
+  margin-left: auto;
+}
+.wb-active-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--wbk-7);
+}
+.wb-sidebar-section {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  margin-top: 6px;
-  padding: 0 6px;
-  font-size: 13px;
-  letter-spacing: 2px;
-  color: var(--wb-ink-soft);
+  margin: 22px 11px 12px;
+  color: var(--wbk-20);
+  font-size: 12px;
+  letter-spacing: 0.06em;
 }
-.wb-side-section button {
+.wb-task-section {
   padding: 0;
-  font-family: var(--wb-hand);
-  font-size: 12.5px;
-  letter-spacing: 0;
-  color: var(--wb-ink-soft);
-  background: none;
-  border: none;
+}
+.wb-task-filter,
+.wb-task-collapse {
+  border: 0;
+  background: transparent;
+  color: inherit;
   cursor: pointer;
 }
-.wb-side-section button:hover {
-  color: var(--wb-ink);
+.wb-task-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-align: left;
 }
-
+.wb-task-collapse {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin: -4px -5px -4px 0;
+  border-radius: 5px;
+  color: var(--wbk-20);
+}
+.wb-task-collapse:hover {
+  background: var(--wbk-251);
+}
+.wb-task-collapse svg {
+  transition: transform 0.16s ease;
+  transform: rotate(-90deg);
+}
+.wb-task-collapse svg.is-open {
+  transform: none;
+}
+.wb-sidebar-section strong {
+  font-weight: 500;
+}
 .wb-task-list {
+  display: flex;
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
   overflow-y: auto;
-  padding: 2px;
+  flex-direction: column;
+  gap: 3px;
   scrollbar-width: thin;
 }
+.wb-recycle-section {
+  display: block;
+  margin-top: 12px;
+  letter-spacing: normal;
+}
+.wb-recycled-folders {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 7px;
+}
+.wb-recycled-folder {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 5px 7px;
+  border-radius: 6px;
+  color: var(--wbk-20);
+  font-size: 12px;
+}
+.wb-recycled-folder > span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wb-recycled-folder button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 23px;
+  height: 23px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.wb-recycled-folder button:hover {
+  background: var(--wbk-251);
+}
+.wb-recycle-empty {
+  padding: 3px 7px;
+  color: var(--wbk-20);
+  font-size: 11px;
+}
 .wb-task-empty {
-  padding: 14px 8px;
-  font-size: 13.5px;
-  color: var(--wb-ink-soft);
-  text-align: center;
+  margin: 10px 10px;
+  color: var(--wbk-21);
+  font-size: 12px;
+  line-height: 1.8;
 }
 .wb-task-item {
   display: flex;
   align-items: center;
-  gap: 8px;
   width: 100%;
-  padding: 7.5px 10px;
-  font-family: var(--wb-hand);
-  font-size: 14px;
-  color: var(--wb-ink);
+  gap: 9px;
+  min-height: 38px;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--wbk-22) !important;
   text-align: left;
-  cursor: pointer;
-  background: none;
-  border: 2px solid transparent;
-  border-radius: 10px 90px 10px 80px / 80px 10px 100px 10px;
-  transition: background 0.12s ease;
+  font-size: 12px !important;
 }
-.wb-task-item:hover {
-  background: rgba(255, 224, 102, 0.4);
+.wb-task-item:hover,
+.wb-task-item.is-current {
+  background: var(--wbk-23);
+  color: var(--wb-ink) !important;
 }
-.wb-task-title {
+.wb-task-item span {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
-  white-space: nowrap;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .wb-task-item time {
-  margin-left: auto;
   flex: none;
-  font-size: 12px;
-  color: var(--wb-ink-soft);
+  color: var(--wbk-24);
+  font-size: 11px;
 }
-
-.wb-user {
+.wb-sidebar-footer {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 8px 4px;
-  border-top: 2.5px dashed rgba(59, 58, 54, 0.3);
-}
-.wb-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: 38px;
-  height: 38px;
-  font-size: 18px;
-  color: var(--wb-ink);
-  background: var(--wb-green-soft);
-  border: 2.5px solid var(--wb-ink);
-  border-radius: 50% 46% 52% 48% / 48% 52% 46% 54%;
-}
-.wb-user-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-.wb-user-meta strong {
-  font-size: 15px;
-  letter-spacing: 1px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.wb-user-meta em {
-  font-style: normal;
+  gap: 7px;
+  min-height: 51px;
+  border-top: 1px dashed var(--wbk-15);
   font-size: 12px;
-  color: var(--wb-ink-soft);
+  color: var(--wbk-25);
 }
-
-/* ============ 中央 ============ */
+.wb-private-dot,
+.wb-live-indicator,
+.wb-status-dot {
+  width: 7px;
+  height: 7px;
+  display: inline-block;
+  border-radius: 50%;
+  background: var(--wbk-26);
+  box-shadow: 0 0 0 3px var(--wbk-27);
+}
+.wb-footer-space {
+  flex: 1;
+}
+.wb-user-avatar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--wbk-28);
+  border-radius: 50%;
+  color: var(--wbk-29);
+  background: var(--wbk-30);
+  font-weight: 700;
+}
 .wb-main {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  min-width: 0;
+  height: 100%;
   min-height: 0;
-  padding-bottom: 2px;
+  min-width: 0;
+  background: var(--wbk-31);
+  background-image: radial-gradient(var(--wbk-32) 0.5px, transparent 0.5px);
+  background-size: 20px 20px;
 }
-.wb-scroll {
+.wb-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex: none;
+  min-height: 67px;
+  padding: 0 33px;
+  border-bottom: 1px solid var(--wbk-33);
+  background: var(--wbk-223);
+}
+.wb-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--wbk-34);
+  font: 600 10px/1.4 sans-serif;
+  letter-spacing: 0.11em;
+}
+.wb-breadcrumb strong {
+  color: var(--wbk-35);
+  font-size: 12px;
+  letter-spacing: normal;
+}
+.wb-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  color: var(--wbk-36);
+  font-size: 12px;
+}
+.wb-status,
+.wb-private-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.wb-status-dot.is-off {
+  background: var(--wbk-37);
+  box-shadow: 0 0 0 3px var(--wbk-38);
+}
+.wb-topbar-divider {
+  width: 1px;
+  height: 17px;
+  background: var(--wbk-39);
+}
+.wb-welcome {
+  width: min(960px, calc(100% - 64px));
+  margin: auto;
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  justify-content: center;
+  align-items: stretch;
   overflow-y: auto;
-  padding: 12px 6px 6px;
-  scrollbar-width: thin;
+  padding: 22px 0 12px;
 }
-
-/* —— 居中 hero（Manus 式 logo + 标题） —— */
-.wb-hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 4vh 20px 0;
-  text-align: center;
-}
-.wb-hero-brand {
+.wb-eyebrow {
   display: flex;
   align-items: center;
-  gap: 14px;
+  justify-content: center;
+  gap: 13px;
+  margin-bottom: 21px;
+  color: var(--wbk-40);
+  font: 700 10px sans-serif;
+  letter-spacing: 0.2em;
 }
-.wb-hero-dino {
-  width: 96px;
-  height: 96px;
-  object-fit: contain;
-  mix-blend-mode: multiply;
-  transform: rotate(-5deg);
+.wb-eyebrow-mark {
+  font:
+    24px/1 "ZCOOL KuaiLe",
+    sans-serif;
+  color: var(--wbk-41);
 }
-.wb-hero h1 {
-  margin: 0;
-  font-family: var(--wb-brush);
-  font-weight: 400;
-  font-size: 58px;
-  line-height: 1.1;
-  letter-spacing: 4px;
-  white-space: nowrap;
+.wb-welcome-brand {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 22px;
+  margin-bottom: 38px;
 }
-.wb-hero-sub {
-  margin: 0;
-  font-size: 20px;
-  color: var(--wb-ink);
-}
-.wb-hl {
-  padding: 0 0.14em;
-  background: linear-gradient(
-    101deg,
-    transparent 1%,
-    var(--wb-yellow-soft) 3%,
-    var(--wb-yellow-soft) 97%,
-    transparent 99%
-  );
-  border-radius: 6px 20px 8px 18px / 18px 8px 20px 6px;
-  box-decoration-break: clone;
-}
-.wb-hl-blue {
-  background: linear-gradient(
-    99deg,
-    transparent 1%,
-    var(--wb-blue-soft) 3%,
-    var(--wb-blue-soft) 97%,
-    transparent 99%
-  );
-}
-
-/* —— 入口卡（示例任务，Manus 三卡位） —— */
-.wb-cards {
+.wb-hero-bot {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-  padding: 6px 4px 0;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  flex: none;
+  color: var(--wbk-42);
+  background: var(--wbk-43);
+  border: 2.5px solid var(--wbk-44);
+  border-radius: 25px 30px 20px 32px / 30px 21px 32px 24px;
+  transform: rotate(-7deg);
+  box-shadow: 6px 7px 0 var(--wbk-45);
 }
-.wb-card {
+.wb-welcome-brand h1 {
+  margin: 0;
+  font:
+    400 clamp(28px, 3.3vw, 48px) / 1.18 "Ma Shan Zheng",
+    "ZCOOL KuaiLe",
+    cursive;
+  letter-spacing: 0.02em;
+}
+.wb-welcome-brand h1 em {
+  position: relative;
+  font-style: normal;
+  white-space: nowrap;
+  z-index: 0;
+}
+.wb-welcome-brand h1 em:after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: -3%;
+  right: -3%;
+  bottom: 1px;
+  height: 12px;
+  background: var(--wbk-46);
+  border-radius: 50% 20% 40% 50%;
+  transform: rotate(-2deg);
+}
+.wb-welcome-brand p {
+  margin: 11px 0 0;
+  color: var(--wbk-47);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+}
+.wb-entry-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 17px;
+}
+.wb-entry-card {
   position: relative;
   display: flex;
+  min-width: 0;
+  min-height: 218px;
   flex-direction: column;
-  padding: 0 0 10px;
-  font-family: var(--wb-hand);
-  color: var(--wb-ink);
+  padding: 24px 25px 19px;
   text-align: left;
-  cursor: pointer;
-  overflow: hidden;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  border: 1px solid var(--wbk-48);
+  border-radius: 17px;
+  box-shadow: 3px 5px 0 var(--wbk-49);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
 }
-.wb-tilt-0 { transform: rotate(-0.8deg); }
-.wb-tilt-1 { transform: rotate(0.7deg); }
-.wb-tilt-2 { transform: rotate(-0.5deg); }
-.wb-tilt-3 { transform: rotate(0.9deg); }
-.wb-card:hover {
-  transform: translateY(-4px) rotate(0deg);
-  box-shadow: 4px 6px 0 rgba(59, 58, 54, 0.22);
+.wb-entry-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 5px 8px 0 var(--wbk-50);
 }
-.wb-card-img {
+.wb-entry-primary {
+  background: var(--wbk-51);
+}
+.wb-entry-platform {
+  background: var(--wbk-52);
+  border-color: var(--wbk-53);
+  box-shadow: 3px 5px 0 var(--wbk-54);
+}
+.wb-entry-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 15px;
+}
+.wb-card-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 51px;
+  height: 51px;
+  border: 1.5px solid var(--wb-ink);
+  border-radius: 15px 18px 13px 17px;
+  background: var(--wbk-55);
+  transform: rotate(-5deg);
+}
+.wb-entry-platform .wb-card-icon {
+  background: var(--wbk-56);
+  transform: rotate(5deg);
+}
+.wb-entry-label {
+  color: var(--wbk-57);
+  font: 600 10px/1.3 sans-serif;
+  letter-spacing: 0.13em;
+}
+.wb-entry-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 9px;
+  font:
+    400 28px/1.1 "Ma Shan Zheng",
+    "ZCOOL KuaiLe",
+    sans-serif;
+}
+.wb-entry-card h2 svg {
+  transition: transform 0.15s ease;
+}
+.wb-entry-card:hover h2 svg {
+  transform: translateX(5px);
+}
+.wb-entry-card p {
+  max-width: 370px;
+  margin: 0 0 15px;
+  font:
+    13px/1.8 "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
+  color: var(--wbk-58);
+}
+.wb-entry-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  font-size: 12px;
+  color: var(--wbk-59);
+}
+.wb-figure {
+  margin-left: auto;
+  font:
+    18px Georgia,
+    serif;
+  color: var(--wbk-60);
+}
+.wb-platform-tiny-icon {
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 6px;
+  background: var(--wbk-61);
+  color: #fff;
+}
+.wb-panel-caption {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 29px 0 14px;
+  color: var(--wbk-63);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.wb-panel-caption > span:first-child {
+  color: var(--wbk-64);
+}
+.wb-panel-caption-line {
+  flex: 1;
+  height: 1px;
+  background: var(--wbk-65);
+}
+.wb-starters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.wb-starters button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 15px;
+  background: var(--wbk-66);
+  border: 1px solid var(--wbk-67);
+  border-radius: 11px;
+  text-align: left;
+  font-size: 13px;
+}
+.wb-starters button:hover {
+  background: var(--wbk-68);
+  border-color: var(--wbk-69);
+}
+.wb-starters button svg {
+  margin-left: auto;
+  flex: none;
+  color: var(--wbk-70);
+}
+.wb-starter-index {
+  font: 600 10px sans-serif;
+  letter-spacing: 0.02em;
+  color: var(--wbk-71);
+}
+.wb-agent-footnote {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-top: 20px;
+  color: var(--wbk-72);
+  font-size: 12px;
+}
+.wb-agent-footnote button {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  padding: 3px 0;
+  border: 0;
+  background: none;
+  color: var(--wbk-73);
+}
+.wb-agent-footnote-avatars {
+  display: flex;
+  padding-left: 4px;
+}
+.wb-agent-footnote-avatars span {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  margin-left: -5px;
+  border: 2px solid var(--wbk-62);
+  border-radius: 50%;
+  background: var(--wbk-74);
+  color: var(--wbk-75);
+}
+.wb-agent-footnote-avatars span:nth-child(2) {
+  background: var(--wbk-76);
+  color: var(--wbk-77);
+}
+.wb-agent-footnote-avatars span:nth-child(3) {
+  background: var(--wbk-78);
+  color: var(--wbk-79);
+}
+.wb-composer-wrap {
+  width: min(960px, calc(100% - 64px));
+  flex: none;
+  margin: 5px auto 19px;
+}
+.wb-composer {
+  padding: 8px 12px 5px 14px;
+  background: var(--wbk-3);
+  border: 1px solid var(--wbk-80);
+  border-radius: 24px;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
+  transition:
+    border-color var(--fn-transition-fast),
+    box-shadow var(--fn-transition-fast);
+}
+.wb-composer:focus-within {
+  border-color: color-mix(in srgb, var(--fn-color-brand) 30%, transparent);
+  box-shadow:
+    0 0 0 4px var(--fn-color-brand-glow),
+    0 22px 46px var(--fn-color-brand-shadow);
+}
+.wb-composer textarea {
+  display: block;
   width: 100%;
-  aspect-ratio: 1 / 0.82;
-  object-fit: cover;
-  mix-blend-mode: multiply;
-  border-bottom: 2.5px solid var(--wb-ink);
+  min-height: 46px;
+  max-height: 145px;
+  resize: vertical;
+  outline: none !important;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  color: var(--wb-ink);
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+  line-height: 1.6;
+  font-size: 14px;
 }
-.wb-card-body {
+.wb-composer textarea::placeholder {
+  color: var(--wbk-82);
+}
+.wb-composer-bottom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.wb-composer-model-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  max-width: min(260px, 34vw);
+  height: 30px;
+  padding: 0 9px;
+  overflow: hidden;
+  border: 1px solid var(--wbk-209);
+  border-radius: 999px;
+  background: var(--wbk-62);
+  color: var(--wbk-216);
+  font:
+    500 11px/1 PingFang SC,
+    Microsoft YaHei,
+    sans-serif;
+  cursor: pointer;
+}
+.wb-composer-model-trigger:hover:not(:disabled) {
+  border-color: var(--wbk-212);
+  background: var(--wbk-233);
+}
+.wb-composer-model-trigger:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.wb-composer-model-trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wb-composer-model-trigger svg {
+  flex: none;
+}
+.wb-composer-reasoning {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--wbk-209);
+  border-radius: 999px;
+  background: var(--wbk-62);
+  color: var(--wbk-216);
+  font:
+    500 11px/1 PingFang SC,
+    Microsoft YaHei,
+    sans-serif;
+  cursor: pointer;
+}
+.wb-composer-reasoning.is-active {
+  border-color: var(--wbk-212);
+  background: var(--wbk-233);
+  color: var(--wbk-235);
+}
+@media (max-width: 740px) {
+  .wb-composer-bottom {
+    gap: 8px;
+  }
+  .wb-composer-agent {
+    max-width: 145px;
+    padding: 0 8px;
+  }
+  .wb-composer-model-trigger {
+    max-width: 130px;
+    gap: 4px;
+    padding: 0 8px;
+  }
+}
+@media (max-width: 360px) {
+  .wb-composer-agent {
+    max-width: 112px;
+  }
+  .wb-composer-model-trigger {
+    max-width: 112px;
+  }
+}
+.wb-composer-privacy {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--wbk-85);
+}
+.wb-composer-spacer {
+  flex: 1;
+}
+.wb-composer-tip {
+  color: var(--wbk-86);
+  font-size: 10px;
+}
+.wb-composer-send {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: white !important;
+  background: var(--wbk-87);
+  border: none;
+  border-radius: 10px;
+}
+.wb-composer-send:hover:not(:disabled) {
+  background: var(--wbk-88);
+}
+.wb-composer-send.is-stop {
+  background: var(--wbk-89);
+}
+.wb-alert {
+  margin: 7px 0;
+  padding: 9px 13px;
+  border: 1px solid var(--wbk-91);
+  border-radius: 9px;
+  background: var(--wbk-92);
+  color: var(--wbk-93);
+  font:
+    12px/1.6 "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
+}
+.wb-conversation {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: min(960px, calc(100% - 64px));
+  margin: 0 auto;
+  min-height: 0;
+}
+.wb-conversation-head {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  flex: none;
+  min-height: 92px;
+  border-bottom: 1px solid var(--wbk-94);
+}
+.wb-agent-bubble {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 45px;
+  height: 45px;
+  background: var(--wbk-95);
+  border: 1.5px solid var(--wbk-96);
+  border-radius: 15px;
+  transform: rotate(-4deg);
+}
+.wb-conversation-head h1 {
+  margin: 0 0 6px;
+  font:
+    700 17px "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
+}
+.wb-conversation-head p {
+  margin: 0;
+  color: var(--wbk-97);
+  font-size: 12px;
+}
+.wb-conversation-spacer {
+  flex: 1;
+}
+.wb-secondary-button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 11px;
+  border: 1px solid var(--wbk-98);
+  border-radius: 9px;
+  background: var(--wbk-3);
+  font-size: 12px !important;
+}
+.wb-secondary-button:hover {
+  background: var(--wbk-99);
+}
+.wb-chat-scroll {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 22px;
+  overflow-y: auto;
+  padding: 29px 5px 14px;
+  scrollbar-width: thin;
+}
+.wb-chat-message {
+  display: flex;
+  gap: 13px;
+  max-width: 90%;
+}
+.wb-chat-message.is-user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+.wb-chat-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 31px;
+  height: 31px;
+  border: 1px solid var(--wbk-100);
+  border-radius: 11px;
+  background: var(--wbk-101);
+  color: var(--wbk-102);
+}
+.wb-chat-message.is-user .wb-chat-avatar {
+  background: var(--wbk-103);
+  border-color: var(--wbk-104);
+  color: var(--wbk-105);
+}
+.wb-chat-message-body {
+  min-width: 0;
+}
+.wb-chat-author {
+  display: flex;
+  gap: 11px;
+  align-items: baseline;
+  margin: 0 0 7px;
+  color: var(--wbk-106);
+  font-size: 12px;
+  font-weight: 700;
+}
+.wb-chat-message.is-user .wb-chat-author {
+  justify-content: flex-end;
+}
+.wb-chat-author time {
+  color: var(--wbk-107);
+  font: 11px sans-serif;
+}
+.wb-chat-text {
+  padding: 14px 17px;
+  border: 1px solid var(--wbk-108);
+  border-radius: 5px 15px 15px 15px;
+  background: var(--wbk-3);
+  color: var(--wbk-109);
+  font:
+    14px/1.9 "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
+  overflow-wrap: anywhere;
+}
+.wb-chat-message.is-user .wb-chat-text {
+  background: var(--wbk-110);
+  border-color: var(--wbk-111);
+  border-radius: 15px 5px 15px 15px;
+}
+.wb-chat-text > *:first-child {
+  margin-top: 0;
+}
+.wb-chat-text > *:last-child {
+  margin-bottom: 0;
+}
+.wb-chat-text pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 12px;
+  border-radius: 9px;
+  background: var(--wbk-112);
+}
+.wb-chat-text code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+}
+.wb-chat-text a {
+  color: var(--wbk-113);
+  text-decoration: underline;
+}
+.wb-chat-text img {
+  max-width: 100%;
+  height: auto;
+}
+.wb-thinking,
+.wb-chat-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--wbk-114);
+  font-size: 12px;
+}
+.wb-thinking svg {
+  animation: wb-shine 2s ease-in-out infinite;
+  color: var(--wbk-115);
+}
+@keyframes wb-shine {
+  50% {
+    opacity: 0.3;
+    transform: rotate(18deg);
+  }
+}
+.wb-approval {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 15px;
+  background: var(--wbk-116);
+  border: 1px solid var(--wbk-117);
+  border-radius: 10px;
+  color: var(--wbk-118);
+  font-size: 12px;
+}
+.wb-approval button {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  padding: 5px 8px;
+  border: 0;
+  background: var(--wbk-119);
+  border-radius: 6px;
+}
+.wb-composer-inchat {
+  margin-top: 0;
+}
+.wb-root-platform {
+  display: block;
+  padding: 0;
+}
+.wb-platform-shell {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  background: var(--wbk-120);
+}
+.wb-platform-bar {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex: none;
+  height: 57px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--wbk-121);
+  background: var(--wbk-3);
+}
+.wb-platform-back {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px;
+  border: 0;
+  background: transparent;
+  font-size: 12px !important;
+}
+.wb-platform-back:hover {
+  color: var(--wbk-122);
+}
+.wb-platform-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 14px;
+}
+.wb-platform-title small {
+  color: var(--wbk-123);
+  font-size: 11px;
+}
+.wb-platform-icon {
+  display: grid;
+  place-items: center;
+  width: 31px;
+  height: 31px;
+  border-radius: 10px;
+  background: var(--wbk-124);
+}
+.wb-platform-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.wb-platform-actions button {
+  display: grid;
+  place-items: center;
+  width: 31px;
+  height: 31px;
+  border: 1px solid var(--wbk-125);
+  background: var(--wbk-3);
+  border-radius: 8px;
+}
+.wb-platform-actions button:hover {
+  background: var(--wbk-126);
+}
+.wb-platform-settings {
+  padding: 13px 22px;
+  border-bottom: 1px solid var(--wbk-127);
+  background: var(--wbk-128);
+}
+.wb-platform-settings label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 700;
+  font-size: 12px;
+}
+.wb-platform-settings div {
+  display: flex;
+  gap: 8px;
+}
+.wb-platform-settings input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--wbk-129);
+  border-radius: 8px;
+  font-family: ui-monospace, monospace;
+  background: white;
+}
+.wb-platform-settings button,
+.wb-platform-placeholder button {
+  padding: 8px 13px;
+  border: none;
+  border-radius: 8px;
+  background: var(--wbk-130);
+  color: #fff;
+}
+.wb-platform-settings p {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--wbk-131);
+}
+.wb-platform-frame {
+  flex: 1;
+  display: block;
+  width: 100%;
+  min-height: 0;
+  border: 0;
+  background: var(--wbk-62);
+}
+.wb-platform-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  flex-direction: column;
+  gap: 15px;
+  padding: 30px;
+  color: var(--wbk-132);
+  text-align: center;
+}
+.wb-platform-placeholder h2 {
+  margin: 0;
+  color: var(--wbk-133);
+}
+.wb-platform-placeholder p {
+  margin: 0;
+  line-height: 1.7;
+}
+.wb-platform-content {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.wb-platform-apps {
+  display: flex;
+  flex: none;
+  width: 300px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  overflow-y: auto;
+  border-right: 1px solid var(--wbk-121);
+  background: var(--wbk-210);
+}
+.wb-platform-apps > strong {
+  padding: 2px 3px 6px;
+  font-size: 12px;
+}
+.wb-platform-app-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.wb-platform-app {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 62px;
+  padding: 8px;
+  border: 1px solid transparent !important;
+  border-radius: 10px;
+  background: transparent !important;
+  text-align: left;
+}
+.wb-platform-stop {
+  flex: none;
+  padding: 5px 7px;
+  border: 1px solid var(--wbk-121);
+  border-radius: 7px;
+  background: var(--wbk-210);
+  color: var(--wbk-123);
+  font-size: 10px;
+}
+.wb-platform-app:hover,
+.wb-platform-app.is-active {
+  border-color: var(--wbk-125) !important;
+  background: var(--wbk-3) !important;
+}
+.wb-platform-app > img,
+.wb-platform-app-image,
+.wb-platform-app-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  overflow: hidden;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--wbk-124);
+  color: var(--wbk-122);
+}
+.wb-platform-app-copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+.wb-platform-app-copy b,
+.wb-platform-app-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wb-platform-app-copy b {
+  font-size: 12px;
+}
+.wb-platform-app-copy small,
+.wb-platform-app-status {
+  color: var(--wbk-123);
+  font-size: 10px;
+}
+.wb-platform-app > svg {
+  flex: none;
+  color: var(--wbk-123);
+}
+.wb-platform-app.is-unavailable {
+  opacity: 0.72;
+}
+.wb-platform-app-status {
+  flex: none;
+}
+.wb-platform-catalog-error {
+  margin: 0;
+  color: var(--wbk-235);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.wb-platform-content > .wb-platform-viewport,
+.wb-platform-content > .wb-platform-placeholder {
+  flex: 1;
+  min-width: 0;
+}
+@media (max-height: 800px) and (min-width: 900px) {
+  .wb-welcome {
+    justify-content: flex-start;
+  }
+  .wb-welcome-brand {
+    margin-bottom: 21px;
+  }
+  .wb-entry-card {
+    min-height: 196px;
+    padding: 18px 23px 15px;
+  }
+  .wb-panel-caption {
+    margin-top: 16px;
+  }
+  .wb-agent-footnote {
+    margin-top: 10px;
+  }
+}
+@media (max-width: 1050px) {
+  .wb-root {
+    grid-template-columns: 218px minmax(0, 1fr);
+  }
+  .wb-welcome,
+  .wb-composer-wrap,
+  .wb-conversation {
+    width: min(920px, calc(100% - 40px));
+  }
+  .wb-entry-card {
+    padding: 19px;
+  }
+  .wb-welcome-brand h1 {
+    font-size: 37px;
+  }
+  .wb-entry-card h2 {
+    font-size: 23px;
+  }
+}
+@media (max-width: 740px) {
+  .wb-root {
+    display: flex;
+    flex-direction: column;
+  }
+  .wb-side {
+    flex: none;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-height: 0;
+    padding: 9px 13px 7px;
+  }
+  .wb-brand {
+    width: auto;
+    padding: 0;
+  }
+  .wb-brand-mark {
+    width: 33px;
+    height: 33px;
+    border-radius: 11px;
+  }
+  .wb-brand-mark svg {
+    width: 21px;
+  }
+  .wb-brand-copy strong {
+    font-size: 17px;
+  }
+  .wb-brand-copy small {
+    display: none;
+  }
+  .wb-newtask {
+    width: auto;
+    min-height: 36px;
+    margin-left: auto;
+    padding: 6px 11px;
+    font-size: 12px !important;
+  }
+  .wb-newtask-shortcut {
+    display: none;
+  }
+  .wb-nav {
+    width: 100%;
+    margin-top: 4px;
+    padding: 0 0 2px;
+    overflow-x: auto;
+    flex-direction: row;
+    white-space: nowrap;
+    border: 0;
+    scrollbar-width: none;
+  }
+  .wb-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .wb-nav-item {
+    width: auto;
+    flex: none;
+    min-height: 32px;
+    padding: 6px 9px;
+    gap: 6px;
+    font-size: 12px !important;
+  }
+  .wb-active-dot,
+  .wb-nav-chevron {
+    display: none;
+  }
+  .wb-sidebar-section,
+  .wb-task-list,
+  .wb-sidebar-footer {
+    display: none;
+  }
+  .wb-main {
+    flex: 1;
+    min-height: 0;
+  }
+  .wb-topbar {
+    min-height: 47px;
+    padding: 0 16px;
+  }
+  .wb-topbar-divider,
+  .wb-private-label {
+    display: none;
+  }
+  .wb-topbar-right {
+    font-size: 11px;
+  }
+  .wb-platform-content {
+    flex-direction: column;
+  }
+  .wb-platform-apps {
+    width: 100%;
+    max-height: 150px;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: 0;
+    border-bottom: 1px solid var(--wbk-121);
+  }
+  .wb-platform-apps > strong,
+  .wb-platform-catalog-error {
+    display: none;
+  }
+  .wb-platform-app {
+    flex: none;
+    width: 220px;
+  }
+  .wb-welcome,
+  .wb-composer-wrap,
+  .wb-conversation {
+    width: calc(100% - 28px);
+  }
+  .wb-welcome {
+    justify-content: flex-start;
+    padding: 21px 0 6px;
+  }
+  .wb-eyebrow {
+    margin-bottom: 15px;
+    font-size: 9px;
+  }
+  .wb-welcome-brand {
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .wb-hero-bot {
+    width: 52px;
+    height: 52px;
+  }
+  .wb-hero-bot svg {
+    width: 29px;
+  }
+  .wb-welcome-brand h1 {
+    font-size: 28px;
+  }
+  .wb-welcome-brand p {
+    font-size: 11px;
+    margin-top: 6px;
+  }
+  .wb-entry-grid {
+    grid-template-columns: 1fr;
+    gap: 11px;
+  }
+  .wb-entry-card {
+    min-height: 156px;
+    padding: 14px 18px;
+  }
+  .wb-card-icon {
+    width: 39px;
+    height: 39px;
+  }
+  .wb-card-icon svg {
+    width: 22px;
+  }
+  .wb-entry-card h2 {
+    margin-top: 11px;
+    font-size: 21px;
+  }
+  .wb-entry-card p {
+    margin-bottom: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .wb-panel-caption {
+    margin: 20px 0 10px;
+  }
+  .wb-starters {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+  .wb-starters button {
+    padding: 10px 12px;
+  }
+  .wb-agent-footnote {
+    flex-wrap: wrap;
+    font-size: 11px;
+  }
+  .wb-composer-wrap {
+    margin: 6px auto 9px;
+  }
+  .wb-composer {
+    padding: 6px 10px 6px 14px;
+    border-radius: 20px;
+  }
+  .wb-composer textarea {
+    min-height: 37px;
+    font-size: 13px;
+  }
+  .wb-composer-privacy,
+  .wb-composer-tip {
+    display: none;
+  }
+  .wb-conversation-head {
+    min-height: 68px;
+  }
+  .wb-conversation-head p {
+    font-size: 10px;
+  }
+  .wb-secondary-button {
+    font-size: 11px !important;
+  }
+  .wb-chat-scroll {
+    padding-top: 16px;
+  }
+  .wb-chat-message {
+    max-width: 98%;
+  }
+  .wb-platform-bar {
+    height: 50px;
+    gap: 8px;
+    padding: 0 10px;
+  }
+  .wb-platform-title small {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wb-root *,
+  .wb-root *::after,
+  .wb-root *::before {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ============================================================
+   Layout V2 — information architecture comes before skin.
+   LYRA: navigation | conversation | main-agent context.
+   Built-in product: near-fullscreen iframe, never a fake Agent UI.
+   ============================================================ */
+.wb-workspace-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.wb-center-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.wb-center-column .wb-conversation,
+.wb-center-column .wb-composer-wrap {
+  width: min(1060px, calc(100% - 96px));
+}
+.wb-center-column .wb-conversation {
+  flex: 1;
+  margin: 0 auto;
+}
+.wb-center-column .wb-composer-wrap {
+  margin: 6px auto 8px;
+}
+.wb-center-column .wb-composer-wrap.wb-composer-empty {
+  margin-top: auto;
+}
+.wb-mode-tabs {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 26px;
+  padding: 3px;
+  border: 1px solid var(--wbk-134);
+  border-radius: 9px;
+  background: var(--wbk-135);
+}
+.wb-mode-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 13px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--wbk-136);
+  font:
+    500 12px/1 "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
+  white-space: nowrap;
+}
+.wb-mode-tabs button:hover {
+  background: var(--wbk-137);
+  color: var(--wbk-138);
+}
+.wb-mode-tabs button.is-selected {
+  color: var(--wbk-139);
+  background: var(--wbk-62);
+  box-shadow: 0 1px 3px var(--wbk-226);
+}
+.wb-insight-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 20px 15px 24px;
+  border-left: 1px solid var(--wbk-140);
+  background: var(--wbk-141);
+  scrollbar-width: thin;
+}
+.wb-insight-card {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  border: 1px solid var(--wbk-142);
+  border-radius: 13px;
+  background: var(--wbk-62);
+  box-shadow: 0 2px 10px var(--wbk-227);
+}
+.wb-insight-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wb-insight-bot {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 39px;
+  height: 39px;
+  border: 1px solid var(--wbk-143);
+  border-radius: 12px;
+  background: var(--wbk-144);
+  color: var(--wbk-145);
+}
+.wb-insight-head > div {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.wb-insight-head strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.wb-insight-head small,
+.wb-insight-section-title small {
+  color: var(--wbk-146);
+  font:
+    11px/1.5 "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
+}
+.wb-insight-status {
+  padding: 4px 7px;
+  color: var(--wbk-147);
+  border-radius: 5px;
+  background: var(--wbk-148);
+  font-size: 11px;
+}
+.wb-insight-status.is-online {
+  color: var(--wbk-149);
+  background: var(--wbk-150);
+}
+.wb-insight-host p,
+.wb-platform-note {
+  margin: 13px 0 10px;
+  color: var(--wbk-151);
+  font:
+    12px/1.8 "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
+}
+.wb-insight-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: start;
+  gap: 3px;
+  padding: 5px 0;
+  border: none;
+  background: none;
+  color: var(--wbk-152) !important;
+  font-size: 12px !important;
+}
+.wb-insight-section-title {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 9px;
+  margin-bottom: 13px;
+}
+.wb-insight-section-title > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.wb-insight-section-title strong {
+  font-size: 13px;
+}
+.wb-insight-section-title > svg {
+  color: var(--wbk-153);
+}
+.wb-team-count {
+  flex: none;
+  padding: 5px 6px;
+  background: var(--wbk-154);
+  color: var(--wbk-155);
+  border-radius: 6px;
+  font-size: 10px;
+}
+.wb-insight-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  padding: 19px 8px;
+  color: var(--wbk-156);
+  font-size: 12px;
+  text-align: center;
+}
+.wb-insight-empty > svg {
+  color: var(--wbk-157);
+}
+.wb-insight-empty button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--wbk-158);
+  border-radius: 7px;
+  background: var(--wbk-159);
+  color: var(--wbk-160);
+  font-size: 11px !important;
+}
+.wb-member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.wb-member {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--wbk-161);
+}
+.wb-member-index {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--wbk-162);
+  color: var(--wbk-163);
+  font: 600 10px/1 sans-serif;
+}
+.wb-member-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--wbk-164);
+  font-size: 12px;
+}
+.wb-member-state {
+  color: var(--wbk-165);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.wb-member-state.is-running {
+  color: var(--wbk-166);
+}
+.wb-team-foot {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 8px;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--wbk-167);
+  color: var(--wbk-168);
+  font:
+    11px/1.55 "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
+}
+.wb-team-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--wbk-169);
+}
+.wb-team-dot.is-streaming {
+  background: var(--wbk-170);
+  box-shadow: 0 0 0 3px var(--wbk-171);
+}
+.wb-platform-tile {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--wbk-172);
+  border-radius: 10px;
+  background: var(--wbk-173);
+  text-align: left;
+}
+.wb-platform-tile:hover {
+  background: var(--wbk-174);
+  border-color: var(--wbk-175);
+}
+.wb-platform-tile > span:nth-child(2) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.wb-platform-tile strong {
+  font-size: 13px;
+}
+.wb-platform-tile small {
+  color: var(--wbk-176);
+  font:
+    11px/1.5 "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
+}
+.wb-platform-tile > svg {
+  flex: none;
+  color: var(--wbk-177);
+}
+.wb-platform-planet {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 43px;
+  height: 43px;
+  border-radius: 12px;
+  background: var(--wbk-178);
+  color: var(--wbk-179);
+}
+.wb-platform-note {
+  margin-bottom: 0;
+}
+.wb-platform-external {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--wbk-125);
+  border-radius: 8px;
+  color: var(--wbk-180);
+  font:
+    12px/1 "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
+  text-decoration: none;
+}
+.wb-platform-external:hover {
+  background: var(--wbk-181);
+}
+.wb-platform-viewport {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  background: var(--wbk-62);
+}
+.wb-platform-viewport .wb-platform-frame {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+.wb-platform-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--wbk-182);
+  background: var(--wbk-183);
+  font-size: 13px;
+}
+@media (max-width: 1270px) {
+  .wb-center-column .wb-welcome,
+  .wb-center-column .wb-conversation,
+  .wb-center-column .wb-composer-wrap {
+    width: calc(100% - 56px);
+  }
+}
+@media (max-width: 1020px) {
+  .wb-topbar {
+    padding: 0 18px;
+  }
+}
+@media (max-width: 740px) {
+  .wb-mode-tabs {
+    margin-left: 6px;
+  }
+  .wb-mode-tabs button {
+    padding: 7px;
+    font-size: 11px;
+  }
+  .wb-mode-tabs button svg {
+    display: none;
+  }
+  .wb-breadcrumb > span,
+  .wb-breadcrumb > svg {
+    display: none;
+  }
+  .wb-topbar-right {
+    display: none;
+  }
+  .wb-center-column .wb-welcome,
+  .wb-center-column .wb-conversation,
+  .wb-center-column .wb-composer-wrap {
+    width: calc(100% - 28px);
+  }
+  .wb-platform-external {
+    font-size: 0;
+    gap: 0;
+    padding: 7px;
+  }
+  .wb-platform-external svg {
+    width: 17px;
+    height: 17px;
+  }
+}
+
+.wb-host-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 15px;
+  color: var(--wbk-184);
+  font-size: 11px;
+}
+.wb-host-selector select {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 30px 9px 10px;
+  border: 1px solid var(--wbk-185);
+  border-radius: 8px;
+  color: var(--wbk-186);
+  background: var(--wbk-187);
+  font:
+    12px "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
+}
+
+/* Layout-first neutral baseline: graphic skin is a separate iteration. */
+.wb-root {
+  --wb-paper: var(--wbk-188);
+  --wb-white: var(--wbk-189);
+  --wb-ink: var(--wbk-190);
+  --wb-line: var(--wbk-191);
+  --wb-accent: var(--wbk-192);
+  --wb-green: var(--wbk-193);
+  background: var(--wbk-188);
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+.wb-main {
+  background: var(--wbk-62);
+  background-image: none;
+}
+.wb-side {
+  background: var(--wbk-194);
+  border-color: var(--wbk-195);
+}
+.wb-brand-mark,
+.wb-hero-bot {
+  transform: none;
+  border-radius: 14px;
+  box-shadow: none;
+}
+.wb-welcome-brand h1 {
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+.wb-welcome-brand h1 em::after {
+  height: 8px;
+  border-radius: 3px;
+  opacity: 0.45;
+}
+.wb-entry-card h2 {
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.wb-newtask {
+  box-shadow: none;
+  border: 1px solid var(--wbk-196);
+}
+.wb-newtask:hover {
+  box-shadow: 0 4px 16px var(--wbk-228);
+  transform: none;
+}
+.wb-entry-card,
+.wb-entry-card:hover {
+  box-shadow: 0 3px 12px var(--wbk-229);
+}
+.wb-entry-primary {
+  background: var(--wbk-62);
+}
+.wb-entry-platform {
+  background: var(--wbk-197);
+  border-color: var(--wbk-198);
+}
+
+/* Keep the platform loading indication visible until the real iframe has loaded. */
+.wb-platform-loading {
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Manus-style navigation structure, LYRA dinosaur and profile settings popover. */
+.wb-brand-mark {
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  box-shadow: none;
+}
+.wb-brand-mark img,
+.wb-agent-bubble img,
+.wb-chat-avatar img,
+.wb-hero-bot img,
+.wb-insight-bot img {
+  object-fit: contain;
+  display: block;
+}
+.wb-cue {
+  margin-left: -6px;
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: var(--wbk-199);
+  color: var(--wbk-200);
+  font:
+    700 10px system-ui,
+    sans-serif;
+}
+.wb-more-dots {
+  width: 18px;
+  flex: none;
+  font-size: 13px;
+  letter-spacing: -2px;
+}
+.wb-project-new {
+  margin: 0;
+}
+.wb-sidebar-section {
+  margin-top: 16px;
+  margin-bottom: 5px;
+}
+.wb-menu-popup {
+  min-width: 155px;
   display: flex;
   flex-direction: column;
   gap: 3px;
-  padding: 10px 14px 0;
+  padding: 4px;
 }
-.wb-card-body strong {
-  font-size: 19px;
-  letter-spacing: 1px;
-}
-.wb-card-body em {
-  font-style: normal;
-  font-size: 13px;
-  color: var(--wb-ink-soft);
-  line-height: 1.45;
-}
-
-/* —— 快速开始 —— */
-.wb-sec-title {
+.wb-menu-popup button {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin: 2px 0 8px;
-  font-size: 17px;
-  font-weight: 400;
-  letter-spacing: 1px;
-}
-.wb-sec-title svg {
-  color: var(--wb-orange);
-}
-.wb-quick-row {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 12px;
-}
-.wb-quick-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 7px;
-  padding: 12px 6px 10px;
-  font-family: var(--wb-hand);
-  font-size: 14px;
-  color: var(--wb-ink);
-  cursor: pointer;
-  transition: transform 0.14s ease, background 0.14s ease;
-}
-.wb-quick-item:nth-child(odd) { transform: rotate(-0.7deg); }
-.wb-quick-item:nth-child(even) { transform: rotate(0.6deg); }
-.wb-quick-item:hover {
-  background: var(--wb-yellow-soft);
-  transform: translateY(-3px) rotate(0deg);
-}
-
-/* —— 底部固定大输入框（Manus 式） —— */
-.wb-ask {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px 9px;
-}
-.wb-ask textarea {
-  width: 100%;
-  padding: 4px 4px;
-  font-family: var(--wb-hand);
-  font-size: 16.5px;
-  color: var(--wb-ink);
+  gap: 9px;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
   background: transparent;
-  border: none;
-  outline: none;
-  resize: none;
+  text-align: left;
+  color: var(--wbk-201);
+  cursor: pointer;
+  font:
+    13px "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
 }
-.wb-ask textarea::placeholder {
-  color: var(--wb-ink-soft);
+.wb-menu-popup button:hover {
+  background: var(--wbk-202);
 }
-.wb-ask-bar {
+.wb-sidebar-footer {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-top: 1px dashed var(--wbk-203);
+  cursor: pointer;
+  text-align: left;
+}
+.wb-sidebar-footer-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  border-top: 2px dashed rgba(59, 58, 54, 0.3);
-  padding-top: 7px;
+  border-top: 1px dashed var(--wbk-203);
 }
-.wb-ask-hint {
-  font-size: 13px;
-  color: var(--wb-ink-soft);
+.wb-sidebar-footer {
+  width: auto;
+  flex: 1;
+  min-width: 0;
+  border-top: 0;
 }
-.wb-send {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  height: 36px;
-  color: #fff;
-  cursor: pointer;
-  background: var(--wb-blue);
-  border: 2.5px solid var(--wb-ink);
-  border-radius: 10px 60px 12px 55px / 55px 12px 65px 10px;
-  box-shadow: 2px 3px 0 rgba(59, 58, 54, 0.22);
-  transition: transform 0.12s ease;
-}
-.wb-send:hover {
-  transform: rotate(-3deg) scale(1.05);
-}
-.wb-send:active {
-  transform: scale(0.96);
+.wb-sidebar-footer:hover {
+  background: var(--wbk-204);
+  border-radius: 8px;
 }
 
-/* ============ 星球乐园弹层 ============ */
-.wb-planet-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4vh 4vw;
-  background: rgba(59, 58, 54, 0.45);
+/* Account dropdown: user card with grouped actions. */
+.wb-account-dropdown .ant-dropdown-menu,
+.wb-account-dropdown .octop-dropdown-menu {
+  padding: 0;
+  background: transparent;
+  border-radius: 16px;
+  box-shadow: none;
 }
-.wb-planet-window {
+.wb-account-menu {
+  width: 264px;
   display: flex;
   flex-direction: column;
-  width: min(1100px, 100%);
-  height: 100%;
-  overflow: hidden;
-  background: var(--wb-paper);
+  gap: 8px;
+  padding: 8px;
+  border-radius: 16px;
+  background: var(--wbk-239);
+  box-shadow: 0 12px 40px var(--wbk-231);
 }
-.wb-planet-bar {
+.wb-account-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 14px;
-  font-size: 15px;
-  background: var(--wb-yellow-soft);
-  border-bottom: 2.5px solid var(--wb-ink);
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--wbk-210);
 }
-.wb-planet-bar button {
-  padding: 4px 14px;
-  font-family: var(--wb-hand);
-  font-size: 14px;
-  color: var(--wb-ink);
-  cursor: pointer;
-  background: var(--wb-card);
-  border: 2px solid var(--wb-ink);
-  border-radius: 8px 40px 10px 36px / 36px 10px 44px 8px;
+.wb-account-avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--wbk-28);
+  border-radius: 12px;
+  color: var(--wbk-29);
+  background: var(--wbk-30);
+  font-weight: 700;
+  overflow: hidden;
 }
-.wb-planet-window iframe {
-  flex: 1;
+.wb-account-avatar img,
+.wb-account-avatar svg {
   width: 100%;
-  border: none;
-  background: var(--wb-paper);
+  height: 100%;
+  border-radius: 12px;
+  object-fit: cover;
+}
+.wb-account-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.wb-account-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.wb-account-display {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--wbk-201);
+}
+.wb-account-role {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.6;
+  background: var(--wbk-211);
+  color: var(--wbk-200);
+}
+.wb-account-handle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--wbk-208);
+}
+.wb-account-group {
+  padding: 5px 0;
+  border-radius: 12px;
+  background: var(--wbk-210);
+}
+.wb-account-group button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  color: var(--wbk-201);
+  cursor: pointer;
+  font:
+    14px "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
+}
+.wb-account-group button:hover {
+  background: var(--wbk-202);
+}
+.wb-account-group button svg {
+  flex-shrink: 0;
+  color: var(--wbk-208);
+}
+.wb-account-chevron {
+  margin-left: auto;
+  color: var(--wbk-238) !important;
+}
+.wb-account-group-danger button {
+  color: var(--wbk-235);
+}
+.wb-account-group-danger button svg {
+  color: var(--wbk-235);
+}
+.wb-account-group-danger button:hover {
+  background: var(--wbk-237);
+}
+.wb-newtask {
+  background: var(--wbk-205);
+  color: white !important;
+  border-color: var(--wbk-206);
+  box-shadow: none;
+}
+.wb-newtask:hover {
+  background: var(--wbk-207);
+  transform: none;
+  box-shadow: 0 3px 10px var(--wbk-230);
 }
 
-/* ============ 响应式 ============ */
-@media (max-width: 1240px) {
-  .wb-cards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .wb-quick-row {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
+/* New interaction: one settings modal and a proper off-canvas small-screen nav. */
+.wb-settings-intro {
+  margin: 0 0 16px;
+  color: var(--wbk-208);
+  font-size: 13px;
+  line-height: 1.7;
 }
-@media (max-width: 920px) {
+.wb-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.wb-settings-link {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 11px;
+  padding: 14px;
+  border: 1px solid var(--wbk-209);
+  border-radius: 12px;
+  background: var(--wbk-210);
+  cursor: pointer;
+  text-align: left;
+}
+.wb-settings-link:hover,
+.wb-settings-link:focus-visible {
+  background: var(--wbk-211);
+  border-color: var(--wbk-212);
+}
+.wb-settings-link > svg {
+  flex: none;
+  color: var(--wbk-213);
+}
+.wb-settings-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  color: var(--wbk-214);
+  background: var(--wbk-215);
+  border-radius: 10px;
+}
+.wb-settings-link-text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+}
+.wb-settings-link-text strong {
+  font-size: 13px;
+  color: var(--wbk-216);
+}
+.wb-settings-link-text small {
+  color: var(--wbk-217);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.wb-mobile-scrim,
+.wb-mobile-toggle {
+  display: none;
+}
+.wb-member-index {
+  background: var(--wbk-218);
+  color: var(--wbk-219);
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+}
+@media (max-width: 740px) {
   .wb-root {
     grid-template-columns: minmax(0, 1fr);
   }
   .wb-side {
+    position: fixed;
+    z-index: 31;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: min(290px, 86vw);
+    transform: translateX(-105%);
+    transition: transform 0.2s ease;
+    box-shadow: 8px 0 26px var(--wbk-231);
+  }
+  .wb-side.is-open {
+    transform: translateX(0);
+  }
+  .wb-mobile-scrim {
+    display: block;
+    position: fixed;
+    z-index: 30;
+    inset: 0;
+    border: 0;
+    background: var(--wbk-232);
+  }
+  .wb-mobile-toggle {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--wbk-220);
+    border-radius: 9px;
+    background: white;
+  }
+  .wb-topbar {
+    min-height: 60px;
+    gap: 8px;
+  }
+  .wb-welcome-brand {
+    gap: 12px;
+    margin-bottom: 21px;
+  }
+  .wb-welcome-brand h1 {
+    font-size: clamp(24px, 7vw, 36px);
+  }
+  .wb-hero-bot {
+    width: 59px;
+    height: 59px;
+  }
+  .wb-hero-bot img {
+    max-width: 42px;
+    max-height: 42px;
+  }
+  .wb-entry-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .wb-entry-card {
+    min-height: 155px;
+    padding: 15px 16px;
+  }
+  .wb-entry-card h2 {
+    margin: 9px 0 4px;
+    font-size: 22px;
+  }
+  .wb-entry-card p {
+    line-height: 1.4;
+    margin-bottom: 7px;
+  }
+  .wb-card-icon {
+    width: 39px;
+    height: 39px;
+  }
+  .wb-card-icon svg {
+    width: 21px;
+    height: 21px;
+  }
+  .wb-starters {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  .wb-starters button {
+    min-height: 39px;
+    padding: 8px 11px;
+  }
+  .wb-panel-caption {
+    margin: 12px 0 7px;
+  }
+  .wb-agent-footnote {
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+  .wb-composer-wrap {
+    margin-bottom: 12px;
+  }
+  .wb-composer-tip,
+  .wb-composer-privacy {
     display: none;
   }
-  .wb-hero h1 {
-    font-size: 38px;
-  }
-  .wb-hero-dino {
-    width: 68px;
-    height: 68px;
-  }
-  .wb-cards {
+  .wb-settings-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* The LYRA shell never remounts when navigating to a feature route. */
+.wb-feature-main {
+  min-width: 0;
+  height: 100%;
+}
+.wb-feature-content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--wbk-188);
+}
+.wb-feature-content .page-container {
+  min-height: 0;
+  background: var(--wbk-188) !important;
+}
+.wb-feature-content .page-content {
+  min-height: 0;
+}
+.wb-home-link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  letter-spacing: inherit;
+}
+.wb-home-link:hover {
+  color: var(--wbk-221);
+}
+.wb-side {
+  flex-shrink: 0;
+}
+@media (max-width: 740px) {
+  .wb-feature-main {
+    width: 100%;
+  }
+  .wb-feature-content .page-content {
+    overflow-y: auto;
+  }
+}
+
+/* ==== recovered rules (settings modal / projects / cap grid / composer) — extracted from last compiled bundle ==== */
+
+.wb-cap-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+.wb-cap-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 13px 14px;
+  text-align: left;
+  border: 1px solid var(--wbk-209);
+  border-radius: 12px;
+  background: var(--wbk-62);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    transform 0.15s ease;
+}
+.wb-cap-card:hover {
+  border-color: var(--wbk-212);
+  background: var(--wbk-233);
+  transform: translateY(-1px);
+}
+.wb-cap-card svg {
+  color: var(--wbk-214);
+}
+.wb-cap-card strong {
+  font-size: 13px;
+  color: var(--wbk-216);
+  font-weight: 650;
+}
+.wb-cap-card small {
+  font-size: 11px;
+  color: var(--wbk-217);
+  line-height: 1.45;
+}
+.wb-insight-system {
+  margin-top: 14px;
+}
+.wb-system-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.wb-system-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 9px 10px;
+  border: 1px solid var(--wbk-209);
+  border-radius: 10px;
+  background: var(--wbk-210);
+  min-width: 0;
+}
+.wb-system-grid small {
+  font-size: 10px;
+  color: var(--wbk-217);
+}
+.wb-system-grid strong {
+  font-size: 13px;
+  color: var(--wbk-216);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wb-composer-plus,
+.wb-composer-mic {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--wbk-209);
+  border-radius: 50%;
+  background: var(--wbk-62);
+  color: var(--wbk-234);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+.wb-composer-plus:hover,
+.wb-composer-mic:hover {
+  border-color: var(--wbk-212);
+  color: var(--wbk-214);
+  background: var(--wbk-233);
+}
+.wb-composer-mic.is-recording {
+  color: var(--wbk-235);
+  border-color: var(--wbk-236);
+  background: var(--wbk-237);
+  animation: wb-mic-pulse 1.4s ease-in-out infinite;
+}
+.wb-composer-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 11px 14px 0;
+}
+.wb-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid var(--wbk-209);
+  border-radius: 8px;
+  background: var(--wbk-210);
+  font-size: 12px;
+  color: var(--wbk-216);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wb-attachment-chip.is-uploading {
+  color: var(--wbk-217);
+  border-style: dashed;
+}
+.wb-attachment-chip.is-failed {
+  color: #cf1322;
+  border-color: #ffa39e;
+}
+.wb-attachment-chip button {
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--wbk-217);
+  padding: 0;
+}
+.wb-attachment-chip button:hover {
+  color: var(--wbk-235);
+}
+.wb-composer-agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--wbk-209);
+  border-radius: 999px;
+  background: var(--wbk-62);
+  color: var(--wbk-216);
+  font:
+    500 11px/1 PingFang SC,
+    Microsoft YaHei,
+    sans-serif;
+  cursor: pointer;
+  max-width: 200px;
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+.wb-composer-agent:hover {
+  border-color: var(--wbk-212);
+  background: var(--wbk-233);
+}
+.wb-composer-agent svg:last-child {
+  color: var(--wbk-238);
+}
+.wb-composer-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  max-width: 260px;
+  height: 34px;
+  padding: 0 10px;
+  overflow: hidden;
+  border: 1px solid var(--wbk-209);
+  border-radius: 999px;
+  background: var(--wbk-210);
+  color: var(--wbk-216);
+  font-size: 12px;
+}
+.wb-composer-project svg {
+  flex: none;
+  color: var(--wbk-213);
+}
+.wb-composer-project span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Apply each selected visual skin to the workbench's custom surfaces and shapes. */
+html[data-skin] .wb-root {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-layout);
+}
+html[data-skin] .wb-side {
+  background: var(--fn-bg-sidebar);
+  border-color: var(--fn-border-primary);
+}
+html[data-skin] .wb-main {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-layout);
+}
+html[data-skin] .wb-root .wb-entry-card,
+html[data-skin] .wb-root .wb-task-row,
+html[data-skin] .wb-root .wb-entry-platform {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-container);
+  border-color: var(--fn-border-primary);
+  border-radius: var(--fn-card-radius);
+}
+html[data-skin] .wb-settings-modal .octop-modal-content,
+html[data-skin] .wb-settings-modal .wb-set-shell,
+html[data-skin] .wb-settings-modal .wb-set-panel {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-layout);
+}
+html[data-skin] .wb-settings-modal .wb-set-nav {
+  background: var(--fn-bg-sidebar);
+  border-color: var(--fn-border-primary);
+}
+html[data-skin] .wb-settings-modal .wb-set-card,
+html[data-skin] .wb-settings-modal .wb-set-theme {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-container);
+  border-color: var(--fn-border-primary);
+  border-radius: var(--fn-radius-md);
+}
+html[data-skin] .wb-settings-modal .wb-set-theme.is-active,
+html[data-skin] .wb-settings-modal .wb-set-nav-item.is-active {
+  color: var(--fn-text-brand);
+  border-color: var(--fn-text-brand);
+  background: var(--fn-bg-secondary);
+}
+html[data-skin="doodle"] .wb-root {
+  font-family: var(
+    --crayon-font-hand,
+    "ZCOOL KuaiLe",
+    "PingFang SC",
+    sans-serif
+  );
+  background-image: radial-gradient(
+    rgba(59, 58, 54, 0.045) 1px,
+    transparent 1.4px
+  );
+  background-size: 24px 24px;
+}
+html[data-skin="doodle"] .wb-root .wb-entry-card,
+html[data-skin="doodle"] .wb-root .wb-task-row,
+html[data-skin="doodle"] .wb-root .wb-composer-wrap,
+html[data-skin="doodle"] .wb-settings-modal .octop-modal-content,
+html[data-skin="doodle"] .wb-settings-modal .wb-set-card {
+  border: 2px solid var(--fn-border-primary);
+  border-radius: 14px 18px 12px 20px / 18px 12px 20px 14px;
+  box-shadow: 3px 4px 0 rgba(59, 58, 54, 0.1);
+}
+html[data-skin="doodle"] .wb-settings-modal .wb-set-label {
+  border-bottom-style: dashed;
+  border-bottom-width: 2px;
+}
+html[data-skin="cloud"] .wb-root {
+  background-image: radial-gradient(
+    ellipse at 83% 8%,
+    rgba(129, 175, 244, 0.17),
+    transparent 58%
+  );
+}
+html[data-skin="cloud"] .wb-root .wb-entry-card,
+html[data-skin="cloud"] .wb-root .wb-composer-wrap,
+html[data-skin="cloud"] .wb-settings-modal .octop-modal-content {
+  box-shadow: 0 8px 26px rgba(66, 108, 160, 0.1);
+}
+html[data-skin="forest"] .wb-root .wb-entry-card,
+html[data-skin="forest"] .wb-root .wb-composer-wrap,
+html[data-skin="forest"] .wb-settings-modal .octop-modal-content {
+  box-shadow: 0 3px 12px rgba(30, 87, 61, 0.12);
+}
+html[data-skin="orbit"] .wb-root {
+  background-image: radial-gradient(
+    ellipse at 80% 10%,
+    rgba(95, 117, 222, 0.12),
+    transparent 55%
+  );
+}
+html[data-skin="journal"] .wb-root {
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 31px,
+    rgba(135, 103, 69, 0.045) 32px
+  );
+}
+html[data-skin="journal"] .wb-root h1,
+html[data-skin="journal"] .wb-root h2,
+html[data-skin="journal"] .wb-settings-modal .wb-set-panel h3 {
+  font-family: Georgia, "Songti SC", "Noto Serif SC", serif;
+  letter-spacing: 0.02em;
+}
+html[data-skin="terminal"] .wb-root h1,
+html[data-skin="terminal"] .wb-root h2,
+html[data-skin="terminal"] .wb-settings-modal .wb-set-panel h3 {
+  font-family: var(--fn-font-mono, ui-monospace, monospace);
+  letter-spacing: -0.015em;
+}
+html[data-skin="terminal"] .wb-root .wb-entry-card,
+html[data-skin="terminal"] .wb-root .wb-task-row,
+html[data-skin="terminal"] .wb-root .wb-composer-wrap,
+html[data-skin="terminal"] .wb-settings-modal .octop-modal-content,
+html[data-skin="terminal"] .wb-settings-modal .wb-set-card {
+  border-radius: 4px;
+  box-shadow: none;
+}
+html[data-skin] .wb-root .wb-main {
+  background-color: var(--fn-bg-layout);
+  background-image: linear-gradient(
+      color-mix(in srgb, var(--fn-bg-layout) 48%, transparent),
+      color-mix(in srgb, var(--fn-bg-layout) 64%, transparent)
+    ),
+    var(--wb-theme-art);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+html[data-skin] .wb-root .wb-entry-card,
+html[data-skin] .wb-root .wb-task-row,
+html[data-skin] .wb-root .wb-entry-platform,
+html[data-skin] .wb-root .wb-composer-wrap {
+  background-color: color-mix(in srgb, var(--fn-bg-container) 86%, transparent);
+  backdrop-filter: blur(9px);
+}
+
+/* The selected skin covers the complete workbench shell, not only its center. */
+html[data-skin] .wb-root {
+  background-color: var(--fn-bg-layout);
+  background-image: linear-gradient(
+      color-mix(in srgb, var(--fn-bg-layout) 48%, transparent),
+      color-mix(in srgb, var(--fn-bg-layout) 58%, transparent)
+    ),
+    var(--wb-theme-art);
+  background-position: center;
+  background-size: cover;
+}
+html[data-skin] .wb-side {
+  color: var(--fn-text-primary);
+  background-color: color-mix(in srgb, var(--fn-bg-sidebar) 64%, transparent);
+  border-color: var(--fn-border-primary);
+  backdrop-filter: blur(12px);
+}
+html[data-skin] .wb-root .wb-main {
+  background-color: transparent;
+  background-image: none;
+}
+html[data-skin] .wb-topbar {
+  color: var(--fn-text-primary);
+  background: color-mix(in srgb, var(--fn-bg-toolbar) 64%, transparent);
+  border-color: var(--fn-border-primary);
+  backdrop-filter: blur(12px);
+}
+html[data-skin] .wb-breadcrumb,
+html[data-skin] .wb-topbar-right {
+  color: var(--fn-text-secondary);
+}
+html[data-skin] .wb-breadcrumb strong {
+  color: var(--fn-text-primary);
+}
+html[data-skin] .wb-topbar-divider {
+  background: var(--fn-border-primary);
+}
+html[data-skin] .wb-mode-tabs {
+  background: color-mix(in srgb, var(--fn-bg-secondary) 76%, transparent);
+  border-color: var(--fn-border-primary);
+}
+html[data-skin] .wb-mode-tabs button {
+  color: var(--fn-text-secondary);
+}
+html[data-skin] .wb-mode-tabs button:hover,
+html[data-skin] .wb-mode-tabs button.is-selected {
+  color: var(--fn-text-primary);
+  background: color-mix(in srgb, var(--fn-bg-container) 82%, transparent);
+}
+html[data-skin] .wb-nav {
+  border-color: var(--fn-border-primary);
+}
+html[data-skin] .wb-nav-item,
+html[data-skin] .wb-task-item {
+  color: var(--fn-text-secondary) !important;
+}
+html[data-skin] .wb-nav-item:hover,
+html[data-skin] .wb-task-item:hover,
+html[data-skin] .wb-task-item.is-current {
+  color: var(--fn-text-primary) !important;
+  background: color-mix(in srgb, var(--fn-bg-secondary) 76%, transparent);
+}
+html[data-skin] .wb-nav-item.is-active {
+  color: var(--fn-text-primary) !important;
+  background: color-mix(in srgb, var(--fn-bg-tertiary) 92%, transparent);
+}
+html[data-skin] .wb-sidebar-section,
+html[data-skin] .wb-task-empty,
+html[data-skin] .wb-task-item time,
+html[data-skin] .wb-project-item small,
+html[data-skin] .wb-project-row small,
+html[data-skin] .wb-archived-toggle {
+  color: var(--fn-text-tertiary);
+}
+html[data-skin] .wb-sidebar-footer {
+  color: var(--fn-text-secondary);
+  border-color: var(--fn-border-primary);
+}
+html[data-skin] .wb-sidebar-footer:hover,
+html[data-skin] .wb-task-collapse:hover,
+html[data-skin] .wb-project-actions button:hover,
+html[data-skin] .wb-task-more:hover,
+html[data-skin] .wb-archived-toggle:hover {
+  color: var(--fn-text-primary);
+  background: color-mix(in srgb, var(--fn-bg-secondary) 76%, transparent);
+}
+html[data-skin] .wb-set-shell,
+html[data-skin] .wb-set-nav,
+html[data-skin] .wb-set-panel {
+  color: var(--fn-text-primary);
+}
+html[data-skin] .wb-theme-popup .ant-popover-inner,
+html[data-skin] .wb-theme-popup .ant-dropdown-menu,
+html[data-skin] .wb-theme-popup.ant-select-dropdown {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-container);
+  border: 1px solid var(--fn-border-primary);
+}
+html[data-skin] .wb-menu-popup button {
+  color: var(--fn-text-secondary);
+}
+html[data-skin] .wb-menu-popup button:hover {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-secondary);
+}
+
+.wb-settings-modal .octop-modal-content {
+  padding: 0 !important;
+  overflow: hidden;
+}
+.wb-set-shell {
+  display: grid;
+  grid-template-columns: 224px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  height: 72vh;
+  min-height: 0;
+  max-height: 72vh;
+}
+.wb-set-nav {
+  padding: 14px 10px;
+  overflow-y: auto;
+  border-right: 1px solid var(--wbk-239);
+  background: var(--wbk-210);
+}
+.wb-set-nav-general {
+  margin-bottom: 10px;
+}
+.wb-set-nav-group {
+  margin-top: 12px;
+}
+.wb-set-nav-title {
+  padding: 4px 10px 6px;
+  color: var(--wbk-240);
+  font:
+    600 11px/1.2 PingFang SC,
+    Microsoft YaHei,
+    sans-serif;
+  letter-spacing: 0.04em;
+}
+.wb-set-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--wbk-241);
+  font:
+    500 13px/1.3 PingFang SC,
+    Microsoft YaHei,
+    sans-serif;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+.wb-set-nav-item:hover {
+  background: var(--wbk-242);
+}
+.wb-set-nav-item.is-active {
+  background: var(--wbk-243);
+  color: var(--wbk-244);
+  font-weight: 600;
+}
+.wb-set-nav-item svg {
+  flex: none;
+  color: var(--wbk-245);
+}
+.wb-set-panel {
+  padding: 22px 26px;
+  overflow-y: auto;
+}
+/* 内嵌设置分区：整个面板交给页面组件（PageShell）自己布局与滚动。 */
+.wb-set-panel.wb-set-panel-embed {
+  padding: 0;
+  overflow: hidden;
+}
+.wb-set-embed-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+.wb-set-panel h3 {
+  margin: 0 0 6px;
+  color: var(--wbk-190);
+  font:
+    650 19px/1.3 PingFang SC,
+    Microsoft YaHei,
+    sans-serif;
+}
+.wb-set-label {
+  margin: 18px 0 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--wbk-239);
+  color: var(--wbk-246);
+  font:
+    600 12px/1.4 PingFang SC,
+    Microsoft YaHei,
+    sans-serif;
+}
+.wb-set-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 13px 0;
+}
+.wb-set-card {
+  padding: 10px 12px;
+  border: 1px solid var(--wbk-209);
+  border-radius: 10px;
+  background: var(--wbk-210);
+  margin-bottom: 8px;
+}
+.wb-set-field-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.wb-set-field-info strong {
+  font-size: 13px;
+  color: var(--wbk-216);
+}
+.wb-set-field-info small {
+  font-size: 11.5px;
+  color: var(--wbk-217);
+}
+.wb-set-themes {
+  display: inline-flex;
+  gap: 8px;
+}
+.wb-set-theme {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 74px;
+  padding: 12px 0 9px;
+  border: 1px solid var(--wbk-209);
+  border-radius: 11px;
+  background: var(--wbk-62);
+  color: var(--wbk-247);
+  cursor: pointer;
+  font:
+    500 12px/1 PingFang SC,
+    Microsoft YaHei,
+    sans-serif;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.wb-set-theme:hover {
+  border-color: var(--wbk-212);
+}
+.wb-set-theme.is-active {
+  border-color: var(--wbk-248);
+  box-shadow: 0 0 0 2px var(--wbk-249);
+  color: var(--wbk-244);
+}
+.wb-set-gallery {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.wb-set-gallery-card {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 64px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  border-radius: 10px;
+  background-color: var(--wbk-210);
+  background-position: center;
+  background-size: cover;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.68);
+  cursor: pointer;
+}
+.wb-set-gallery-card span {
+  position: relative;
+}
+.wb-set-gallery-card.is-active {
+  border-color: var(--fn-color-brand, #377cf4);
+  box-shadow: 0 0 0 2px var(--fn-color-brand, #377cf4);
+}
+.wb-set-gallery-card:focus-visible {
+  outline: 2px solid var(--fn-color-brand, #377cf4);
+  outline-offset: 2px;
+}
+.wb-set-gallery-card svg {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
+}
+.wb-set-gallery-card.is-coming-soon {
+  background: var(--wbk-202);
+  color: var(--wbk-217);
+  cursor: default;
+  text-shadow: none;
+}
+@media (max-width: 740px) {
+  .wb-set-gallery {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.wb-set-note {
+  margin: 6px 0 0;
+  color: var(--wbk-240);
+  font-size: 12px;
+  line-height: 1.7;
+}
+/* 个人账户：头像 + 显示名 + 密码 */
+.wb-set-account {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.wb-set-account-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wb-set-account .wb-set-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--wbk-209);
+  border-radius: 10px;
+  background: var(--wbk-210);
+}
+.wb-user-avatar img,
+.wb-user-avatar svg {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.wb-pw-error {
+  margin: 4px 0 0;
+  color: #d4380d;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.wb-project-item small,
+.wb-project-row small {
+  margin-left: auto;
+  color: var(--wbk-238);
+  font-size: 11px;
+}
+.wb-project-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.wb-project-row .wb-nav-item {
+  flex: 1;
+  min-width: 0;
+}
+.wb-project-inline-edit {
+  min-width: 0;
+  cursor: text;
+}
+.wb-project-inline-edit input {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  padding: 2px 0;
+  border: 0;
+  border-bottom: 1px solid var(--wbk-250);
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.wb-project-actions {
+  position: absolute;
+  right: 4px;
+  display: none;
+  gap: 2px;
+}
+.wb-project-row:hover .wb-project-actions {
+  display: inline-flex;
+}
+.wb-project-row.is-editing .wb-project-actions {
+  display: none;
+}
+.wb-project-row:hover .wb-nav-item small {
+  visibility: hidden;
+}
+.wb-project-actions button {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wbk-250);
+  cursor: pointer;
+}
+.wb-project-actions button:hover {
+  background: var(--wbk-251);
+  color: var(--wbk-252);
+}
+.wb-task-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.wb-task-row .wb-task-item {
+  flex: 1;
+  min-width: 0;
+}
+.wb-task-more {
+  position: absolute;
+  right: 4px;
+  display: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wbk-250);
+  cursor: pointer;
+}
+.wb-task-row:hover .wb-task-more {
+  display: grid;
+}
+.wb-task-row:hover .wb-task-item time {
+  visibility: hidden;
+}
+.wb-task-more:hover {
+  background: var(--wbk-251);
+  color: var(--wbk-252);
+}
+.wb-archived-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--wbk-240);
+  font:
+    500 12px/1.2 PingFang SC,
+    Microsoft YaHei,
+    sans-serif;
+  cursor: pointer;
+}
+.wb-archived-toggle:hover {
+  background: var(--wbk-251);
+  color: var(--wbk-201);
+}
+.wb-archived-toggle svg {
+  transition: transform 0.15s ease;
+}
+.wb-archived-toggle svg.is-open {
+  transform: rotate(180deg);
+}
+.wb-archived-toggle span {
+  margin-left: auto;
+}
+.wb-project-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 4px;
+}
+.wb-project-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.wb-form-btn {
+  padding: 7px 16px;
+  border: 1px solid var(--wbk-209);
+  border-radius: 8px;
+  background: var(--wbk-62);
+  color: var(--wbk-241);
+  font:
+    500 13px/1.4 PingFang SC,
+    Microsoft YaHei,
+    sans-serif;
+  cursor: pointer;
+}
+.wb-form-btn:hover {
+  border-color: var(--wbk-212);
+  background: var(--wbk-233);
+}
+.wb-form-btn.is-primary {
+  border-color: var(--wbk-248);
+  background: var(--wbk-248);
+  color: var(--wbk-62);
+}
+.wb-form-btn.is-primary:hover {
+  background: var(--wbk-253);
+  border-color: var(--wbk-253);
+}
+.wb-project-form-note {
+  margin: 0;
+  color: var(--wbk-240);
+  font-size: 12px;
+  line-height: 1.6;
+} /* ==== sidebar collapsed state (reconstructed) ==== */
+
+/* ===== 收起态侧栏：72px 图标栏（logo + 图标导航 + 底部头像）===== */
+@media (min-width: 741px) {
+  .wb-root.wb-side-collapsed {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+  .wb-root.wb-side-collapsed .wb-side {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .wb-root.wb-side-collapsed .wb-brand {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .wb-root.wb-side-collapsed .wb-brand-copy {
+    display: none;
+  }
+  .wb-root.wb-side-collapsed .wb-newtask {
+    font-size: 0;
+    gap: 0;
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .wb-root.wb-side-collapsed .wb-nav {
+    gap: 4px;
+    border-bottom: 0;
+  }
+  .wb-root.wb-side-collapsed .wb-nav-item {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .wb-root.wb-side-collapsed .wb-nav-item span:not(.wb-more-dots) {
+    display: none;
+  }
+  .wb-root.wb-side-collapsed .wb-nav-item .wb-nav-chevron {
+    display: none;
+  }
+  .wb-root.wb-side-collapsed .wb-sidebar-section,
+  .wb-root.wb-side-collapsed .wb-nav-item.wb-project-item,
+  .wb-root.wb-side-collapsed .wb-project-row,
+  .wb-root.wb-side-collapsed .wb-project-folder-row,
+  .wb-root.wb-side-collapsed .wb-task-row,
+  .wb-root.wb-side-collapsed .wb-task-list {
+    display: none;
+  }
+  .wb-root.wb-side-collapsed .wb-sidebar-footer-row {
+    margin-top: auto;
+  }
+  .wb-root.wb-side-collapsed .wb-sidebar-footer {
+    justify-content: center;
+    margin-top: auto;
+  }
+  .wb-root.wb-side-collapsed .wb-sidebar-footer span:not(.wb-user-avatar),
+  .wb-root.wb-side-collapsed .wb-sidebar-footer svg {
+    display: none;
+  }
+  .wb-root.wb-side-collapsed .wb-sidebar-footer .wb-user-avatar {
+    margin: 0 auto;
+  }
+}
+
+/* 项目区 = Manus 式：标题行带折叠箭头 + 右侧 ⋯/＋，项目行 = 文件夹图标 + 名称 */
+.wb-projects-head {
+  gap: 4px;
+}
+.wb-projects-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 0;
+  padding: 2px 5px 2px 4px;
+  margin-left: -4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+.wb-projects-toggle:hover {
+  background: var(--wbk-251);
+}
+.wb-projects-toggle svg {
+  transition: transform 0.16s ease;
+  transform: rotate(-90deg);
+}
+.wb-projects-toggle svg.is-open {
+  transform: none;
+}
+.wb-projects-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.wb-projects-head-actions button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--wbk-238);
+  cursor: pointer;
+}
+.wb-projects-head-actions button:hover {
+  background: var(--wbk-251);
+  color: var(--wbk-252);
+}
+.wb-project-glyph {
+  flex: none;
+  color: var(--wbk-238);
+}
+
+/* Keep every workbench-owned surface on the selected visual skin. */
+html[data-skin] .wb-root .wb-newtask {
+  color: var(--fn-text-primary) !important;
+  background: color-mix(in srgb, var(--fn-bg-container) 90%, transparent);
+  border-color: var(--fn-border-primary);
+  box-shadow: 0 3px 10px
+    color-mix(in srgb, var(--fn-text-primary) 10%, transparent);
+}
+html[data-skin] .wb-root .wb-newtask:hover {
+  background: color-mix(in srgb, var(--fn-bg-secondary) 92%, transparent);
+}
+html[data-skin] .wb-root .wb-composer,
+html[data-skin] .wb-root .wb-starters button,
+html[data-skin] .wb-root .wb-insight-card,
+html[data-skin] .wb-root .wb-cap-card,
+html[data-skin] .wb-root .wb-system-grid > div,
+html[data-skin] .wb-root .wb-platform-tile,
+html[data-skin] .wb-root .wb-platform-actions button,
+html[data-skin] .wb-root .wb-platform-settings,
+html[data-skin] .wb-root .wb-platform-apps,
+html[data-skin] .wb-root .wb-code-browser,
+html[data-skin] .wb-root .wb-code-preview {
+  color: var(--fn-text-primary);
+  background-color: color-mix(in srgb, var(--fn-bg-container) 88%, transparent);
+  border-color: var(--fn-border-primary);
+  backdrop-filter: blur(9px);
+}
+html[data-skin] .wb-root .wb-composer {
+  background-color: color-mix(in srgb, var(--fn-bg-container) 72%, transparent);
+}
+html[data-skin] .wb-root .wb-chat-message.is-user .wb-chat-text,
+html[data-skin] .wb-root .wb-mode-tabs button.is-selected,
+html[data-skin] .wb-root .wb-set-nav-item.is-active,
+html[data-skin] .wb-root .wb-set-theme.is-active {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-secondary);
+}
+html[data-skin] .wb-root .wb-composer-model-trigger,
+html[data-skin] .wb-root .wb-composer-reasoning,
+html[data-skin] .wb-root .wb-composer-agent,
+html[data-skin] .wb-root .wb-composer-project,
+html[data-skin] .wb-root .wb-composer-plus,
+html[data-skin] .wb-root .wb-composer-mic,
+html[data-skin] .wb-root .wb-attachment-chip,
+html[data-skin] .wb-root .wb-form-btn,
+html[data-skin] .wb-root .wb-set-theme,
+html[data-skin] .wb-root .wb-platform-stop {
+  color: var(--fn-text-primary);
+  background-color: color-mix(in srgb, var(--fn-bg-secondary) 88%, transparent);
+  border-color: var(--fn-border-primary);
+}
+html[data-skin] .wb-root .wb-composer-reasoning.is-active {
+  color: var(--fn-color-brand);
+  background-color: color-mix(in srgb, var(--fn-color-brand) 12%, transparent);
+  border-color: color-mix(in srgb, var(--fn-color-brand) 35%, transparent);
+}
+html[data-skin] .wb-root input,
+html[data-skin] .wb-root select,
+html[data-skin] .wb-root textarea {
+  color: var(--fn-text-primary);
+  background-color: var(--fn-bg-container);
+  border-color: var(--fn-border-input);
+}
+html[data-skin] .wb-root .wb-composer textarea {
+  background: transparent;
+  border-color: transparent;
+}
+html[data-skin] .wb-root .wb-composer textarea::placeholder,
+html[data-skin] .wb-root .wb-composer-tip,
+html[data-skin] .wb-root .wb-composer-privacy,
+html[data-skin] .wb-root .wb-entry-card p,
+html[data-skin] .wb-root .wb-entry-meta,
+html[data-skin] .wb-root .wb-panel-caption,
+html[data-skin] .wb-root .wb-agent-footnote,
+html[data-skin] .wb-root .wb-chat-author time,
+html[data-skin] .wb-root .wb-platform-app-copy small,
+html[data-skin] .wb-root .wb-platform-app-status,
+html[data-skin] .wb-root .wb-platform-settings p,
+html[data-skin] .wb-root .wb-code-file-path {
+  color: var(--fn-text-secondary);
+}
+html[data-skin] .wb-root .wb-composer-send,
+html[data-skin] .wb-root .wb-form-btn.is-primary,
+html[data-skin] .wb-root .wb-insight-empty button {
+  color: #fff;
+  background: var(--fn-color-brand);
+  border-color: var(--fn-color-brand);
+}
+html[data-skin] .wb-root .wb-composer-send:hover:not(:disabled),
+html[data-skin] .wb-root .wb-form-btn.is-primary:hover {
+  background: var(--fn-color-brand-hover);
+  border-color: var(--fn-color-brand-hover);
+}
+html[data-skin] .wb-root .wb-code-tree-header,
+html[data-skin] .wb-root .wb-code-entry.is-selected,
+html[data-skin] .wb-root .wb-code-preview pre,
+html[data-skin] .wb-root .wb-host-selector select {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-secondary);
+  border-color: var(--fn-border-primary);
+}
+html[data-skin] .wb-root .wb-project-inline-edit input {
+  background: transparent;
+}
+html[data-skin] .wb-settings-modal .wb-set-account .wb-set-field {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-container);
+  border-color: var(--fn-border-primary);
+}
+html[data-skin] .wb-settings-modal input,
+html[data-skin] .wb-settings-modal select,
+html[data-skin] .wb-settings-modal textarea {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-container);
+  border-color: var(--fn-border-input);
+}
+html[data-skin] .wb-root .wb-chat-text,
+html[data-skin] .wb-root .wb-chat-author,
+html[data-skin] .wb-root .wb-conversation-head h1,
+html[data-skin] .wb-root .wb-platform-placeholder h2,
+html[data-skin] .wb-settings-modal .wb-set-panel h3,
+html[data-skin] .wb-settings-modal .wb-set-field-info strong {
+  color: var(--fn-text-primary);
+}
+html[data-skin] .wb-root .wb-platform-placeholder,
+html[data-skin] .wb-root .wb-platform-placeholder p,
+html[data-skin] .wb-root .wb-platform-tile small,
+html[data-skin] .wb-root .wb-insight-head small,
+html[data-skin] .wb-root .wb-insight-section-title small,
+html[data-skin] .wb-root .wb-member-state,
+html[data-skin] .wb-root .wb-team-foot,
+html[data-skin] .wb-settings-modal .wb-set-nav-title,
+html[data-skin] .wb-settings-modal .wb-set-label,
+html[data-skin] .wb-settings-modal .wb-set-field-info small,
+html[data-skin] .wb-settings-modal .wb-set-note,
+html[data-skin] .wb-settings-modal .wb-project-form-note {
+  color: var(--fn-text-secondary);
+}
+html[data-skin] .wb-root .wb-code-entry,
+html[data-skin] .wb-root .wb-platform-external,
+html[data-skin] .wb-root .wb-insight-link,
+html[data-skin] .wb-settings-modal .wb-set-nav-item {
+  color: var(--fn-text-secondary);
+}
+html[data-skin] .wb-root .wb-code-entry:hover,
+html[data-skin] .wb-root .wb-platform-external:hover,
+html[data-skin] .wb-root .wb-insight-link:hover,
+html[data-skin] .wb-settings-modal .wb-set-nav-item:hover {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-secondary);
+}
+html[data-skin] .wb-theme-popup .ant-dropdown-menu-item:hover,
+html[data-skin] .wb-theme-popup .ant-dropdown-menu-submenu-title:hover,
+html[data-skin] .wb-theme-popup .ant-dropdown-menu-item-selected,
+html[data-skin]
+  .wb-theme-popup
+  .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-secondary);
+}
+html[data-skin] .wb-theme-popup .ant-select-item {
+  color: var(--fn-text-primary);
+}
+
+/* 项目/文件夹子树内直接挂载任务行（与最近列表同一内容） */
+.wb-project-group .wb-task-row {
+  padding-left: 22px;
+}
+.wb-project-folder-row + .wb-task-row,
+.wb-project-folder-content .wb-task-row {
+  padding-left: 34px;
 }

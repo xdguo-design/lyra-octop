@@ -369,13 +369,7 @@ export function useSlashMentionInput({
       } else {
         setSlashMenuOpen(false);
         const mention = getMentionAtCursor(val);
-        if (
-          mention &&
-          (availableConnectors ||
-            mentionAgents.length > 0 ||
-            availableSubagents.length > 0 ||
-            agentId)
-        ) {
+        if (mention) {
           setMentionMenuOpen(true);
           setMentionQuery(mention.query);
           setMentionAtIndex(mention.atIndex);
@@ -385,13 +379,7 @@ export function useSlashMentionInput({
         }
       }
     },
-    [
-      setText,
-      availableConnectors,
-      mentionAgents.length,
-      availableSubagents.length,
-      agentId,
-    ],
+    [setText],
   );
 
   const handleKeyDown = useCallback(

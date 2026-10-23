@@ -1,9 +1,11 @@
 /** Shared model ref formatting — matches agent create/edit drawers. */
+import type { ReasoningCapability } from "../api/types/provider";
 
 export interface ModelPickerOption {
   provider_name: string;
   model: string;
   name?: string;
+  reasoning_config?: ReasoningCapability | null;
 }
 
 /** Form / Select sentinel: empty string means auto (stored as null). */

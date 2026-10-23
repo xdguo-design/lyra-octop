@@ -1,0 +1,245 @@
+.ehrWorkbench {
+  height: 100%;
+  background: #f5f5f5;
+}
+
+.ehrSider {
+  background: #fff !important;
+  border-right: 1px solid #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 8px;
+}
+
+.ehrBrand {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.ehrNav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 12px;
+  flex: 1;
+}
+
+.ehrNavItem,
+.ehrNavItemActive {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #262626;
+  text-align: left;
+  width: 100%;
+}
+
+.ehrNavItem:hover {
+  background: #f5f5f5;
+}
+
+.ehrNavItemActive {
+  background: #e6f4ff;
+  color: #1677ff;
+  font-weight: 500;
+}
+
+.ehrSiderFooter {
+  padding: 8px;
+  border-top: 1px solid #f0f0f0;
+  font-size: 12px;
+}
+
+.ehrContent {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ehrTopbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ehrBody {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.ehrMain {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  min-width: 0;
+}
+
+.ehrAgent {
+  width: 360px;
+  border-left: 1px solid #f0f0f0;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.ehrAgentHeader {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.ehrAgentMessages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+}
+
+.ehrAgentInput {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid #f0f0f0;
+  align-items: flex-end;
+}
+
+.ehrMsg {
+  max-width: 92%;
+  padding: 8px 12px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ehrMsgUser {
+  margin-left: auto;
+  background: #1677ff;
+  color: #fff;
+}
+
+.ehrMsgBot {
+  margin-right: auto;
+  background: #f5f5f5;
+  color: #262626;
+}
+
+.ehrMsgSources {
+  border-top: 1px dashed #e0e0e0;
+  padding-top: 4px;
+}
+
+/* 搜索首页 */
+.ehrSearchHero {
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 16px;
+}
+
+.ehrSearchBar {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.ehrSearchBar > :first-child {
+  flex: 1;
+  min-width: 260px;
+}
+
+.ehrResultList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ehrResultCard {
+  border-radius: 10px;
+}
+
+/* 图谱视图 */
+.ehrGraphView {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ehrGraphToolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ehrGraphSvg {
+  width: 100%;
+  max-width: 760px;
+  height: auto;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+}
+
+.ehrGraphNode {
+  cursor: pointer;
+}
+
+.ehrGraphNode:hover circle {
+  stroke: #1677ff;
+  stroke-width: 2;
+}
+
+/* 技能视图 */
+.ehrJsonBlock {
+  background: #f6f8fa;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 12px;
+  max-height: 420px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* 服务地址弹层 */
+.ehrUrlModal {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: 420px;
+  height: 160px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  z-index: 1000;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: center;
+}
+
+@media (max-width: 1080px) {
+  .ehrAgent {
+    display: none;
+  }
+}

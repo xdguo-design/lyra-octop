@@ -66,6 +66,18 @@ async def test_list_requires_auth(env: Any) -> None:
     assert r.status_code == 401
 
 
+async def test_install_subagent_invalid_slug_detail_uses_request_locale(env: Any) -> None:
+    client, _srv, auth, aid = env
+    response = await client.post(
+        f"/api/agents/{aid}/subagents/install",
+        headers={**auth, "Accept-Language": "zh-CN"},
+        json={"slug": "../invalid"},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "子 Agent 标识为必填项，且不能包含 / 或以 . 开头。"}
+
+
 async def test_catalog_list_non_empty(env: Any) -> None:
     c, _srv, auth, _aid = env
 

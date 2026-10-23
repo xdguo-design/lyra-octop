@@ -1085,3 +1085,136 @@
 .customMcpFooterSaveOnly {
   justify-content: flex-end;
 }
+
+.unifiedCatalog {
+  min-height: 100%;
+}
+.unifiedToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.unifiedFilters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.unifiedFilter,
+.unifiedFilterActive {
+  appearance: none;
+  cursor: pointer;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 8px 12px;
+  color: var(--fn-text-tertiary, #7d86a6);
+  font: inherit;
+  font-size: 14px;
+}
+.unifiedFilterActive {
+  color: var(--fn-text-primary, #212b4d);
+  background: #e9eeff;
+  font-weight: 600;
+}
+.unifiedSearch {
+  width: min(360px, 100%);
+}
+.unifiedError {
+  margin-bottom: 12px;
+}
+.unifiedResourceCard {
+  display: flex;
+  min-height: 154px;
+  flex-direction: column;
+  padding: 20px;
+  border: 1px solid var(--fn-border-secondary, #ebedf3);
+  border-radius: 16px;
+  background: var(--fn-bg-primary, #fff);
+  box-shadow: 0 6px 18px rgba(18, 35, 76, 0.035);
+}
+.unifiedResourceCard:hover {
+  border-color: #c7d0ff;
+  box-shadow: 0 8px 24px rgba(80, 100, 180, 0.1);
+}
+.unifiedResourceHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.unifiedResourceIcon {
+  display: flex;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: #e9f1ff;
+  color: #5266ce;
+}
+.unifiedResourceTitle {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.unifiedResourceDescription {
+  display: -webkit-box;
+  min-height: 40px;
+  margin: 12px 0 14px;
+  overflow: hidden;
+  color: var(--fn-text-tertiary, #7e88a2);
+  font-size: 13px;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.unifiedResourceFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  color: var(--fn-text-tertiary, #8e97b0);
+  font-size: 12px;
+}
+.unifiedResourceFooter :global(.ant-tag) {
+  margin: 0;
+}
+.unifiedSkillPreview {
+  max-height: 40vh;
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--fn-border-secondary);
+  border-radius: 10px;
+  background: var(--fn-bg-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.unifiedModalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+@media (max-width: 650px) {
+  .unifiedToolbar {
+    align-items: stretch;
+    flex-direction: column-reverse;
+    gap: 10px;
+  }
+  .unifiedSearch {
+    width: 100%;
+  }
+  .unifiedFilters {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+}

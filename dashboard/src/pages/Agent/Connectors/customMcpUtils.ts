@@ -22,6 +22,11 @@ export interface ServerCardState {
   collapsed: boolean;
   oauthConfigured: boolean;
   oauthExpiresAt?: number;
+  /** Pre-registered OAuth client (servers without dynamic registration, e.g. GitHub). */
+  oauthClientId: string;
+  /** Write-only input; empty keeps the stored secret. */
+  oauthClientSecret: string;
+  oauthClientSecretConfigured: boolean;
 }
 
 export const PROBE_ON_SAVE_KEY = "octop.customMcp.probeOnSave";
@@ -41,28 +46,6 @@ export function friendlyServerLabel(card: {
 }): string {
   const label = (card.displayName ?? "").trim();
   return label || card.name.trim() || "mcp-server";
-}
-
-/** Stable accent colors for custom MCP cards (avoid all looking the same). */
-const MCP_ACCENT_PALETTE = [
-  "#0d9488", // teal
-  "#2563eb", // blue
-  "#7c3aed", // violet
-  "#db2777", // pink
-  "#ea580c", // orange
-  "#0891b2", // cyan
-  "#65a30d", // lime
-  "#d97706", // amber
-  "#4f46e5", // indigo
-  "#e11d48", // rose
-] as const;
-
-export function accentForServerName(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i += 1) {
-    hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
-  }
-  return MCP_ACCENT_PALETTE[hash % MCP_ACCENT_PALETTE.length];
 }
 
 export function headersToText(headers?: Record<string, string>): string {
@@ -130,6 +113,9 @@ export function serversToCards(servers: CustomMcpServers): ServerCardState[] {
     collapsed: true,
     oauthConfigured: spec.oauth?.configured === true,
     oauthExpiresAt: spec.oauth?.expires_at,
+    oauthClientId: spec.oauth_client_id ?? "",
+    oauthClientSecret: "",
+    oauthClientSecretConfigured: spec.oauth_client_secret_configured === true,
   }));
 }
 
@@ -162,6 +148,14 @@ export function cardsToServers(cards: ServerCardState[]): CustomMcpServers {
       const headers = parseHeadersText(card.headersText);
       if (Object.keys(headers).length > 0) {
         spec.headers = headers;
+      }
+      const oauthClientId = card.oauthClientId.trim();
+      if (oauthClientId) {
+        spec.oauth_client_id = oauthClientId;
+      }
+      const oauthClientSecret = card.oauthClientSecret.trim();
+      if (oauthClientSecret) {
+        spec.oauth_client_secret = oauthClientSecret;
       }
     } else {
       spec.command = card.command.trim();
@@ -251,6 +245,9 @@ export function newCard(
     shared: false,
     collapsed: false,
     oauthConfigured: false,
+    oauthClientId: "",
+    oauthClientSecret: "",
+    oauthClientSecretConfigured: false,
   };
 }
 

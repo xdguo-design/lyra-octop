@@ -19,6 +19,8 @@ import {
   GraduationCap,
   Shield,
   PanelsTopLeft,
+  ClipboardPlus,
+  Stethoscope,
 } from "lucide-react";
 import type { OctopUser } from "../api/modules/auth";
 import { navAllowed, userCan } from "../utils/permissions";
@@ -50,6 +52,8 @@ export interface NavSection {
 /** Every nav item key the sidebar can show. Keep in sync with `SIDEBAR_NAV_KEYS` in `octop.infra.users.preferences`. */
 export const SIDEBAR_NAV_KEYS = [
   "chat",
+  "admission-demo",
+  "ehr",
   "experts",
   "tasks",
   "token-usage",
@@ -67,6 +71,7 @@ export const SIDEBAR_NAV_KEYS = [
   "admin-storage",
   "admin-plugins",
   "admin-security",
+  "admin-audit-log",
   "admin-advanced",
 ] as const;
 
@@ -121,6 +126,7 @@ export const SIDEBAR_GROUPED_NAV_KEYS = [
   "admin-storage",
   "admin-plugins",
   "admin-security",
+  "admin-audit-log",
   "admin-advanced",
   "agent-config",
 ] as const;
@@ -141,6 +147,18 @@ export function buildNavSections(
       path: "/chat",
       icon: <MessageSquareText size={iconSize} strokeWidth={iconStroke} />,
       labelKey: "nav.chat",
+    },
+    {
+      key: "admission-demo",
+      path: "/admission-demo",
+      icon: <ClipboardPlus size={iconSize} strokeWidth={iconStroke} />,
+      labelKey: "nav.admissionDemo",
+    },
+    {
+      key: "ehr",
+      path: "/ehr",
+      icon: <Stethoscope size={iconSize} strokeWidth={iconStroke} />,
+      labelKey: "nav.ehrWorkbench",
     },
   ];
   if (navAllowed(user, "experts")) {
@@ -302,6 +320,14 @@ export function buildNavSections(
       path: "/admin/security",
       icon: <Shield size={iconSize} strokeWidth={iconStroke} />,
       labelKey: "nav.security",
+    });
+  }
+  if (navAllowed(user, "admin-audit-log")) {
+    adminItems.push({
+      key: "admin-audit-log",
+      path: "/admin/audit-log",
+      icon: <Activity size={iconSize} strokeWidth={iconStroke} />,
+      labelKey: "nav.auditLog",
     });
   }
   if (navAllowed(user, "admin-advanced")) {

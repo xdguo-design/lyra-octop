@@ -28,7 +28,7 @@ export function ConnectorInstanceCard({
   const { t } = useTranslation();
   const { modal, message } = App.useApp();
   const user = useCurrentUser();
-  const accent = catalogEntry ? connectorAccent(catalogEntry) : "#8c8c8c";
+  const accent = catalogEntry ? connectorAccent(catalogEntry) : "#1677ff";
   const isOwner = user?.id === instance.owner_user_id;
   const ownerLabel =
     instance.owner_display_name || instance.owner_username || "";
@@ -82,6 +82,7 @@ export function ConnectorInstanceCard({
             <ConnectorLogo
               kind={instance.kind}
               icon={catalogEntry?.icon}
+              name={instance.display_name}
               size={40}
             />
           </div>

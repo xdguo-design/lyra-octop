@@ -22,6 +22,8 @@ PREFERENCES_KEY_SIDEBAR_NAV = "sidebar_nav"
 SIDEBAR_NAV_KEYS = frozenset(
     {
         "chat",
+        "admission-demo",
+        "ehr",
         "experts",
         "tasks",
         "token-usage",
@@ -39,6 +41,7 @@ SIDEBAR_NAV_KEYS = frozenset(
         "admin-storage",
         "admin-plugins",
         "admin-security",
+        "admin-audit-log",
         "admin-advanced",
     }
 )

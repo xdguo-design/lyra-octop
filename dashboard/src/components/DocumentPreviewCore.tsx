@@ -9,7 +9,15 @@
  * widths in one layout tree — avoids the classic antd scroll/ellipsis drift.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Button, Image, Tabs } from "antd";
 import { ArrowDownToLine } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -17,7 +25,9 @@ import { isNotFoundApiError } from "../utils/apiError";
 import type { DocKind } from "../utils/docKind";
 import styles from "./DocumentPreviewCore.module.less";
 import DocumentPreviewLoading from "./DocumentPreviewLoading";
-import PdfDocumentPreview, { PdfViewerSkeleton } from "./PdfDocumentPreview";
+import PdfViewerSkeleton from "./PdfViewerSkeleton";
+
+const PdfDocumentPreview = lazy(() => import("./PdfDocumentPreview"));
 
 export interface DocumentPreviewCoreProps {
   kind: DocKind;
@@ -606,7 +616,9 @@ export default function DocumentPreviewCore({
     }
     return (
       <div className={styles.documentPreview}>
-        <PdfDocumentPreview fileUrl={src} filename={filename} />
+        <Suspense fallback={<PdfViewerSkeleton />}>
+          <PdfDocumentPreview fileUrl={src} filename={filename} />
+        </Suspense>
       </div>
     );
   }

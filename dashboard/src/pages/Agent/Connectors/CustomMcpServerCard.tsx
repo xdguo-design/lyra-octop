@@ -2,7 +2,6 @@ import type { CSSProperties } from "react";
 import { Alert, App, Button, Input, Select, Switch } from "antd";
 import {
   Activity,
-  Cable,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
@@ -11,11 +10,8 @@ import {
 import { useTranslation } from "react-i18next";
 
 import type { CustomMcpTransport } from "../../../api/modules/connectors";
-import {
-  accentForServerName,
-  friendlyServerLabel,
-  type ServerCardState,
-} from "./customMcpUtils";
+import { ConnectorLogo } from "./connectorDefs";
+import { friendlyServerLabel, type ServerCardState } from "./customMcpUtils";
 import styles from "./index.module.less";
 
 interface CustomMcpServerCardProps {
@@ -52,8 +48,8 @@ export function CustomMcpServerCard({
   const { t } = useTranslation();
   const { modal } = App.useApp();
   const isHttp = card.transport === "streamable_http";
+  const oauthCallbackUrl = `${window.location.origin}/api/connectors/oauth/callback`;
   const label = friendlyServerLabel(card);
-  const accent = accentForServerName(card.name.trim() || label);
   const summary = isHttp
     ? card.url.trim() || "https://…"
     : [
@@ -106,14 +102,19 @@ export function CustomMcpServerCard({
       }`}
       style={
         {
-          "--mcp-accent": accent,
+          "--mcp-accent": "var(--fn-color-brand)",
         } as CSSProperties
       }
     >
       <div className={styles.customMcpServerTop}>
         <div className={styles.customMcpServerIdentity}>
           <span className={styles.customMcpServerIcon}>
-            <Cable size={22} aria-hidden />
+            <ConnectorLogo
+              kind="custom-mcp"
+              name={card.displayName || card.name}
+              url={card.url}
+              size={22}
+            />
           </span>
           <div className={styles.customMcpServerMeta}>
             <span className={styles.customMcpServerName} title={label}>
@@ -263,6 +264,62 @@ export function CustomMcpServerCard({
                   }
                   autoSize={{ minRows: 2, maxRows: 6 }}
                   placeholder={"Authorization: Bearer sk-..."}
+                />
+              </div>
+              <div className={styles.customMcpField}>
+                <label>
+                  {t(
+                    "connectors.customMcp.oauthClientId",
+                    "OAuth Client ID（可选）",
+                  )}
+                </label>
+                <Input
+                  value={card.oauthClientId}
+                  onChange={(e) =>
+                    onUpdate(card.key, { oauthClientId: e.target.value })
+                  }
+                  placeholder={t(
+                    "connectors.customMcp.oauthClientIdPlaceholder",
+                    "不支持动态注册的服务才需要，如 GitHub MCP",
+                  )}
+                />
+                <div className={styles.customMcpFieldHint}>
+                  {t(
+                    "connectors.customMcp.oauthClientHint",
+                    "当服务的授权服务器不支持动态客户端注册时（如 GitHub MCP），先在服务商注册一个 OAuth 应用并填写 Client ID，即可用「一键授权」代替手动令牌。",
+                  )}
+                </div>
+                <div className={styles.customMcpFieldHint}>
+                  {t(
+                    "connectors.customMcp.oauthCallbackUrl",
+                    "OAuth 回调地址：",
+                  )}
+                  <code>{oauthCallbackUrl}</code>
+                </div>
+              </div>
+              <div className={styles.customMcpField}>
+                <label>
+                  {t(
+                    "connectors.customMcp.oauthClientSecret",
+                    "OAuth Client Secret（可选）",
+                  )}
+                </label>
+                <Input.Password
+                  value={card.oauthClientSecret}
+                  onChange={(e) =>
+                    onUpdate(card.key, { oauthClientSecret: e.target.value })
+                  }
+                  placeholder={
+                    card.oauthClientSecretConfigured
+                      ? t(
+                          "connectors.customMcp.oauthSecretKept",
+                          "已保存，留空保持不变",
+                        )
+                      : t(
+                          "connectors.customMcp.oauthSecretPlaceholder",
+                          "公开客户端可留空",
+                        )
+                  }
                 />
               </div>
             </>

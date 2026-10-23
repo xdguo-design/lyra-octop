@@ -58,6 +58,20 @@ async def test_missing_hashed_asset_returns_404(tmp_octop_home: Path) -> None:
             assert r.status_code == 404
 
 
+async def test_embedded_subapp_directory_serves_its_index(tmp_octop_home: Path) -> None:
+    sub_index = _DASHBOARD / "admission-registration" / "index.html"
+    if not sub_index.exists():
+        return
+    async with octop_client(tmp_octop_home) as (_client, srv):
+        app = build_app(srv)
+        with TestClient(app) as c:
+            for path in ("/admission-registration", "/admission-registration/"):
+                r = c.get(path)
+                assert r.status_code == 200, path
+                assert "/admission-registration/assets/" in r.text, path
+                assert "no-cache" in r.headers.get("cache-control", ""), path
+
+
 async def test_path_traversal_is_blocked(tmp_octop_home: Path) -> None:
     async with octop_client(tmp_octop_home) as (_client, srv):
         app = build_app(srv)

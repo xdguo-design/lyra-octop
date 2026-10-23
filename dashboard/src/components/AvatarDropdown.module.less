@@ -1,22 +1,67 @@
 .menuPopover {
   z-index: 1100 !important;
 
+  :global(.octop-popover-inner),
   :global(.ant-popover-inner) {
-    padding: 0;
-    border-radius: 12px;
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+    padding: 8px !important;
+    border-radius: 16px;
+    background: var(--fn-bg-tertiary, #f3f4f6) !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.14);
     overflow: hidden;
   }
 }
 
 .menu {
-  width: 260px;
-  padding: 14px 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 288px;
+}
+
+.menuGroup {
+  padding: 5px 0;
   background: var(--fn-bg-elevated, #fff);
+  border-radius: 12px;
 }
 
 .menuHeader {
-  padding: 0 16px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--fn-bg-elevated, #fff);
+  border-radius: 12px;
+}
+
+.menuAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  img,
+  svg {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.menuHeaderText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .menuHeaderTop {
@@ -44,21 +89,21 @@
 }
 
 .menuHandle {
-  display: block;
-  margin-top: 2px;
   font-size: 12px;
-}
-
-.menuDivider {
-  margin: 6px 0 !important;
+  color: var(--fn-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .menuItem {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
   width: 100%;
-  padding: 10px 16px;
+  height: 38px;
+  padding: 0 12px;
   border: none;
   background: transparent;
   color: var(--fn-text-primary);
@@ -72,6 +117,14 @@
     background: var(--fn-bg-tertiary, rgba(0, 0, 0, 0.04));
     color: var(--fn-text-primary);
   }
+}
+
+.menuItemLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 14px;
 
   svg {
     flex-shrink: 0;
@@ -79,16 +132,23 @@
   }
 }
 
+.menuItemExtra {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--fn-text-tertiary);
+}
+
 .menuItemDanger {
-  color: var(--fn-text-primary);
+  color: var(--fn-text-danger, #ef4444);
+
+  .menuItemLabel svg {
+    color: var(--fn-text-danger, #ef4444);
+  }
 
   &:hover {
-    color: #cf1322;
-    background: rgba(255, 77, 79, 0.06);
-
-    svg {
-      color: #cf1322;
-    }
+    background: var(--fn-bg-danger-light, rgba(239, 68, 68, 0.08));
+    color: var(--fn-text-danger, #ef4444);
   }
 }
 
@@ -97,22 +157,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 16px;
-  min-height: 40px;
-}
-
-.menuItemLabel {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 14px;
-  color: var(--fn-text-primary);
-  min-width: 0;
-
-  svg {
-    flex-shrink: 0;
-    color: var(--fn-text-secondary);
-  }
+  padding: 0 12px;
+  min-height: 38px;
 }
 
 .accountAvatar {

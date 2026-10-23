@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 from octop.api.common.agent import require_agent_owner_row
 from octop.api.common.workspace import require_running_workspace
 from octop.api.deps import current_user, get_server
+from octop.i18n import tr
 from octop.infra.agents.subagents.catalog import SubagentDefinition
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.utils.locale import (
@@ -187,7 +188,7 @@ async def install_subagent(
     if not slug or "/" in slug or slug.startswith("."):
         raise HTTPException(
             status_code=400,
-            detail="slug is required and must not contain / or start with .",
+            detail=tr("api.validation.subagent_slug_invalid", resolve_request_locale(request)),
         )
 
     require_agent_owner_row(agent_id, user=user, as_user=as_user, server=server)

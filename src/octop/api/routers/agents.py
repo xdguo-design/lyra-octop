@@ -69,6 +69,7 @@ class AgentPatchBody(AgentRuntimeFields):
     icon: str | None = None
     template_name: str | None = None
     is_shared: bool | None = None
+    chat_visible: bool | None = None
     color: str | None = None
     icon_name: str | None = None
     icon_url: str | None = None
@@ -189,6 +190,7 @@ def _row_dict(
         "published_expert_id": row.published_expert_id,
         "welcome_message": welcome_from_row(row),
         "is_shared": bool(int(getattr(row, "is_shared", 0) or 0)),
+        "chat_visible": bool(getattr(row, "chat_visible", 1)),
         "is_owner": row.user_id is not None and row.user_id == viewer_user_id,
         "owner_username": owner_username,
         "kind": getattr(row, "kind", None) or "expert",
@@ -212,13 +214,13 @@ async def list_agents(
     server: Any = Depends(get_server),
     scope: Literal["mine", "all"] = Query(
         "mine",
-        description="mine: agents owned by the current user; all: every agent (admin only)",
+        description="mine: owned or explicitly shared agents; all: every agent (admin only)",
     ),
 ) -> list[dict[str, Any]]:
     """List agents for the dashboard.
 
     Default ``scope=mine`` returns agents owned by the authenticated user plus
-    agents other users have explicitly shared.
+    agents explicitly shared by other users or the platform.
     Holders of the ``users`` permission (and admins) may pass ``scope=all``.
     """
     if scope == "all" and not user_has_permission(user, "users"):
@@ -401,6 +403,7 @@ async def patch_agent(
         not in {
             "config",
             "is_shared",
+            "chat_visible",
             "welcome_message",
             "skill_package_ids",
             "knowledge_base_ids",
@@ -432,6 +435,8 @@ async def patch_agent(
         refreshed = server.app_runtime.agent_registry.get_row(agent_id)
         if refreshed is not None:
             row = refreshed
+    if body.chat_visible is not None:
+        row = server.app_runtime.agent_registry.set_chat_visible(agent_id, body.chat_visible)
     if body.is_shared is not None:
         row = await server.app_runtime.agent_registry.set_shared(agent_id, body.is_shared)
     return _row_dict(
