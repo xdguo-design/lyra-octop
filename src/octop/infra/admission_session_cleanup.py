@@ -13,7 +13,7 @@ ADMISSION_SESSION_CLEANUP_JOB_ID = "sys-admission-session-expiry-cleanup"
 
 async def purge_expired_admission_sessions(session_repo: Any) -> int:
     """Delete expired sessions and their cascading turn records off the event loop."""
-    deleted = await asyncio.to_thread(session_repo.delete_expired)
+    deleted = int(await asyncio.to_thread(session_repo.delete_expired))
     if deleted:
         logger.info("Purged %d expired admission registration sessions", deleted)
     return deleted

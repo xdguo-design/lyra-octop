@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from octop.api.common.agent import assert_agent_access, require_agent_row, user_owns_agent
@@ -55,6 +55,26 @@ class CronExamplesResponse(BaseModel):
     """Compat mirror of welcome ``task_examples`` (workspace → catalog → name)."""
 
     task_examples: dict[str, list[str]] | None = None
+
+
+class CronRunResponse(BaseModel):
+    run_id: str
+    cron_id: str
+    agent_id: str
+    trigger_kind: str
+    status: str
+    started_at: int
+    finished_at: int | None
+    error: str | None
+
+
+class CronRunStartedResponse(BaseModel):
+    run_id: str
+    status: str = "running"
+
+
+class CronRunCancelResponse(BaseModel):
+    cancelled: bool
 
 
 def _get_cron_manager(server: Any) -> Any:
@@ -238,13 +258,18 @@ async def delete_cron(
     await mgr.delete(cron_id)
 
 
-@router.post("/agents/{agent_id}/cron/{cron_id}/run-now", status_code=204, summary="Run cron now")
+@router.post(
+    "/agents/{agent_id}/cron/{cron_id}/run-now",
+    status_code=202,
+    response_model=CronRunStartedResponse,
+    summary="Run cron now",
+)
 async def run_now(
     agent_id: str,
     cron_id: str,
     user: Any = Depends(current_user),
     server: Any = Depends(get_server),
-) -> None:
+) -> CronRunStartedResponse:
     """Trigger an immediate one-off run without waiting for the schedule."""
     agent_row = require_agent_row(agent_id, user=user, as_user=None, server=server)
     mgr = _get_cron_manager(server)
@@ -252,4 +277,56 @@ async def run_now(
     if existing is None:
         raise OctopError(ErrorCode.NOT_FOUND, "cron job not found")
     _assert_cron_manage(agent_id=agent_id, agent_row=agent_row, user=user, row=existing)
-    await mgr.run_now(cron_id)
+    run_id = await mgr.run_now(cron_id)
+    return CronRunStartedResponse(run_id=run_id)
+
+
+@router.get(
+    "/agents/{agent_id}/cron/{cron_id}/runs",
+    response_model=list[CronRunResponse],
+    summary="List recent Cron runs",
+)
+async def list_cron_runs(
+    agent_id: str,
+    cron_id: str,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    user: Any = Depends(current_user),
+    server: Any = Depends(get_server),
+) -> list[CronRunResponse]:
+    agent_row = require_agent_row(agent_id, user=user, as_user=None, server=server)
+    mgr = _get_cron_manager(server)
+    _assert_cron_manage(agent_id=agent_id, agent_row=agent_row, user=user)
+    return [
+        CronRunResponse.model_validate(item)
+        for item in mgr.list_runs(
+            cron_id,
+            user_id=int(user.id),
+            agent_id=agent_id,
+            limit=limit,
+            offset=offset,
+        )
+    ]
+
+
+@router.post(
+    "/agents/{agent_id}/cron/{cron_id}/runs/{run_id}/cancel",
+    response_model=CronRunCancelResponse,
+    summary="Cancel an in-flight Cron run",
+)
+async def cancel_cron_run(
+    agent_id: str,
+    cron_id: str,
+    run_id: str,
+    user: Any = Depends(current_user),
+    server: Any = Depends(get_server),
+) -> CronRunCancelResponse:
+    agent_row = require_agent_row(agent_id, user=user, as_user=None, server=server)
+    mgr = _get_cron_manager(server)
+    _assert_cron_manage(agent_id=agent_id, agent_row=agent_row, user=user)
+    run = mgr.get_run(run_id, cron_id=cron_id, user_id=int(user.id), agent_id=agent_id)
+    if run is None:
+        raise OctopError(ErrorCode.NOT_FOUND, "cron run not found")
+    if run["status"] != "running":
+        return CronRunCancelResponse(cancelled=False)
+    return CronRunCancelResponse(cancelled=await mgr.cancel_run(run_id))

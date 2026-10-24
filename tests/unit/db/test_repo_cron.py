@@ -110,6 +110,104 @@ def test_set_run_status(repo: CronJobRepo, agent_id: str, user_id: int):
     assert row.last_error == "boom"
 
 
+def test_run_history_is_owned_ordered_and_survives_job_deletion(
+    repo: CronJobRepo, agent_id: str, user_id: int
+):
+    cid = new_ulid()
+    repo.create(
+        cron_id=cid,
+        agent_id=agent_id,
+        user_id=user_id,
+        trigger="interval:60",
+        prompt="run report",
+        session_key=_session_key(agent_id, user_id),
+    )
+    repo.start_run(
+        run_id="run-old",
+        cron_id=cid,
+        agent_id=agent_id,
+        user_id=user_id,
+        instance_id="instance-a",
+        trigger_kind="manual",
+        started_at=10,
+    )
+    repo.finish_run("run-old", status="ok", finished_at=11)
+    repo.start_run(
+        run_id="run-new",
+        cron_id=cid,
+        agent_id=agent_id,
+        user_id=user_id,
+        instance_id="instance-a",
+        trigger_kind="scheduled",
+        started_at=20,
+    )
+    assert repo.finish_run("run-new", status="error", finished_at=21, error="oops")
+    assert not repo.finish_run("run-new", status="ok", finished_at=22)
+
+    rows = repo.list_runs(cron_id=cid, user_id=user_id, agent_id=agent_id, limit=1)
+    assert rows[0]["run_id"] == "run-new"
+    assert rows[0]["status"] == "error"
+    assert repo.get_run("run-new", user_id=user_id + 1, agent_id=agent_id, cron_id=cid) is None
+    repo.delete(cid)
+    assert repo.list_runs(cron_id=cid, user_id=user_id, agent_id=agent_id)[0]["run_id"] == "run-new"
+
+
+def test_mark_interrupted_runs_closes_only_active_runs(
+    repo: CronJobRepo, agent_id: str, user_id: int
+):
+    repo.touch_instance("live-instance", heartbeat_at=19)
+    repo.start_run(
+        run_id="running",
+        cron_id="deleted-job",
+        agent_id=agent_id,
+        user_id=user_id,
+        instance_id="dead-instance",
+        trigger_kind="manual",
+        started_at=10,
+    )
+    repo.start_run(
+        run_id="live-running",
+        cron_id="deleted-job",
+        agent_id=agent_id,
+        user_id=user_id,
+        instance_id="live-instance",
+        trigger_kind="scheduled",
+        started_at=11,
+    )
+    repo.start_run(
+        run_id="finished",
+        cron_id="deleted-job",
+        agent_id=agent_id,
+        user_id=user_id,
+        instance_id="live-instance",
+        trigger_kind="manual",
+        started_at=12,
+    )
+    repo.finish_run("finished", status="ok", finished_at=13)
+    assert (
+        repo.mark_interrupted_runs(
+            finished_at=20, stale_before=15, current_instance_id="new-instance"
+        )
+        == 1
+    )
+    assert (
+        repo.get_run("running", user_id=user_id, agent_id=agent_id, cron_id="deleted-job")["status"]
+        == "interrupted"
+    )
+    assert (
+        repo.get_run("live-running", user_id=user_id, agent_id=agent_id, cron_id="deleted-job")[
+            "status"
+        ]
+        == "running"
+    )
+    assert (
+        repo.get_run("finished", user_id=user_id, agent_id=agent_id, cron_id="deleted-job")[
+            "status"
+        ]
+        == "ok"
+    )
+
+
 def test_list_by_agent(repo: CronJobRepo, agent_id: str, user_id: int):
     sk = _session_key(agent_id, user_id)
     repo.create(

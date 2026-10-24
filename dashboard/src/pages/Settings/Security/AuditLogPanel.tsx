@@ -71,6 +71,7 @@ const ACTION_OPTIONS = [
   "cron.delete",
   "cron.run_ok",
   "cron.run_failed",
+  "cron.run_cancelled",
   "security.policy.update",
   "security.tool_guard_rules.update",
   "security.tool_guard_rules.reset",

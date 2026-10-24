@@ -138,7 +138,7 @@ async def test_boot_schedules_enabled_jobs(tmp_path: Path) -> None:
 
     await mgr.boot()
 
-    assert mgr._scheduler.add_job.call_count == 2
+    assert mgr._scheduler.add_job.call_count == 3
 
 
 @pytest.mark.asyncio
@@ -160,7 +160,8 @@ async def test_boot_skips_disabled_jobs(tmp_path: Path) -> None:
     mgr = _make_manager(services)
     await mgr.boot()
 
-    mgr._scheduler.add_job.assert_not_called()
+    assert mgr._scheduler.add_job.call_count == 1
+    assert mgr._scheduler.add_job.call_args.kwargs["id"].startswith("sys-cron-heartbeat-")
 
 
 @pytest.mark.asyncio
@@ -651,7 +652,7 @@ async def test_run_now_raises_for_unknown(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_run_now_fires_job(tmp_path: Path) -> None:
-    """run_now() schedules an immediate async task via ensure_future."""
+    """run_now() returns a stable history id and schedules an immediate task."""
     services = _make_services(tmp_path)
     aid, uid = _make_agent(services)
     gateway = _make_gateway()
@@ -665,11 +666,38 @@ async def test_run_now_fires_job(tmp_path: Path) -> None:
         prompt="run",
     )
 
-    with patch("octop.infra.cron.manager.asyncio.ensure_future") as mock_ef:
-        await mgr.run_now(cid)
-        mock_ef.assert_called_once()
-        coro = mock_ef.call_args[0][0]
+    with patch("octop.infra.cron.manager.asyncio.create_task") as mock_create_task:
+        run_id = await mgr.run_now(cid)
+        mock_create_task.assert_called_once()
+        coro = mock_create_task.call_args[0][0]
         coro.close()  # clean up without awaiting
+    assert run_id
+
+
+@pytest.mark.asyncio
+async def test_cancel_run_persists_cancelled_history(tmp_path: Path) -> None:
+    import asyncio
+
+    services = _make_services(tmp_path)
+    aid, uid = _make_agent(services)
+    mgr = _make_manager(services)
+    cid = _cron_id()
+    await mgr.create(cron_id=cid, agent_id=aid, user_id=uid, trigger="interval:3600", prompt="run")
+    started = asyncio.Event()
+    never = asyncio.Event()
+
+    async def blocking_delivery(_command):
+        started.set()
+        await never.wait()
+
+    mgr._delivery_service.deliver = blocking_delivery
+    run_id = await mgr.run_now(cid)
+    await asyncio.wait_for(started.wait(), timeout=1)
+    assert await mgr.cancel_run(run_id)
+    history = mgr.list_runs(cid, user_id=uid, agent_id=aid)
+    assert history[0]["run_id"] == run_id
+    assert history[0]["status"] == "cancelled"
+    assert not await mgr.cancel_run(run_id)
 
 
 # ---------------------------------------------------------------------------
