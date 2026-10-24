@@ -396,7 +396,7 @@ def test_turn_limit_keeps_direct_page_edits_available_after_twenty_dialog_turns(
     assert response.status_code == 200
 
 
-def test_ai_proxy_extracts_both_pages_for_the_initial_answer(monkeypatch) -> None:
+def test_ai_proxy_extracts_both_pages_for_the_initial_answer_with_one_call(monkeypatch) -> None:
     pages = []
 
     class FakeResponse(_SessionResponse):
@@ -405,12 +405,14 @@ def test_ai_proxy_extracts_both_pages_for_the_initial_answer(monkeypatch) -> Non
             self.headers = {}
 
         def json(self):
-            return {
-                "fields": (
-                    {"contact_phone": "13800138000"} if self.page == 1 else {"occupation": "学生"}
-                ),
-                "modelName": "Qwen Display",
-            }
+            fields = (
+                {"contact_phone": "13800138000", "occupation": "学生"}
+                if self.page == 0
+                else {"contact_phone": "13800138000"}
+                if self.page == 1
+                else {"occupation": "学生"}
+            )
+            return {"fields": fields, "modelName": "Qwen Display"}
 
     class FakeClient(_FakeUpstreamClient):
         async def post(self, url, json, headers):
@@ -424,7 +426,7 @@ def test_ai_proxy_extracts_both_pages_for_the_initial_answer(monkeypatch) -> Non
         headers={"Authorization": "Bearer platform-token"},
     )
     assert response.status_code == 200
-    assert pages == [1, 2]
+    assert pages == [0]
     assert response.json()["fields"] == {"phone": "13800138000", "occupation": "学生"}
 
 
