@@ -64,6 +64,13 @@ def test_set_active_edge_tts_only(voice_mgr: VoiceManager) -> None:
     assert active["stt"] == "browser"
 
 
+def test_doubao_can_be_active_for_both_directions(voice_mgr: VoiceManager) -> None:
+    repo = voice_mgr._repo
+    repo.create(name="doubao", kind="doubao", capability="both", api_key="key")
+    active = voice_mgr.set_active(stt="doubao", tts="doubao")
+    assert active == {"stt": "doubao", "tts": "doubao"}
+
+
 def test_edge_cannot_be_stt(voice_mgr: VoiceManager) -> None:
     with pytest.raises(OctopError) as exc:
         voice_mgr.set_active(stt="edge")

@@ -7,6 +7,7 @@ Adding Notion / Ardot / Linear-style connectors is mostly a catalog row.
 
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import Any
 from urllib.parse import urlencode, urlparse
@@ -68,17 +69,58 @@ async def _validate_metadata_endpoints(metadata: dict[str, Any], *, issuer: str)
     return metadata
 
 
+def _authorization_metadata_urls(issuer: str) -> list[str]:
+    """Candidate AS metadata URLs: suffix form + RFC 8414 path-insertion form.
+
+    RFC 8414 inserts ``.well-known/oauth-authorization-server`` between the
+    host and the issuer path (e.g. issuer ``https://github.com/login/oauth``
+    -> ``https://github.com/.well-known/oauth-authorization-server/login/oauth``).
+    Some providers only serve one of the two forms, so try both.
+    """
+    text = issuer.rstrip("/")
+    candidates = [f"{text}/.well-known/oauth-authorization-server"]
+    parsed = urlparse(text)
+    if parsed.path and parsed.path != "/":
+        inserted = (
+            f"{parsed.scheme}://{parsed.netloc}/.well-known/oauth-authorization-server{parsed.path}"
+        )
+        if inserted not in candidates:
+            candidates.append(inserted)
+    return candidates
+
+
+def _is_transient_transport_error(exc: Exception) -> bool:
+    """Connect stalls / timeouts (e.g. flaky routes to public hosts) are retryable."""
+    return isinstance(exc, (httpx.TimeoutException, httpx.TransportError))
+
+
 async def fetch_authorization_metadata(issuer: str) -> dict[str, Any]:
-    metadata_url = f"{issuer.rstrip('/')}/.well-known/oauth-authorization-server"
-    await _ensure_mcp_oauth_url(metadata_url, issuer=issuer, field="issuer_metadata")
-    r = await safe_request("GET", metadata_url, timeout=20.0)
-    r.raise_for_status()
-    data = r.json()
-    if not isinstance(data, dict):
-        raise ValueError("invalid oauth metadata")
-    if not data.get("authorization_endpoint") or not data.get("token_endpoint"):
-        raise ValueError("oauth metadata missing endpoints")
-    return await _validate_metadata_endpoints(data, issuer=issuer)
+    last_error: Exception | None = None
+    for metadata_url in _authorization_metadata_urls(issuer):
+        for attempt in range(2):  # one retry: transient connect stalls are common
+            try:
+                await _ensure_mcp_oauth_url(metadata_url, issuer=issuer, field="issuer_metadata")
+                r = await safe_request("GET", metadata_url, timeout=20.0)
+                r.raise_for_status()
+                data = r.json()
+            except Exception as exc:  # 404 etc. -> next candidate form
+                last_error = exc
+                if _is_transient_transport_error(exc) and attempt == 0:
+                    await asyncio.sleep(0.5)
+                    continue
+                break
+            if (
+                isinstance(data, dict)
+                and data.get("authorization_endpoint")
+                and data.get("token_endpoint")
+            ):
+                return await _validate_metadata_endpoints(data, issuer=issuer)
+            last_error = ValueError("oauth metadata missing endpoints")
+            break  # got a response but invalid; try the next candidate form
+    detail = (
+        str(last_error) if last_error is not None and str(last_error).strip() else repr(last_error)
+    )
+    raise ValueError(f"无法获取授权服务器元数据（{issuer}）：{detail}")
 
 
 async def register_dynamic_client(
@@ -103,7 +145,9 @@ async def register_dynamic_client(
         "response_types": ["code"],
         "token_endpoint_auth_method": auth_method,
     }
-    r = await safe_request("POST", reg_url, json=payload, timeout=20.0)
+    r = await safe_request(
+        "POST", reg_url, json=payload, timeout=20.0, headers={"Accept": "application/json"}
+    )
     r.raise_for_status()
     data = r.json()
     if not isinstance(data, dict) or not data.get("client_id"):
@@ -177,7 +221,11 @@ async def exchange_authorization_code(
         "POST",
         token_url,
         data=data,
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            # Some AS (e.g. GitHub) return urlencoded unless JSON is requested.
+            "Accept": "application/json",
+        },
         timeout=30.0,
     )
     try:
@@ -217,7 +265,10 @@ async def refresh_access_token(
         "POST",
         token_url,
         data=data,
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
+        },
         timeout=30.0,
     )
     try:

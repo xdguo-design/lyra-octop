@@ -7,12 +7,14 @@ import json
 import math
 import struct
 import uuid
+import zlib
 from collections.abc import AsyncIterator
 from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
+from websockets.asyncio.client import connect as websocket_connect
 
 from octop.i18n.domains.voice import (
     format_voice_probe_error,
@@ -36,6 +38,158 @@ class STTResult:
 
 class BrowserOnlyError(Exception):
     """Raised when the active provider must run in the browser."""
+
+
+def _doubao_api_key(row: VoiceProviderRow) -> str:
+    key = (row.api_key or "").strip()
+    if not key:
+        raise ValueError("Doubao Voice API key is required")
+    return key
+
+
+def _doubao_frame(message_type: int, flags: int, serialization: int, payload: bytes) -> bytes:
+    return (
+        bytes((0x11, (message_type << 4) | flags, (serialization << 4), 0))
+        + len(payload).to_bytes(4, "big")
+        + payload
+    )
+
+
+def _doubao_asr_response(frame: bytes) -> tuple[dict[str, Any], bool]:
+    if len(frame) < 8:
+        raise RuntimeError("Doubao ASR returned a malformed response")
+    message_type, flags = frame[1] >> 4, frame[1] & 0x0F
+    offset = 4
+    if message_type == 0xF:
+        code = int.from_bytes(frame[offset : offset + 4], "big")
+        offset += 4
+        size = int.from_bytes(frame[offset : offset + 4], "big")
+        raise RuntimeError(f"Doubao ASR error {code}: {frame[offset + 4 : offset + 4 + size]!r}")
+    if message_type != 0x9:
+        return {}, flags in {0x2, 0x3}
+    if flags in {0x1, 0x3}:
+        offset += 4
+    size = int.from_bytes(frame[offset : offset + 4], "big")
+    payload = frame[offset + 4 : offset + 4 + size]
+    if frame[2] & 0x0F == 1:
+        payload = zlib.decompress(payload, 16 + zlib.MAX_WBITS)
+    body = json.loads(payload) if payload else {}
+    return body, flags in {0x2, 0x3} or bool(body.get("is_last_package"))
+
+
+async def transcribe_doubao(
+    row: VoiceProviderRow, audio: bytes, *, mime: str, language: str
+) -> STTResult:
+    api_key = _doubao_api_key(row)
+    if not audio:
+        raise ValueError("Doubao ASR audio is empty")
+    if len(audio) > 16 * 1024 * 1024:
+        raise ValueError("Doubao ASR audio exceeds the 16 MiB request limit")
+    audio_format = (
+        "wav"
+        if "wav" in mime.lower()
+        else "mp3"
+        if "mp3" in mime.lower() or "mpeg" in mime.lower()
+        else None
+    )
+    if audio_format is None:
+        raise ValueError(f"Doubao ASR does not support audio format {mime!r}; upload WAV or MP3")
+    extra = row.get_extra()
+    resource_id = str(extra.get("stt_resource_id") or "volc.seedasr.sauc.duration")
+    request = {
+        "user": {"uid": str(row.name)},
+        "audio": {
+            "format": audio_format,
+            "rate": 16000,
+            "bits": 16,
+            "channel": 1,
+            "language": "en-US" if language.lower().startswith("en") else "zh-CN",
+        },
+        "request": {"model_name": "bigmodel", "enable_itn": True, "enable_punc": True},
+    }
+    headers = {
+        "X-Api-Key": api_key,
+        "X-Api-Resource-Id": resource_id,
+        "X-Api-Request-Id": str(uuid.uuid4()),
+    }
+    text = ""
+    async with websocket_connect(
+        "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream",
+        additional_headers=headers,
+        open_timeout=20,
+        close_timeout=5,
+        max_size=16 * 1024 * 1024,
+    ) as websocket:
+        await websocket.send(_doubao_frame(0x1, 0, 1, json.dumps(request).encode("utf-8")))
+        await websocket.send(_doubao_frame(0x2, 0x2, 0, audio))
+        async for frame in websocket:
+            if not isinstance(frame, bytes):
+                continue
+            body, done = _doubao_asr_response(frame)
+            code = body.get("code")
+            if code is not None and str(code) != "0":
+                raise RuntimeError(
+                    f"Doubao ASR error {code}: {body.get('message') or 'unknown error'}"
+                )
+            payload = body.get("payload_msg") or {}
+            result = payload.get("result") or body.get("result") or []
+            if isinstance(result, list):
+                text = "".join(str(item.get("text") or "") for item in result)
+            elif isinstance(result, dict):
+                text = str(result.get("text") or "")
+            text = str(payload.get("text") or body.get("text") or text).strip()
+            if done:
+                break
+    return STTResult(text=text)
+
+
+async def synthesize_doubao(
+    row: VoiceProviderRow,
+    text: str,
+    *,
+    voice_id: str | None,
+    speed: float,
+) -> AsyncIterator[bytes]:
+    api_key = _doubao_api_key(row)
+    extra = row.get_extra()
+    resource_id = str(extra.get("tts_resource_id") or "seed-tts-2.0")
+    speaker = voice_id or str(extra.get("voice_id") or "zh_female_wenjingmaomao_uranus_bigtts")
+    payload = {
+        "req_params": {
+            "text": text,
+            "speaker": speaker,
+            "audio_params": {
+                "format": "mp3",
+                "sample_rate": 24000,
+                "speech_rate": round((max(0.5, min(2.0, speed)) - 1) * 100),
+            },
+        }
+    }
+    async with (
+        httpx.AsyncClient(timeout=120.0) as client,
+        client.stream(
+            "POST",
+            "https://openspeech.bytedance.com/api/v3/tts/unidirectional",
+            headers={
+                "X-Api-Key": api_key,
+                "X-Api-Resource-Id": resource_id,
+                "X-Api-Request-Id": str(uuid.uuid4()),
+                "Content-Type": "application/json",
+            },
+            json=payload,
+        ) as response,
+    ):
+        response.raise_for_status()
+        async for line in response.aiter_lines():
+            if not line.strip():
+                continue
+            event = json.loads(line.removeprefix("data:").strip())
+            code = int(event.get("code") or 0)
+            if code not in {0, 20000000}:
+                raise RuntimeError(f"Doubao TTS error {code}: {event.get('message', '')}")
+            data = event.get("data")
+            if data:
+                yield base64.b64decode(data)
 
 
 def parse_tencent_credentials(row: VoiceProviderRow) -> tuple[str, str]:
@@ -481,7 +635,7 @@ def _missing_credentials(row: VoiceProviderRow, kind: str, *, locale: str = "en"
         except ValueError:
             return voice_credentials_error(kind, locale)
         return None
-    if kind in {"openai", "mimo"} and not row.api_key:
+    if kind in {"openai", "mimo", "doubao"} and not row.api_key:
         return voice_credentials_error(kind, locale)
     return None
 
@@ -502,14 +656,16 @@ async def test_stt(
         return {"ok": True, "mode": "browser"}
     if row is None:
         return {"ok": False, "error": voice_not_configured(locale)}
-    if kind not in {"openai", "tencent", "mimo"}:
+    if kind not in {"openai", "tencent", "mimo", "doubao"}:
         # edge is TTS-only and unknown kinds have no adapter: keep offline pass.
         return {"ok": True, "mode": kind}
     missing = _missing_credentials(row, kind, locale=locale)
     if missing:
         return {"ok": False, "error": missing}
     transcribe = (
-        transcribe_mimo
+        transcribe_doubao
+        if kind == "doubao"
+        else transcribe_mimo
         if kind == "mimo"
         else transcribe_openai
         if kind == "openai"
@@ -555,7 +711,9 @@ async def test_tts(
     if missing:
         return {"ok": False, "error": missing}
     synth = (
-        synthesize_mimo
+        synthesize_doubao
+        if kind == "doubao"
+        else synthesize_mimo
         if kind == "mimo"
         else synthesize_openai
         if kind == "openai"
@@ -563,7 +721,8 @@ async def test_tts(
     )
     token = _ui_locale.set(locale)
     try:
-        chunks = await _drain(synth(row, "ping", voice_id=None, speed=1.0))
+        probe_text = "你好，这是豆包语音测试。" if kind == "doubao" else "ping"
+        chunks = await _drain(synth(row, probe_text, voice_id=None, speed=1.0))
     except Exception as exc:  # probe reports failures, never 500s
         return _probe_failure(exc, locale=locale)
     finally:

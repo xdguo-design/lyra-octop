@@ -172,10 +172,11 @@ export default defineConfig(({ mode }) => {
       suppressViteDisconnectReload(),
       react(),
       VitePWA({
-        // prompt: new SW stays in waiting until the user accepts via
-        // PwaUpdatePrompt → applyUpdate() → SKIP_WAITING. Avoid autoUpdate
-        // skipWaiting + page reload loops (especially Safari/WebKit).
-        registerType: "prompt",
+        // autoUpdate: single-user private deploy — a waiting SW made the UI
+        // look "stuck on the old version no matter how hard you refresh"
+        // whenever the update banner was dismissed. skipWaiting + clientsClaim
+        // let every deploy land on the next reload instead.
+        registerType: "autoUpdate",
         // SW registration is handled in sw-register.ts for full control.
         injectRegister: false,
         // Use public/manifest.json directly instead of auto-generating one.
@@ -209,8 +210,8 @@ export default defineConfig(({ mode }) => {
           navigateFallback: null,
           // Take control on first activation so Chrome can fire beforeinstallprompt.
           clientsClaim: true,
-          // Do not activate updated workers until the user confirms (SKIP_WAITING).
-          skipWaiting: false,
+          // Activate updated workers immediately — never wait in limbo.
+          skipWaiting: true,
           runtimeCaching: [
             {
               // Always revalidate the HTML shell so a new deploy is picked up

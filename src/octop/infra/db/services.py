@@ -6,14 +6,18 @@ from dataclasses import dataclass
 
 from octop.config import OctopConfig
 from octop.infra.db.pool import DatabasePool
+from octop.infra.db.repos.admission_sessions import AdmissionSessionRepo
 from octop.infra.db.repos.agents import AgentRepo
 from octop.infra.db.repos.audit import AuditRepo
 from octop.infra.db.repos.backends import BackendRepo
 from octop.infra.db.repos.bridge_connections import BridgeConnectionRepo
 from octop.infra.db.repos.care_push import CarePushRepo
 from octop.infra.db.repos.channels import ChannelRepo
+from octop.infra.db.repos.chat_files import ChatFileRepo
 from octop.infra.db.repos.connectors import ConnectorRepo
+from octop.infra.db.repos.creations import CreationRepo
 from octop.infra.db.repos.cron import CronJobRepo
+from octop.infra.db.repos.email_verification import EmailVerificationRepo
 from octop.infra.db.repos.invites import InviteRepo
 from octop.infra.db.repos.knowledge import KnowledgeRepo
 from octop.infra.db.repos.proactive_care_config import ProactiveCareConfigRepo
@@ -31,6 +35,7 @@ from octop.infra.db.repos.usage import UsageRepo
 from octop.infra.db.repos.user_policies import UserPolicyRepo
 from octop.infra.db.repos.users import UserRepo
 from octop.infra.db.repos.voice_providers import VoiceProviderRepo
+from octop.infra.db.repos.workbench import WorkbenchRepo
 from octop.infra.utils.paths import PathLayout
 
 
@@ -39,11 +44,14 @@ class RepoBundle:
     db: DatabasePool
 
     user_repo: UserRepo
+    admission_session_repo: AdmissionSessionRepo
     user_policy_repo: UserPolicyRepo
     invite_repo: InviteRepo
+    email_verification_repo: EmailVerificationRepo
     agent_repo: AgentRepo
     provider_repo: ProviderRepo
     channel_repo: ChannelRepo
+    chat_file_repo: ChatFileRepo
     cron_repo: CronJobRepo
     session_repo: SessionRepo
     thread_repo: ThreadRepo
@@ -56,6 +64,7 @@ class RepoBundle:
     storage_backend_repo: BackendRepo
     bridge_connection_repo: BridgeConnectionRepo
     connector_repo: ConnectorRepo
+    creation_repo: CreationRepo
     skill_package_repo: SkillPackageRepo
     published_expert_repo: PublishedExpertRepo
     knowledge_repo: KnowledgeRepo
@@ -63,17 +72,21 @@ class RepoBundle:
     care_push_repo: CarePushRepo
     proactive_care_config_repo: ProactiveCareConfigRepo
     sso_repo: SsoRepo
+    workbench_repo: WorkbenchRepo
 
     @classmethod
     def from_pool(cls, db: DatabasePool) -> RepoBundle:
         return cls(
             db=db,
             user_repo=UserRepo(db),
+            admission_session_repo=AdmissionSessionRepo(db),
             user_policy_repo=UserPolicyRepo(db),
             invite_repo=InviteRepo(db),
+            email_verification_repo=EmailVerificationRepo(db),
             agent_repo=AgentRepo(db),
             provider_repo=ProviderRepo(db),
             channel_repo=ChannelRepo(db),
+            chat_file_repo=ChatFileRepo(db),
             cron_repo=CronJobRepo(db),
             session_repo=SessionRepo(db),
             thread_repo=ThreadRepo(db),
@@ -86,6 +99,7 @@ class RepoBundle:
             storage_backend_repo=BackendRepo(db),
             bridge_connection_repo=BridgeConnectionRepo(db),
             connector_repo=ConnectorRepo(db),
+            creation_repo=CreationRepo(db),
             skill_package_repo=SkillPackageRepo(db),
             published_expert_repo=PublishedExpertRepo(db),
             knowledge_repo=KnowledgeRepo(db),
@@ -93,6 +107,7 @@ class RepoBundle:
             care_push_repo=CarePushRepo(db),
             proactive_care_config_repo=ProactiveCareConfigRepo(db),
             sso_repo=SsoRepo(db),
+            workbench_repo=WorkbenchRepo(db),
         )
 
 
@@ -111,12 +126,20 @@ class SharedServices:
         return self.repos.user_repo
 
     @property
+    def admission_session_repo(self) -> AdmissionSessionRepo:
+        return self.repos.admission_session_repo
+
+    @property
     def user_policy_repo(self) -> UserPolicyRepo:
         return self.repos.user_policy_repo
 
     @property
     def invite_repo(self) -> InviteRepo:
         return self.repos.invite_repo
+
+    @property
+    def email_verification_repo(self) -> EmailVerificationRepo:
+        return self.repos.email_verification_repo
 
     @property
     def agent_repo(self) -> AgentRepo:
@@ -129,6 +152,10 @@ class SharedServices:
     @property
     def channel_repo(self) -> ChannelRepo:
         return self.repos.channel_repo
+
+    @property
+    def chat_file_repo(self) -> ChatFileRepo:
+        return self.repos.chat_file_repo
 
     @property
     def cron_repo(self) -> CronJobRepo:
@@ -179,6 +206,10 @@ class SharedServices:
         return self.repos.connector_repo
 
     @property
+    def creation_repo(self) -> CreationRepo:
+        return self.repos.creation_repo
+
+    @property
     def skill_package_repo(self) -> SkillPackageRepo:
         return self.repos.skill_package_repo
 
@@ -205,6 +236,10 @@ class SharedServices:
     @property
     def sso_repo(self) -> SsoRepo:
         return self.repos.sso_repo
+
+    @property
+    def workbench_repo(self) -> WorkbenchRepo:
+        return self.repos.workbench_repo
 
 
 def build_shared_services(

@@ -53,7 +53,11 @@ function ChatWithKey() {
   return <Chat />;
 }
 
-export default function MainLayout() {
+export default function MainLayout({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
   const location = useLocation();
   const currentPath = location.pathname;
   const selectedKey = resolveSelectedKey(currentPath);
@@ -197,7 +201,7 @@ export default function MainLayout() {
           }}
         >
           {/* Mobile overlay backdrop */}
-          {isMobile && !collapsed && (
+          {!embedded && isMobile && !collapsed && (
             <div
               onClick={toggleCollapsed}
               style={{
@@ -209,29 +213,31 @@ export default function MainLayout() {
             />
           )}
 
-          <div
-            style={{
-              position: "relative",
-              flexShrink: 0,
-              alignSelf: "stretch",
-              display: "flex",
-              minHeight: 0,
-            }}
-          >
-            <Sidebar
-              selectedKey={selectedKey}
-              collapsed={collapsed}
-              onToggle={toggleCollapsed}
-              isMobile={isMobile}
-            />
-            {!isMobile && (
-              <RailEdgeControl
-                expanded={!collapsed}
-                onToggle={handleNavRailToggle}
-                side="end"
+          {!embedded && (
+            <div
+              style={{
+                position: "relative",
+                flexShrink: 0,
+                alignSelf: "stretch",
+                display: "flex",
+                minHeight: 0,
+              }}
+            >
+              <Sidebar
+                selectedKey={selectedKey}
+                collapsed={collapsed}
+                onToggle={toggleCollapsed}
+                isMobile={isMobile}
               />
-            )}
-          </div>
+              {!isMobile && (
+                <RailEdgeControl
+                  expanded={!collapsed}
+                  onToggle={handleNavRailToggle}
+                  side="end"
+                />
+              )}
+            </div>
+          )}
 
           {isChatRoute && !isMinimalLayout && (
             <div
@@ -258,7 +264,8 @@ export default function MainLayout() {
               overflow: "hidden",
             }}
           >
-            {isMobile &&
+            {!embedded &&
+              isMobile &&
               !(
                 SELF_HEADER_PATHS.has(currentPath) ||
                 [...SELF_HEADER_PATHS].some((p) =>

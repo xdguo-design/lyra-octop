@@ -1,0 +1,36 @@
+name: Agent Mail send-flow regression
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - "src/octop/infra/connectors/gateway/**"
+      - "src/octop/api/routers/agent_tools.py"
+      - "tests/integration/test_agently_mail_send_flow.py"
+      - "tests/unit/connectors/test_agently_cli.py"
+      - "tests/unit/api/test_tool_readiness.py"
+      - ".github/workflows/agent-mail-send-test.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mail-send-flow:
+    runs-on: ubuntu-latest
+    name: Simulated send, confirmation and guardrails
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install dependencies
+        run: make install
+      - name: Check changed Python files
+        run: |
+          uv run ruff check tests/integration/test_agently_mail_send_flow.py
+          uv run ruff format --check tests/integration/test_agently_mail_send_flow.py
+      - name: Run end-to-end gateway and regression tests (upstream mocked)
+        run: |
+          uv run pytest -q             tests/integration/test_agently_mail_send_flow.py             tests/unit/connectors/test_agently_cli.py             tests/unit/api/test_tool_readiness.py

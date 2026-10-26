@@ -27,6 +27,7 @@ export type CaptchaFieldProps = {
   slideVerifiedLabel: string;
   unsupportedLabel: string;
   onReadyChange: (ready: boolean) => void;
+  onEnter?: () => void;
 };
 
 type VendorApi = {
@@ -217,6 +218,7 @@ const CaptchaField = forwardRef<CaptchaFieldHandle, CaptchaFieldProps>(
       slideVerifiedLabel,
       unsupportedLabel,
       onReadyChange,
+      onEnter,
     },
     ref,
   ) {
@@ -406,6 +408,9 @@ const CaptchaField = forwardRef<CaptchaFieldHandle, CaptchaFieldProps>(
             data-testid="captcha-image-input"
             value={imageAnswer}
             onChange={(e) => setImageAnswer(e.target.value.toUpperCase())}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onEnter?.();
+            }}
             maxLength={IMAGE_CAPTCHA_LENGTH}
             placeholder={t("login.imageCaptchaPlaceholder", "Captcha code")}
             style={{

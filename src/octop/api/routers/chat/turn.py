@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -17,9 +19,20 @@ from octop_gateway.models import (
 
 from octop.api.common.agent import require_agent_row
 from octop.api.common.validators import validate_chat_mcp_servers, validate_chat_skills
+from octop.api.common.workspace import require_running_workspace
 from octop.api.routers.chat.models import ChatTurnBody
 from octop.infra.errors import ErrorCode, OctopError
+from octop.infra.files.context import build_file_context
+from octop.infra.files.parse import FileParseError
+from octop.infra.files.service import (
+    FileIntegrityError,
+    FileReadBusy,
+    FileService,
+    FileTooLargeError,
+)
+from octop.infra.files.worker import FileWorkerError
 from octop.infra.gateway.media.attachment_hints import (
+    VISION_MAX_COUNT,
     inbound_attachments_from_parts,
     is_vision_attachment,
 )
@@ -43,6 +56,23 @@ __all__ = [
     "prepare_dashboard_turn",
     "turn_has_content",
 ]
+
+
+def _mark_vision_attachment_status(attachments: list[dict[str, Any]]) -> None:
+    """Reflect the harness image-count limit in persisted attachment status."""
+    sent = 0
+    for attachment in attachments:
+        if not is_vision_attachment(
+            kind=str(attachment.get("kind") or ""),
+            media_type=str(attachment.get("media_type") or ""),
+            path=str(attachment.get("workspace_path") or ""),
+        ):
+            continue
+        if sent < VISION_MAX_COUNT:
+            attachment["read_status"] = "vision"
+            sent += 1
+        else:
+            attachment["read_status"] = "not_sent"
 
 
 @dataclass
@@ -150,6 +180,56 @@ def _workspace_path_from_block(block: dict[str, Any]) -> str | None:
         if isinstance(raw, str) and raw.strip():
             return inbound_rel_path(raw.strip())
     return None
+
+
+async def _bind_file_attachments(
+    server: Any,
+    *,
+    agent_id: str,
+    user_id: int,
+    thread_id: str,
+    turn: ChatTurnBody,
+) -> dict[str, dict[str, str]]:
+    """Validate uploaded IDs against their exact stored path and bind to this thread."""
+    file_refs: dict[str, dict[str, str]] = {}
+    last_user_message = next(
+        (
+            message
+            for message in reversed(turn.messages)
+            if isinstance(message, dict) and str(message.get("role") or "").lower() == "user"
+        ),
+        None,
+    )
+    content = last_user_message.get("content") if isinstance(last_user_message, dict) else None
+    blocks = (
+        [block for block in content if isinstance(block, dict)] if isinstance(content, list) else []
+    )
+    repo = server.services.chat_file_repo
+    loop = asyncio.get_running_loop()
+    for block in blocks:
+        file_id = str(block.get("file_id") or block.get("fileId") or "").strip()
+        if not file_id:
+            continue  # Legacy path-only messages remain readable.
+        revision_id = str(block.get("revision_id") or block.get("revisionId") or "").strip()
+        workspace_path = _workspace_path_from_block(block)
+        if not revision_id or not workspace_path:
+            raise OctopError(ErrorCode.FORBIDDEN, "Invalid uploaded file reference")
+        bound = await loop.run_in_executor(
+            None,
+            partial(
+                repo.bind_thread,
+                file_id,
+                user_id=user_id,
+                agent_id=agent_id,
+                thread_id=thread_id,
+                revision_id=revision_id,
+                workspace_path=workspace_path,
+            ),
+        )
+        if not bound:
+            raise OctopError(ErrorCode.FORBIDDEN, "Uploaded file is unavailable in this thread")
+        file_refs[workspace_path] = {"file_id": file_id, "revision_id": revision_id}
+    return file_refs
 
 
 def content_parts_from_dashboard_turn(turn: ChatTurnBody) -> list[ContentPart]:
@@ -263,6 +343,9 @@ async def prepare_dashboard_turn(
         thread_id=turn.thread_id,
         session_key=turn.session_key,
     )
+    file_refs = await _bind_file_attachments(
+        server, agent_id=agent_id, user_id=int(user.id), thread_id=thread_id, turn=turn
+    )
     model_ref = (turn.default_model or "").strip() or None
     if (
         model_ref is not None
@@ -291,6 +374,59 @@ async def prepare_dashboard_turn(
     )
     inbound_content = content_parts_from_dashboard_turn(turn)
     inbound_attachments = inbound_attachments_from_parts(inbound_content)
+    _mark_vision_attachment_status(inbound_attachments)
+    context_files: list[dict[str, Any]] = []
+    if file_refs:
+        workspace = await require_running_workspace(
+            agent_id, user=user, as_user=None, server=server
+        )
+        file_service = FileService(server.services.chat_file_repo)
+        attachments_by_path = {item.get("workspace_path", ""): item for item in inbound_attachments}
+        for path, file_ref in file_refs.items():
+            attachment = attachments_by_path.get(path)
+            if attachment is None:
+                continue
+            attachment.update(file_ref)
+            if is_vision_attachment(
+                kind=str(attachment.get("kind") or ""),
+                media_type=str(attachment.get("media_type") or ""),
+                path=str(attachment.get("workspace_path") or ""),
+            ):
+                continue
+            try:
+                read_result = await file_service.read(
+                    workspace=workspace,
+                    file_id=file_ref["file_id"],
+                    revision_id=file_ref["revision_id"],
+                    user_id=int(user.id),
+                    agent_id=agent_id,
+                    thread_id=thread_id,
+                )
+            except FileIntegrityError as exc:
+                raise OctopError.localized(ErrorCode.FILE_INTEGRITY_FAILED) from exc
+            except FileTooLargeError:
+                attachment["read_status"] = "too_large"
+                continue
+            except FileParseError:
+                attachment["read_status"] = "unsupported"
+                continue
+            except (FileReadBusy, FileWorkerError):
+                attachment["read_status"] = "failed"
+                continue
+            attachment["read_status"] = str(read_result["read_status"])
+            context_files.append(
+                {
+                    **read_result,
+                    "filename": attachment.get("filename", "attachment"),
+                }
+            )
+    file_context = build_file_context(context_files, locale=str(getattr(user, "locale", "en")))
+    if file_context:
+        inbound_content.append(TextContent(text=file_context))
+    for attachment in inbound_attachments:
+        attachment_ref = file_refs.get(attachment.get("workspace_path", ""))
+        if attachment_ref:
+            attachment.update(attachment_ref)
     return PreparedDashboardTurn(
         thread_id=thread_id,
         session_key=session_key,

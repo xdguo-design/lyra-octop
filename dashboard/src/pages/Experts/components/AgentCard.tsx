@@ -27,6 +27,7 @@ import PluginCatalogDrawer from "./PluginCatalogDrawer";
 import { request } from "../../../api/request";
 import type { OctopAgent } from "../../../context/AgentContext";
 import { useAgent } from "../../../context/AgentContext";
+import { useCurrentUser } from "../../../hooks/useCurrentUser";
 import MbtiPersonaTag from "../../../components/MbtiPersonaTag";
 import { ExpertIcon } from "./iconForName";
 import {
@@ -38,7 +39,10 @@ import {
 import styles from "../index.module.less";
 import RemoteExpertHint from "../../Chat/components/RemoteExpertHint";
 import { expertDeleteConfirm } from "../../../utils/remoteExpert";
-import { isSharedExpertViewer } from "../../../utils/sharedExpert";
+import {
+  canManageExpert,
+  isSharedExpertViewer,
+} from "../../../utils/sharedExpert";
 import type { PublishedExpert } from "../../../api/modules/publishedExperts";
 import PublishTemplateButton from "./PublishTemplateButton";
 import AgentMoreActions from "./AgentMoreActions";
@@ -90,6 +94,7 @@ export const AgentCard = memo(function AgentCard({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { setActiveAgent, refresh: refreshAgents } = useAgent();
+  const currentUser = useCurrentUser();
 
   const [localState, setLocalState] = useState(agent.state);
   const [localError, setLocalError] = useState(agent.last_error);
@@ -285,7 +290,7 @@ export const AgentCard = memo(function AgentCard({
   const friendlyError = formatAgentError(localError, t);
   const chatReady = isAgentChatReady(localState);
   const sharedViewer = isSharedExpertViewer(agent);
-  const isOwner = agent.is_owner !== false;
+  const canManage = canManageExpert(agent, currentUser?.role === "admin");
   const deleteConfirm = expertDeleteConfirm(agent, t);
 
   return (
@@ -315,12 +320,15 @@ export const AgentCard = memo(function AgentCard({
               <div className={styles.agentCard2Name}>{agent.name}</div>
               {agent.is_shared && (
                 <Tag color="blue">
-                  {sharedViewer
+                  {sharedViewer && agent.owner_username
                     ? t("experts.share.fromOwner", {
                         name: agent.owner_username,
                       })
                     : t("experts.share.badge")}
                 </Tag>
+              )}
+              {agent.chat_visible === false && (
+                <Tag>{t("experts.chatHiddenBadge")}</Tag>
               )}
               <RemoteExpertHint agent={agent} />
             </div>
@@ -357,12 +365,12 @@ export const AgentCard = memo(function AgentCard({
               )}
               <MbtiPersonaTag
                 value={agent.persona_mbti}
-                onClick={isOwner ? () => setMbtiCatalogOpen(true) : undefined}
+                onClick={canManage ? () => setMbtiCatalogOpen(true) : undefined}
               />
             </div>
           </div>
 
-          {isOwner && (
+          {canManage && (
             <div className={styles.agentCard2HeaderActions}>
               <Switch
                 size="small"
@@ -407,7 +415,7 @@ export const AgentCard = memo(function AgentCard({
 
         {/* Footer actions */}
         <div className={styles.agentCard2Footer}>
-          {isOwner && (
+          {canManage && (
             <>
               <Tooltip
                 title={
@@ -505,7 +513,7 @@ export const AgentCard = memo(function AgentCard({
               {t("experts.openChat", "对话")}
               <ChevronRight size={13} />
             </button>
-          ) : isOwner &&
+          ) : canManage &&
             (localState === "failed" ||
               localState === "stopped" ||
               localState === "created") ? (

@@ -67,3 +67,31 @@ async def test_tool_settings_patch_builtin_and_plugin(env: Any) -> None:
         json={"enabled": False, "source": "builtin"},
     )
     assert bad.status_code == 400, bad.text
+
+
+async def test_tool_settings_missing_plugin_id_detail_uses_request_locale(env: Any) -> None:
+    client, _srv, auth = env
+    created = await client.post(
+        "/api/agents",
+        headers=auth,
+        json={"name": "tool-plugin-validation-agent"},
+    )
+    assert created.status_code == 201, created.text
+    aid = created.json()["agent_id"]
+
+    response = await client.patch(
+        f"/api/agents/{aid}/tool-settings/lookup",
+        headers={**auth, "Accept-Language": "zh-CN"},
+        json={"enabled": True, "source": "plugin"},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "插件工具必须提供 plugin_id。"}
+
+    critical = await client.patch(
+        f"/api/agents/{aid}/tool-settings/read_file",
+        headers={**auth, "Accept-Language": "zh-CN"},
+        json={"enabled": False, "source": "builtin"},
+    )
+    assert critical.status_code == 400
+    assert critical.json() == {"detail": "关键工具 read_file 不能停用。"}

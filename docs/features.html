@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Lyra Octop 功能介绍：自托管 AI 助手、Agent、知识库、通道、工作台与自动化。"
+    />
+    <title>Lyra Octop 功能介绍</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #17221f;
+        --muted: #586a64;
+        --green: #176b52;
+        --pale: #eaf4ef;
+        --line: #dbe5df;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: #f7faf8;
+        font:
+          16px/1.65 system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+      }
+      header {
+        padding: 64px max(24px, calc((100% - 1080px) / 2));
+        color: white;
+        background: linear-gradient(120deg, #124c3b, #258563);
+      }
+      header p {
+        max-width: 700px;
+        color: #e1f3ea;
+      }
+      main {
+        width: min(1080px, calc(100% - 40px));
+        margin: 34px auto 72px;
+      }
+      h1 {
+        margin: 0;
+        font-size: clamp(2.2rem, 5vw, 3.7rem);
+        line-height: 1.12;
+      }
+      h2 {
+        margin-top: 0;
+        font-size: 1.45rem;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 16px;
+      }
+      article {
+        padding: 22px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: white;
+      }
+      article p {
+        margin-bottom: 0;
+        color: var(--muted);
+      }
+      .tag {
+        display: inline-block;
+        margin: 0 0 10px;
+        padding: 2px 9px;
+        border-radius: 999px;
+        color: var(--green);
+        background: var(--pale);
+        font-size: 0.82rem;
+      }
+      .note {
+        margin: 24px 0;
+        padding: 16px 20px;
+        border-left: 4px solid #d49b39;
+        background: #fff7e7;
+      }
+      a {
+        color: var(--green);
+      }
+      footer {
+        margin-top: 28px;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>一个由你掌控的 AI 工作台</h1>
+      <p>
+        Lyra Octop
+        将多模型对话、Agent、知识、自动化和团队协作放在可自托管的平台中。你可以从浏览器、命令行或已连接的消息通道使用它。
+      </p>
+    </header>
+    <main>
+      <section class="grid" aria-label="功能介绍">
+        <article>
+          <span class="tag">平台与数据</span>
+          <h2>自托管、多用户</h2>
+          <p>
+            在自己的机器或容器运行服务；支持 SQLite 与
+            PostgreSQL、多用户账号、角色权限、审计记录、备份和系统设置。
+          </p>
+        </article>
+        <article>
+          <span class="tag">模型</span>
+          <h2>连接你选择的模型</h2>
+          <p>
+            管理云端与本地模型供应商、模型参数和连接测试。模型是否可用取决于供应商配置、凭据、网络和模型能力。
+          </p>
+        </article>
+        <article>
+          <span class="tag">对话</span>
+          <h2>围绕工作持续对话</h2>
+          <p>
+            按 Agent
+            管理聊天和历史；上传文件、查看附件、恢复历史记录，并使用联网搜索等已配置的工具。
+          </p>
+        </article>
+        <article>
+          <span class="tag">Agent</span>
+          <h2>配置不同的工作助手</h2>
+          <p>
+            创建专家 Agent，配置人格、指令、知识库、Skills
+            与连接器；通过权限和审批规则控制工具的使用范围。
+          </p>
+        </article>
+        <article>
+          <span class="tag">知识与扩展</span>
+          <h2>让知识和工具可组合</h2>
+          <p>
+            管理知识库、插件、MCP Connector
+            和可选扩展；能力受实际安装的组件与所连服务支持范围影响。
+          </p>
+        </article>
+        <article>
+          <span class="tag">协作</span>
+          <h2>团队、ACP 与工具审批</h2>
+          <p>
+            使用 Agent Teams、Human-in-the-Loop 审批和 ACP 接入 IDE
+            等客户端；协作动作依照 Agent 与用户权限执行。
+          </p>
+        </article>
+        <article>
+          <span class="tag">消息通道</span>
+          <h2>从常用入口触达助手</h2>
+          <p>
+            配置飞书、钉钉、企业微信、Telegram、Discord 等支持的通道，让助手在
+            Web 对话之外接收消息。
+          </p>
+        </article>
+        <article>
+          <span class="tag">自动化</span>
+          <h2>Cron 定时运行与记录</h2>
+          <p>
+            管理定时任务、手动触发运行、查看持久化运行记录，并在当前服务进程中取消正在运行的任务。
+          </p>
+        </article>
+        <article>
+          <span class="tag">工作台与创作</span>
+          <h2>项目、内容与演示能力</h2>
+          <p>
+            使用工作台项目、资源与创作页面；可按部署配置体验语音、图片/视频生成及
+            Admission 演示功能。
+          </p>
+        </article>
+        <article>
+          <span class="tag">远程操作</span>
+          <h2>浏览器和桌面自动化</h2>
+          <p>
+            按需启用浏览器自动化与远程桌面能力。它们依赖相应运行时、权限和服务配置，不会因安装主程序而自动启用。
+          </p>
+        </article>
+        <article>
+          <span class="tag">管理</span>
+          <h2>Web 控制台与 CLI</h2>
+          <p>
+            用 Web 控制台管理账号、模型、Agent、通道、定时任务和系统；用 CLI
+            启动服务并完成常见维护操作。
+          </p>
+        </article>
+        <article>
+          <span class="tag">部署</span>
+          <h2>从本机到容器</h2>
+          <p>
+            支持安装脚本、Python 环境和 Docker 部署；可配置
+            TLS、系统服务、运行数据目录与数据库。
+          </p>
+        </article>
+      </section>
+      <div class="note">
+        <strong>能力状态：</strong>以上介绍的是产品现有模块，不代表每个第三方
+        Provider、文件格式和端到端场景均已完成验收。文件
+        OCR/引用/编辑/导出闭环、音频转写与视频抽帧理解、跨进程 Cron 取消及
+        Projects/routines
+        仍有路线图工作。请查看测试文档中的“未完成与外部依赖”部分。
+      </div>
+      <p>
+        <a href="user-guide.md">阅读用户指南</a> ·
+        <a href="features.md">查看完整功能清单</a> ·
+        <a href="release-notes-2026-10.md">查看本次更新日志</a> ·
+        <a href="testing/offline-test-guide.md">线下测试指南</a>
+      </p>
+      <footer>Lyra Octop · 自托管 AI 助手平台</footer>
+    </main>
+  </body>
+</html>

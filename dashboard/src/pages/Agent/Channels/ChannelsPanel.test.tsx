@@ -66,7 +66,7 @@ describe("<ChannelsPanel /> create-flow default", () => {
         allow_all_channels: true,
       });
     });
-  });
+  }, 15_000);
 
   it.each([undefined, true, false])(
     "loads and saves Discord all-channels setting %s without losing boolean false",

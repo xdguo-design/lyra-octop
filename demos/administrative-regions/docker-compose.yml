@@ -1,0 +1,14 @@
+services:
+  administrative-regions:
+    build:
+      context: ./backend
+    env_file:
+      - .env
+    ports:
+      - "${REGIONS_PORT:-8210}:8210"
+    volumes:
+      - regions-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  regions-data:

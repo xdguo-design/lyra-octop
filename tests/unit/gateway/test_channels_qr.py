@@ -169,6 +169,22 @@ def test_dingtalk_qrcode_generate_keeps_device_code_server_side(mock_server_and_
     assert stored.device_code == "device-secret"
 
 
+def test_dingtalk_qrcode_generate_error_uses_request_locale(mock_server_and_user):
+    server, user = mock_server_and_user
+    with patch(
+        "octop.api.routers.channels.dingtalk_registration.generate",
+        new=AsyncMock(side_effect=RuntimeError("provider detail")),
+    ):
+        client = TestClient(_make_app(server, user))
+        response = client.post(
+            "/agents/agent1/channels/dingtalk/qrcode/generate",
+            headers={"Accept-Language": "zh-CN"},
+        )
+
+    assert response.status_code == 502
+    assert response.json() == {"detail": "启动钉钉应用注册失败。"}
+
+
 def test_dingtalk_qrcode_poll_creates_channel_without_returning_secret(
     mock_server_and_user,
 ):

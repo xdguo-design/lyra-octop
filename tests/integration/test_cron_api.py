@@ -7,6 +7,7 @@ run-now invoking the cron manager and updating last_status.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -157,7 +158,12 @@ async def test_run_now_records_last_status(env: Any) -> None:
     cid = r.json()["id"]
 
     r = await c.post(f"/api/agents/{aid}/cron/{cid}/run-now", headers=alice_auth)
-    assert r.status_code == 204
+    assert r.status_code == 202
+    run_id = r.json()["run_id"]
+
+    r = await c.get(f"/api/agents/{aid}/cron/{cid}/runs", headers=alice_auth)
+    assert r.status_code == 200
+    assert any(item["run_id"] == run_id for item in r.json())
 
     r = await c.get(f"/api/agents/{aid}/cron/{cid}", headers=alice_auth)
     assert r.status_code == 200
@@ -166,6 +172,65 @@ async def test_run_now_records_last_status(env: Any) -> None:
     # the row was touched, regardless of which terminal status it lands on.
     assert body["last_status"] is not None
     assert body["last_run_at"] is not None
+
+
+async def test_cron_run_history_is_private_and_survives_job_delete(env: Any) -> None:
+    c, srv, alice_auth, bob_auth, aid = env
+    create = await c.post(
+        f"/api/agents/{aid}/cron",
+        headers=alice_auth,
+        json={"trigger": "interval:3600", "prompt": "run history test"},
+    )
+    assert create.status_code == 201, create.text
+    cron_id = create.json()["id"]
+    started = await c.post(f"/api/agents/{aid}/cron/{cron_id}/run-now", headers=alice_auth)
+    assert started.status_code == 202, started.text
+    run_id = started.json()["run_id"]
+
+    history = await c.get(f"/api/agents/{aid}/cron/{cron_id}/runs", headers=bob_auth)
+    assert history.status_code == 403
+    assert (
+        await c.delete(f"/api/agents/{aid}/cron/{cron_id}", headers=alice_auth)
+    ).status_code == 204
+    history = await c.get(f"/api/agents/{aid}/cron/{cron_id}/runs", headers=alice_auth)
+    assert history.status_code == 200
+    assert any(item["run_id"] == run_id for item in history.json())
+
+
+async def test_cancel_active_run_through_api(env: Any) -> None:
+    c, srv, alice_auth, bob_auth, aid = env
+    create = await c.post(
+        f"/api/agents/{aid}/cron",
+        headers=alice_auth,
+        json={"trigger": "interval:3600", "prompt": "cancel through API"},
+    )
+    assert create.status_code == 201, create.text
+    cron_id = create.json()["id"]
+    manager = srv.app_runtime.cron_manager
+    started = asyncio.Event()
+    never = asyncio.Event()
+
+    async def blocking_delivery(_command: Any) -> None:
+        started.set()
+        await never.wait()
+
+    manager._delivery_service.deliver = blocking_delivery
+    response = await c.post(f"/api/agents/{aid}/cron/{cron_id}/run-now", headers=alice_auth)
+    assert response.status_code == 202, response.text
+    run_id = response.json()["run_id"]
+    await asyncio.wait_for(started.wait(), timeout=2)
+
+    denied = await c.post(
+        f"/api/agents/{aid}/cron/{cron_id}/runs/{run_id}/cancel", headers=bob_auth
+    )
+    assert denied.status_code == 403
+    cancelled = await c.post(
+        f"/api/agents/{aid}/cron/{cron_id}/runs/{run_id}/cancel", headers=alice_auth
+    )
+    assert cancelled.status_code == 200
+    assert cancelled.json() == {"cancelled": True}
+    history = await c.get(f"/api/agents/{aid}/cron/{cron_id}/runs", headers=alice_auth)
+    assert history.json()[0]["status"] == "cancelled"
 
 
 async def test_cron_settings_returns_timezone(env: Any) -> None:

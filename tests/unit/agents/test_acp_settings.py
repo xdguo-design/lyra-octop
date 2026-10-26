@@ -36,12 +36,17 @@ def test_load_defaults_include_codebuddy(
     assert "kimi_code" in runners
     assert "cursor_cli" in runners
     assert "pi" in runners
+    assert "kilo_code" in runners
     assert runners["kimi_code"]["command"] == "kimi"
     assert runners["kimi_code"]["args"] == ["acp"]
     assert runners["cursor_cli"]["command"] == "agent"
     assert runners["cursor_cli"]["args"] == ["acp"]
     assert runners["pi"]["command"] == "npx"
     assert runners["pi"]["args"] == ["-y", "pi-acp"]
+    assert runners["kilo_code"]["command"] == "kilo"
+    assert runners["kilo_code"]["args"] == ["acp"]
+    assert runners["kilo_code"]["trusted"] is False
+    assert runners["kilo_code"]["enabled"] is False
     assert "qwen_code" not in runners
 
 

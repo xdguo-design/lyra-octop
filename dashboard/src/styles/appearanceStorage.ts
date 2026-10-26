@@ -1,3 +1,4 @@
+import { DEFAULT_SKIN, isVisualSkin, type VisualSkin } from "./visualSkins";
 import {
   DEFAULT_CUSTOM_COLOR,
   DEFAULT_PALETTE,
@@ -13,6 +14,10 @@ export type ThemePreference = "system" | "light" | "dark";
 export type StoredAppearance = {
   preference: ThemePreference;
   palette: ThemePalette;
+  /** Optional whole-interface visual skin; null keeps the base appearance. */
+  skin?: VisualSkin | null;
+  /** Distinguishes a deliberate Doodle choice from its old automatic default. */
+  skinExplicit?: boolean;
   /** Brand hex for the "custom" palette; ignored for curated palettes. */
   customColor?: string;
 };
@@ -32,9 +37,14 @@ function isPalette(value: unknown): value is ThemePalette {
   );
 }
 
+/** LYRA 统一品牌：历史存的 rose（Octop 上游默认）一律迁到 tech 蓝。 */
+function normalizeLyraPalette(value: ThemePalette): ThemePalette {
+  return value === "rose" ? "tech" : value;
+}
+
 function readLegacyPalette(): ThemePalette {
   const stored = localStorage.getItem(LEGACY_PALETTE_STORAGE_KEY);
-  if (isPalette(stored)) return stored;
+  if (isPalette(stored)) return normalizeLyraPalette(stored);
   return DEFAULT_PALETTE;
 }
 
@@ -48,6 +58,8 @@ export function readStoredAppearance(): StoredAppearance {
     return {
       preference: "system",
       palette: readLegacyPalette(),
+      skin: DEFAULT_SKIN,
+      skinExplicit: false,
       customColor: DEFAULT_CUSTOM_COLOR,
     };
   }
@@ -57,6 +69,8 @@ export function readStoredAppearance(): StoredAppearance {
     return {
       preference: raw,
       palette: readLegacyPalette(),
+      skin: DEFAULT_SKIN,
+      skinExplicit: false,
       customColor: DEFAULT_CUSTOM_COLOR,
     };
   }
@@ -68,12 +82,16 @@ export function readStoredAppearance(): StoredAppearance {
       const preference = isPreference(obj.preference)
         ? obj.preference
         : "system";
-      const palette = isPalette(obj.palette)
-        ? obj.palette
-        : readLegacyPalette();
+      const palette = normalizeLyraPalette(
+        isPalette(obj.palette) ? obj.palette : readLegacyPalette(),
+      );
       const customColor =
         normalizeHexColor(obj.customColor as string) ?? DEFAULT_CUSTOM_COLOR;
-      return { preference, palette, customColor };
+      const skinExplicit =
+        isVisualSkin(obj.skin) &&
+        (obj.skin !== "doodle" || obj.skinExplicit === true);
+      const skin = skinExplicit ? (obj.skin as VisualSkin) : DEFAULT_SKIN;
+      return { preference, palette, skin, skinExplicit, customColor };
     }
   } catch {
     // fall through
@@ -82,6 +100,8 @@ export function readStoredAppearance(): StoredAppearance {
   return {
     preference: "system",
     palette: readLegacyPalette(),
+    skin: DEFAULT_SKIN,
+    skinExplicit: false,
     customColor: DEFAULT_CUSTOM_COLOR,
   };
 }
@@ -93,6 +113,9 @@ export function writeStoredAppearance(appearance: StoredAppearance): void {
     JSON.stringify({
       preference: appearance.preference,
       palette: appearance.palette,
+      skin: isVisualSkin(appearance.skin) ? appearance.skin : null,
+      skinExplicit:
+        isVisualSkin(appearance.skin) && (appearance.skinExplicit ?? true),
       customColor:
         normalizeHexColor(appearance.customColor ?? "") ?? DEFAULT_CUSTOM_COLOR,
     }),

@@ -1,18 +1,80 @@
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
+import { Button, Modal } from "antd";
+import {
+  AppWindow,
+  CalendarDays,
+  ChartColumn,
+  Gamepad2,
+  Lightbulb,
+  Presentation,
+  ShoppingBag,
+  type LucideIcon,
+} from "lucide-react";
 import styles from "./WorkbenchHome.module.less";
+
+type CreationType = "miniProgram" | "presentation";
+
+const CREATION_TASKS: Record<
+  CreationType,
+  Array<{
+    titleKey: string;
+    descriptionKey: string;
+    promptKey: string;
+    icon: LucideIcon;
+  }>
+> = {
+  miniProgram: [
+    {
+      titleKey: "workbench.home.miniShop",
+      descriptionKey: "workbench.home.miniShopDesc",
+      promptKey: "workbench.home.miniShopPrompt",
+      icon: ShoppingBag,
+    },
+    {
+      titleKey: "workbench.home.miniBooking",
+      descriptionKey: "workbench.home.miniBookingDesc",
+      promptKey: "workbench.home.miniBookingPrompt",
+      icon: CalendarDays,
+    },
+    {
+      titleKey: "workbench.home.miniGame",
+      descriptionKey: "workbench.home.miniGameDesc",
+      promptKey: "workbench.home.miniGamePrompt",
+      icon: Gamepad2,
+    },
+  ],
+  presentation: [
+    {
+      titleKey: "workbench.home.pptProduct",
+      descriptionKey: "workbench.home.pptProductDesc",
+      promptKey: "workbench.home.pptProductPrompt",
+      icon: Presentation,
+    },
+    {
+      titleKey: "workbench.home.pptReport",
+      descriptionKey: "workbench.home.pptReportDesc",
+      promptKey: "workbench.home.pptReportPrompt",
+      icon: ChartColumn,
+    },
+    {
+      titleKey: "workbench.home.pptProposal",
+      descriptionKey: "workbench.home.pptProposalDesc",
+      promptKey: "workbench.home.pptProposalPrompt",
+      icon: Lightbulb,
+    },
+  ],
+};
 
 interface WorkbenchHomeProps {
   /** Browser environment ready (Chromium installed). */
   envReady: boolean;
   /** A browser session is being created. */
   starting: boolean;
-  /** Dispatch a task to the main agent (opens the real chat page). */
+  /** Dispatch a task to the current expert's assistant panel. */
   onSubmitTask: (task: string) => void;
   /** Open the planet kids-workbench app panel. */
   onOpenPlanet: () => void;
-  /** Navigate to the tasks / workflow page. */
-  onOpenTasks: () => void;
   /** Start a browser session directly. */
   onStartBrowser: () => void;
 }
@@ -26,19 +88,6 @@ function SendIcon() {
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function PlusIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M12 5v14M5 12h14"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
       />
     </svg>
   );
@@ -72,11 +121,11 @@ export default function WorkbenchHome({
   starting,
   onSubmitTask,
   onOpenPlanet,
-  onOpenTasks,
   onStartBrowser,
 }: WorkbenchHomeProps) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState("");
+  const [creationType, setCreationType] = useState<CreationType | null>(null);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -143,7 +192,20 @@ export default function WorkbenchHome({
           </span>
         </button>
 
-        <button type="button" className={styles.card} onClick={onOpenTasks}>
+        {/* 工作流卡 = 对话式创建：把引导语派给主 Agent，
+            由它问清需求后调 cronjob_create 生成定时任务。 */}
+        <button
+          type="button"
+          className={styles.card}
+          onClick={() =>
+            onSubmitTask(
+              t(
+                "workbench.home.flowCreateTask",
+                "帮我创建一个定时任务。请先问我要做什么、多久执行一次或具体什么时间执行，确认后用 cronjob_create 工具帮我创建。",
+              ),
+            )
+          }
+        >
           <ThumbFrame title={t("workbench.home.cardFlow", "工作流")}>
             <img
               className={styles.thumbImg}
@@ -161,25 +223,104 @@ export default function WorkbenchHome({
           </span>
         </button>
 
-        <span className={`${styles.card} ${styles.cardSoon}`}>
-          <ThumbFrame title={t("workbench.home.cardMore", "更多工作台")}>
+        <button
+          type="button"
+          className={styles.card}
+          onClick={() => setCreationType("miniProgram")}
+        >
+          <ThumbFrame title={t("workbench.home.cardMiniProgram", "制作小程序")}>
             <span className={styles.thumbSoon}>
-              <span className={styles.thumbSoonIcon}>
-                <PlusIcon />
+              <span
+                className={`${styles.thumbSoonIcon} ${styles.creationIcon}`}
+              >
+                <AppWindow size={18} aria-hidden />
               </span>
               <span className={styles.thumbSoonText}>
-                {t("workbench.home.cardMoreDesc", "敬请期待")}
+                {t(
+                  "workbench.home.cardMiniProgramDesc",
+                  "商城、预约、互动游戏",
+                )}
               </span>
             </span>
           </ThumbFrame>
           <span className={styles.cardTitle}>
-            {t("workbench.home.cardMore", "更多工作台")}
+            {t("workbench.home.cardMiniProgram", "制作小程序")}
           </span>
           <span className={styles.cardDesc}>
-            {t("workbench.home.cardMoreDesc", "敬请期待")}
+            {t("workbench.home.cardMiniProgramDesc", "商城、预约、互动游戏")}
           </span>
-        </span>
+        </button>
+
+        <button
+          type="button"
+          className={styles.card}
+          onClick={() => setCreationType("presentation")}
+        >
+          <ThumbFrame title={t("workbench.home.cardPresentation", "创建 PPT")}>
+            <span className={styles.thumbSoon}>
+              <span
+                className={`${styles.thumbSoonIcon} ${styles.creationIcon}`}
+              >
+                <Presentation size={18} aria-hidden />
+              </span>
+              <span className={styles.thumbSoonText}>
+                {t(
+                  "workbench.home.cardPresentationDesc",
+                  "产品介绍、汇报、方案",
+                )}
+              </span>
+            </span>
+          </ThumbFrame>
+          <span className={styles.cardTitle}>
+            {t("workbench.home.cardPresentation", "创建 PPT")}
+          </span>
+          <span className={styles.cardDesc}>
+            {t("workbench.home.cardPresentationDesc", "产品介绍、汇报、方案")}
+          </span>
+        </button>
       </div>
+
+      <Modal
+        title={
+          creationType === "miniProgram"
+            ? t("workbench.home.miniProgramDialogTitle", "选择小程序类型")
+            : t("workbench.home.presentationDialogTitle", "选择 PPT 类型")
+        }
+        open={creationType !== null}
+        footer={
+          <Button onClick={() => setCreationType(null)}>
+            {t("common.cancel", "取消")}
+          </Button>
+        }
+        onCancel={() => setCreationType(null)}
+        destroyOnClose
+      >
+        <div className={styles.creationTaskList}>
+          {(creationType ? CREATION_TASKS[creationType] : []).map((task) => {
+            const Icon = task.icon;
+            return (
+              <button
+                key={task.titleKey}
+                type="button"
+                className={styles.creationTask}
+                onClick={() => {
+                  const prompt = t(task.promptKey);
+                  setCreationType(null);
+                  onSubmitTask(prompt);
+                }}
+              >
+                <span className={styles.creationTaskIcon}>
+                  <Icon size={18} aria-hidden />
+                </span>
+                <span className={styles.creationTaskCopy}>
+                  <strong>{t(task.titleKey)}</strong>
+                  <small>{t(task.descriptionKey)}</small>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </Modal>
 
       <button
         type="button"

@@ -34,6 +34,7 @@ describe("index.html boot theme", () => {
   beforeEach(() => {
     localStorage.removeItem(THEME_STORAGE_KEY);
     document.documentElement.removeAttribute("data-theme");
+    document.documentElement.removeAttribute("data-skin");
     stubMatchMedia(true);
   });
 
@@ -41,6 +42,7 @@ describe("index.html boot theme", () => {
     window.matchMedia = originalMatchMedia;
     localStorage.removeItem(THEME_STORAGE_KEY);
     document.documentElement.removeAttribute("data-theme");
+    document.documentElement.removeAttribute("data-skin");
   });
 
   it("styles the splash from data-theme, not OS color scheme", () => {
@@ -50,8 +52,8 @@ describe("index.html boot theme", () => {
     );
   });
 
-  it("uses the white vertical mark in dark mode", () => {
-    expect(INDEX_HTML).toContain('src="/logo_vertical_white.svg"');
+  it("swaps in the dark boot logo for dark mode", () => {
+    expect(INDEX_HTML).toContain('src="/lyra-dino.svg"');
     expect(INDEX_HTML).toContain(
       'html[data-theme="dark"] .octop-boot-logo--dark',
     );
@@ -84,6 +86,43 @@ describe("index.html boot theme", () => {
     stubMatchMedia(false);
     eval(bootThemeScript());
     expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+  });
+
+  it("sets the selected skin before first paint", () => {
+    localStorage.setItem(
+      THEME_STORAGE_KEY,
+      JSON.stringify({ preference: "dark", palette: "teal", skin: "forest" }),
+    );
+    eval(bootThemeScript());
+    expect(document.documentElement.getAttribute("data-skin")).toBe("forest");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+  });
+
+  it("leaves the base appearance active when no skin was selected", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "light");
+    eval(bootThemeScript());
+    expect(document.documentElement.hasAttribute("data-skin")).toBe(false);
+  });
+
+  it("migrates the old automatic Doodle default to the base appearance", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ skin: "doodle" }));
+    eval(bootThemeScript());
+    expect(document.documentElement.hasAttribute("data-skin")).toBe(false);
+  });
+
+  it("preserves an explicitly selected Doodle skin", () => {
+    localStorage.setItem(
+      THEME_STORAGE_KEY,
+      JSON.stringify({ skin: "doodle", skinExplicit: true }),
+    );
+    eval(bootThemeScript());
+    expect(document.documentElement.getAttribute("data-skin")).toBe("doodle");
+  });
+
+  it("preserves other selected skins before the app loads", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ skin: "forest" }));
+    eval(bootThemeScript());
+    expect(document.documentElement.getAttribute("data-skin")).toBe("forest");
   });
 
   it("migrates a legacy plain theme string", () => {

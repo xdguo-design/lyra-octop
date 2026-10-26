@@ -40,7 +40,10 @@ async def test_admin_default_list_is_mine_only(env: Any) -> None:
     r = await c.get("/api/agents", headers=admin_auth)
     assert r.status_code == 200
     rows = r.json()
-    assert all(a.get("user_id") == rows[0].get("user_id") for a in rows) if rows else True
+    # Platform-shared agents (user_id NULL) are visible by contract; the
+    # default list must still not leak other users' agents.
+    owner_ids = {a.get("user_id") for a in rows} - {None}
+    assert len(owner_ids) <= 1
     assert any(a["agent_id"] == ctx["alice_agent_id"] for a in rows)
 
 

@@ -183,7 +183,9 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: dashboard/package-lock.json
+          cache-dependency-path: |
+            dashboard/package-lock.json
+            demos/admission-registration/frontend/package-lock.json
 
       - name: Build Octop wheel from current source
         if: steps.wheel.outputs.source == 'build'
@@ -194,6 +196,11 @@ jobs:
           npm ci --prefer-offline --no-audit
           NODE_ENV=production NODE_OPTIONS="--max-old-space-size=4096" npm run build
           cd ..
+          echo "=== build admission-registration app ==="
+          cd demos/admission-registration/frontend
+          npm ci --prefer-offline --no-audit
+          npm run build:dashboard
+          cd ../../..
           echo "=== frontend output ==="
           ls -la src/octop/dashboard | head -20
           echo "=== build wheel ==="
@@ -303,7 +310,9 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: dashboard/package-lock.json
+          cache-dependency-path: |
+            dashboard/package-lock.json
+            demos/admission-registration/frontend/package-lock.json
 
       - name: Build Octop wheel from current source
         if: steps.wheel.outputs.source == 'build'
@@ -314,6 +323,11 @@ jobs:
           npm ci --prefer-offline --no-audit
           NODE_ENV=production NODE_OPTIONS="--max-old-space-size=4096" npm run build
           cd ..
+          echo "=== build admission-registration app ==="
+          cd demos/admission-registration/frontend
+          npm ci --prefer-offline --no-audit
+          npm run build:dashboard
+          cd ../../..
           echo "=== frontend output ==="
           ls -la src/octop/dashboard | head -20
           echo "=== build wheel ==="

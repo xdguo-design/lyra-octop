@@ -54,6 +54,8 @@ export interface OctopThread {
   pinned?: boolean;
   unread_count?: number;
   model_ref?: string | null;
+  acp_runner?: string | null;
+  acp_model?: string | null;
   reasoning_mode?: "auto" | "enabled" | "disabled" | null;
   reasoning_effort?: string | null;
   conversation_mode?: "ask" | "plan" | "craft" | null;
@@ -117,6 +119,8 @@ export interface OctopThreadPatch {
   title?: string;
   pinned?: boolean;
   model_ref?: string | null;
+  acp_runner?: string | null;
+  acp_model?: string | null;
   reasoning_mode?: "auto" | "enabled" | "disabled" | null;
   reasoning_effort?: string | null;
   conversation_mode?: "ask" | "plan" | "craft" | null;
@@ -163,10 +167,13 @@ export const octopThreadsApi = {
       `/agents/${encodeURIComponent(agentId)}/threads?limit=${limit}`,
     ),
 
-  create: (agentId: string) =>
+  create: (
+    agentId: string,
+    body?: { acp_runner?: string | null; acp_model?: string | null },
+  ) =>
     request<{ thread_id: string; session_key: string }>(
       `/agents/${encodeURIComponent(agentId)}/threads`,
-      { method: "POST" },
+      { method: "POST", ...(body ? { body: JSON.stringify(body) } : {}) },
     ),
 
   historyMigrationStatus: (agentId: string) =>

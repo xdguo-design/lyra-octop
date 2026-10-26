@@ -13,6 +13,8 @@ USER_TURN_WS_KEYS = frozenset(
         "thread_id",
         "model",
         "default_model",
+        "acp_runner",
+        "acp_model",
         "reasoning_mode",
         "reasoning_effort",
         "conversation_mode",

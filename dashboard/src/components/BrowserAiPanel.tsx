@@ -51,6 +51,10 @@ interface BrowserAiPanelProps {
   browserStarting?: boolean;
   /** Callback to start a browser session */
   onStartBrowser?: () => void;
+  /** Task injected from the workbench home input; auto-sent once the thread is ready. */
+  injectedTask?: string | null;
+  /** Called after the injected task has been handed to the chat stream. */
+  onInjectedTaskDone?: () => void;
 }
 
 // Keywords that trigger "stop recording and generate skill"
@@ -80,6 +84,8 @@ export default function BrowserAiPanel({
   setBrowserLastRecordingId,
   skillName = "",
   onSkillNameSet,
+  injectedTask = null,
+  onInjectedTaskDone,
 }: BrowserAiPanelProps) {
   const { t } = useTranslation();
   const panelClassName = `${styles.panel}${
@@ -134,6 +140,24 @@ export default function BrowserAiPanel({
     send,
     cancelStream,
   } = useAgentThreadChat(agentId);
+
+  // 工作台首页输入框派来的任务：等线程就绪后自动发出，完成即回报父组件。
+  const consumedInjectedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!injectedTask || consumedInjectedRef.current === injectedTask) return;
+    if (!activeAgent || booting || !threadId || isStreaming) return;
+    consumedInjectedRef.current = injectedTask;
+    send(injectedTask);
+    onInjectedTaskDone?.();
+  }, [
+    injectedTask,
+    activeAgent,
+    booting,
+    threadId,
+    isStreaming,
+    send,
+    onInjectedTaskDone,
+  ]);
 
   // When browserRecording transitions, sync phase
   useEffect(() => {

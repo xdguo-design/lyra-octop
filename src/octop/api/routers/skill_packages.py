@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel, Field
 
 from octop.api.deps import get_server, require_permission
+from octop.i18n import tr
 from octop.infra.agents.experts.skillhub_market import (
     SkillHubMarketError,
     SkillHubMarketErrorKind,
@@ -272,6 +273,27 @@ async def list_skill_packages(
     ]
 
 
+def _installed_skill_slugs(store: SkillPackageStore) -> list[str]:
+    return sorted(
+        {
+            str(skill["slug"])
+            for package in store.repo.list_all()
+            for skill in store.list_skill_summaries(package.id)
+        }
+    )
+
+
+@router.get(
+    "/installed-slugs",
+    summary="List skill slugs available in accessible packages",
+)
+async def list_installed_skill_slugs(
+    server: OctopServer = Depends(get_server),
+    _user: User = Depends(require_permission("skill_packages")),
+) -> list[str]:
+    return await asyncio.to_thread(_installed_skill_slugs, _store(server))
+
+
 @router.get("/hub/search", summary="Search SkillHub for installing into packages")
 async def package_hub_search(
     q: str = "",
@@ -364,6 +386,149 @@ async def create_from_skillhub(
     except (SkillHubMarketError, SkillHubDownloadError) as exc:
         raise _map_skillhub_error(exc) from exc
     return _package_payload_with_creator(server, store, result.row)
+
+
+# FreeLLM is a public *catalog*, not a trusted execution source. Only explicit,
+# authenticated imports are allowed; exports are previews, never auto-published.
+class FreeLLMImportBody(BaseModel):
+    skill_id: str
+    overwrite: bool = False
+
+
+@router.get("/freellm/catalog", summary="Browse verified FreeLLM skills")
+async def freellm_catalog(
+    user: User = Depends(require_permission("skill_packages")),
+) -> dict[str, Any]:
+    from octop.infra.skills.freellm_catalog import FreeLLMSyncError, list_freellm_skills
+
+    try:
+        items = await list_freellm_skills()
+    except (FreeLLMSyncError, OSError) as exc:
+        raise OctopError(ErrorCode.SKILL_IMPORT_FAILED, "FreeLLM catalog unavailable") from exc
+    return {"source": "https://freellm.top/skills/", "items": items, "count": len(items)}
+
+
+@router.get("/freellm/{skill_id}/preview", summary="Preview untrusted FreeLLM SKILL.md")
+async def freellm_preview(
+    skill_id: str,
+    user: User = Depends(require_permission("skill_packages")),
+) -> dict[str, Any]:
+    from octop.infra.skills.freellm_catalog import FreeLLMSyncError, preview_freellm_skill
+
+    try:
+        return await preview_freellm_skill(skill_id)
+    except (FreeLLMSyncError, OSError) as exc:
+        raise OctopError(
+            ErrorCode.SKILL_IMPORT_FAILED, "FreeLLM skill preview unavailable"
+        ) from exc
+
+
+@router.post(
+    "/{package_id}/skills/freellm/import",
+    status_code=status.HTTP_201_CREATED,
+    summary="Import a reviewed FreeLLM Skill into a package on explicit request",
+)
+async def freellm_import_to_package(
+    package_id: str,
+    body: FreeLLMImportBody,
+    request: Request,
+    server: OctopServer = Depends(get_server),
+    user: User = Depends(require_permission("skill_packages")),
+) -> dict[str, Any]:
+    from octop.infra.skills.freellm_catalog import FreeLLMSyncError, preview_freellm_skill
+
+    store = _store(server)
+    row = _package_or_404(store, package_id, locale=resolve_request_locale(request))
+    store.assert_can_mutate(row, user)
+    try:
+        skill = await preview_freellm_skill(body.skill_id)
+    except (FreeLLMSyncError, OSError) as exc:
+        raise OctopError(ErrorCode.SKILL_IMPORT_FAILED, "FreeLLM skill import unavailable") from exc
+    # Namespace the slug to avoid silently replacing locally authored skills.
+    slug = f"freellm-{skill['id']}"
+    return await create_package_skill(
+        package_id,
+        CreatePackageSkillBody(
+            name=slug,
+            content=skill["markdown"],
+            overwrite=body.overwrite,
+        ),
+        request,
+        server,
+        user,
+    )
+
+
+@router.get(
+    "/{package_id}/skills/{slug}/freellm/export",
+    summary="Export a reviewable Skill for submission to FreeLLM",
+)
+async def freellm_export_preview(
+    package_id: str,
+    slug: str,
+    request: Request,
+    server: OctopServer = Depends(get_server),
+    user: User = Depends(require_permission("skill_packages")),
+) -> dict[str, Any]:
+    store = _store(server)
+    row = _package_or_404(store, package_id, locale=resolve_request_locale(request))
+    store.assert_can_mutate(row, user)
+    skill = _package_skill_or_404(store, package_id, slug)
+    manifest = (store.package_skills_dir(package_id) / slug / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    # No network write: the owner must inspect secrets, licenses, and sources
+    # and explicitly approve publication through a protected GitHub PR.
+    from octop.infra.skills.freellm_submission import submission_digest
+
+    return {
+        "reviewed_sha256": submission_digest(manifest),
+        "status": "review_required",
+        "target": "https://github.com/xdguo-design/freellm",
+        "slug": slug,
+        "name": skill["name"],
+        "description": skill["description"],
+        "markdown": manifest,
+        "published": False,
+    }
+
+
+class FreeLLMSubmitBody(BaseModel):
+    reviewed_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    confirm_public: bool = False
+
+
+@router.post(
+    "/{package_id}/skills/{slug}/freellm/submit",
+    summary="Submit an explicitly approved public FreeLLM Skill for GitHub PR review",
+)
+async def freellm_submit_review(
+    package_id: str,
+    slug: str,
+    body: FreeLLMSubmitBody,
+    request: Request,
+    server: OctopServer = Depends(get_server),
+    user: User = Depends(require_permission("skill_packages")),
+) -> dict[str, Any]:
+    from octop.infra.skills.freellm_catalog import FreeLLMSyncError
+    from octop.infra.skills.freellm_submission import submit_review_pull_request
+
+    store = _store(server)
+    row = _package_or_404(store, package_id, locale=resolve_request_locale(request))
+    store.assert_can_mutate(row, user)
+    _package_skill_or_404(store, package_id, slug)
+    manifest = (store.package_skills_dir(package_id) / slug / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    try:
+        return await submit_review_pull_request(
+            slug=slug,
+            markdown=manifest,
+            approved_digest=body.reviewed_sha256,
+            approved_publication=body.confirm_public,
+        )
+    except (FreeLLMSyncError, OSError) as exc:
+        raise OctopError(ErrorCode.SKILL_IMPORT_FAILED, str(exc)) from exc
 
 
 @router.get("/{package_id}", summary="Get a global skill package and its skills")
@@ -704,7 +869,7 @@ async def hub_install_package_skill(
     except SkillPackageError:
         raise HTTPException(
             status_code=400,
-            detail="skill_name is required and must not contain path separators or start with .",
+            detail=tr("api.validation.skill_name_invalid", locale),
         ) from None
 
     display_name = (body.display_name or "").strip()
@@ -720,13 +885,25 @@ async def hub_install_package_skill(
         else {}
     )
     if len(display_name) > 200:
-        raise HTTPException(status_code=400, detail="display_name is too long")
+        raise HTTPException(
+            status_code=400,
+            detail=tr("api.validation.skill_display_name_too_long", locale),
+        )
     if any(len(value) > 200 for value in label.values()):
-        raise HTTPException(status_code=400, detail="localized skill label is too long")
+        raise HTTPException(
+            status_code=400,
+            detail=tr("api.validation.skill_label_too_long", locale),
+        )
     if any(len(value) > 1024 for value in summary.values()):
-        raise HTTPException(status_code=400, detail="localized skill summary is too long")
+        raise HTTPException(
+            status_code=400,
+            detail=tr("api.validation.skill_summary_too_long", locale),
+        )
     if len(icon_url) > 2048 or (icon_url and not valid_skillhub_icon_url(icon_url)):
-        raise HTTPException(status_code=400, detail="icon_url must be an HTTP(S) URL")
+        raise HTTPException(
+            status_code=400,
+            detail=tr("api.validation.skill_icon_url_invalid", locale),
+        )
 
     target = _PackageInstallTarget(store=store, package_id=package_id, server=server)
     transport = "http"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import json
 import logging
@@ -9,6 +10,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
+from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import ValidationError
 from starlette.websockets import WebSocketState
 
@@ -24,6 +26,7 @@ from octop.api.routers.chat.turn import (
 from octop.infra.bridge.ids import parse_bridge_agent_id
 from octop.infra.errors import OctopError
 from octop.infra.gateway.ws import WS_CHANNEL_ID
+from octop.infra.history.projection import live_message_inputs
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +133,14 @@ async def dashboard_chat_ws(
                         {"type": "error", "message": f"thread {thread_id!r} not found"},
                     )
                     continue
-                server.app_runtime.agent_registry.cancel_stream(agent_id, thread_id)
+                if row.acp_runner == "opencode":
+                    from octop.infra.agents.acp_direct import cancel_direct_turn
+
+                    await cancel_direct_turn(
+                        user_id=user.id, agent_id=agent_id, thread_id=thread_id
+                    )
+                else:
+                    server.app_runtime.agent_registry.cancel_stream(agent_id, thread_id)
                 continue
 
             if msg_type != "user_turn":
@@ -160,6 +170,91 @@ async def dashboard_chat_ws(
             except OctopError as exc:
                 await send_frame({"type": "error", "message": str(exc)})
                 await send_frame({"type": "done"})
+                continue
+
+            thread_row = gateway.thread_registry.get_thread(prepared.thread_id)
+            if thread_row is not None and thread_row.acp_runner == "opencode":
+                has_attachments = any(
+                    isinstance(message.get("content"), list) for message in (frame.messages or [])
+                )
+                if has_attachments:
+                    await send_frame(
+                        {
+                            "type": "error",
+                            "message": "OpenCode direct chat currently accepts text only",
+                        }
+                    )
+                    await send_frame({"type": "done"})
+                    continue
+                hub.subscribe(prepared.thread_id, connection_id)
+                hub.mark_turn_active(prepared.thread_id)
+                direct_thread_id = prepared.thread_id
+                prompt_text = turn.text or ""
+                try:
+                    from octop.infra.agents.acp_direct import run_direct_turn
+
+                    async def on_acp_message(
+                        event: dict[str, Any], _is_last: bool, thread_id: str = direct_thread_id
+                    ) -> None:
+                        if event.get("type") == "tool_start":
+                            await hub.push_to_thread(
+                                thread_id,
+                                {
+                                    "type": "tool_call_chunk",
+                                    "id": event.get("call_id"),
+                                    "name": event.get("name"),
+                                    "args": {},
+                                },
+                            )
+                        elif event.get("type") == "permission_request":
+                            from octop.infra.agents.acp_direct import cancel_direct_turn
+
+                            await cancel_direct_turn(
+                                user_id=user.id,
+                                agent_id=agent_id,
+                                thread_id=thread_id,
+                            )
+                            await hub.push_to_thread(
+                                thread_id,
+                                {
+                                    "type": "error",
+                                    "message": "OpenCode requested tool permission; approve it in the OpenCode session and retry.",
+                                },
+                            )
+
+                    await asyncio.to_thread(
+                        server.services.thread_message_repo.append_legacy_interval,
+                        prepared.thread_id,
+                        live_message_inputs([HumanMessage(content=prompt_text)]),
+                    )
+                    result = await run_direct_turn(
+                        registry=server.app_runtime.agent_registry,
+                        user_id=user.id,
+                        agent_id=agent_id,
+                        thread_id=prepared.thread_id,
+                        model=thread_row.acp_model,
+                        prompt=prompt_text,
+                        on_message=on_acp_message,
+                    )
+                    event = result.get("event")
+                    answer = str(event.get("text") or "") if isinstance(event, dict) else ""
+                    if answer:
+                        await hub.push_to_thread(
+                            prepared.thread_id, {"type": "token", "content": answer}
+                        )
+                        await asyncio.to_thread(
+                            server.services.thread_message_repo.append_legacy_interval,
+                            prepared.thread_id,
+                            live_message_inputs([AIMessage(content=answer)]),
+                        )
+                except Exception as exc:
+                    logger.exception("direct OpenCode turn failed thread=%s", prepared.thread_id)
+                    await hub.push_to_thread(
+                        prepared.thread_id, {"type": "error", "message": str(exc)}
+                    )
+                finally:
+                    await hub.push_to_thread(prepared.thread_id, {"type": "done"})
+                    hub.mark_turn_idle(prepared.thread_id)
                 continue
 
             inbound = build_dashboard_inbound(

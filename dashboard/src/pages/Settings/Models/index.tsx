@@ -10,7 +10,7 @@
  *  2. Custom providers — any configured provider whose name doesn't match a preset.
  */
 import { useMemo, useState } from "react";
-import { Button, Divider, Empty, Space, Tabs, Typography } from "antd";
+import { Button, Divider, Empty, Input, Space, Tabs, Typography } from "antd";
 import {
   Images,
   MessageSquareText,
@@ -30,6 +30,7 @@ import {
   isLocalPreset,
   isPresetProvider,
   partitionCloudPresets,
+  presetVariantLabel,
 } from "./presetUtils";
 import type { PresetGroup } from "./presetUtils";
 import type { ProviderPreset } from "./useProviders";
@@ -70,6 +71,41 @@ function resolveModelCategory(
 
 const { Title } = Typography;
 
+function filterPresetCollection(
+  collection: { grouped: PresetGroup[]; ungrouped: ProviderPreset[] },
+  query: string,
+): { grouped: PresetGroup[]; ungrouped: ProviderPreset[] } {
+  if (!query) return collection;
+  const matches = (values: Array<string | undefined>) =>
+    values.some((value) => value?.toLowerCase().includes(query));
+  return {
+    grouped: collection.grouped.flatMap((group) => {
+      if (matches([group.groupKey, group.groupName])) return [group];
+      const presets = group.presets.filter((preset) =>
+        matches([
+          preset.id,
+          preset.name,
+          preset.vendor,
+          preset.vendor_name,
+          preset.provider_variant,
+          presetVariantLabel(preset),
+        ]),
+      );
+      return presets.length > 0 ? [{ ...group, presets }] : [];
+    }),
+    ungrouped: collection.ungrouped.filter((preset) =>
+      matches([
+        preset.id,
+        preset.name,
+        preset.vendor,
+        preset.vendor_name,
+        preset.provider_variant,
+        presetVariantLabel(preset),
+      ]),
+    ),
+  };
+}
+
 export default function ModelsPage() {
   const { t } = useTranslation();
   const user = useCurrentUser();
@@ -92,6 +128,7 @@ export default function ModelsPage() {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [showMoreProviders, setShowMoreProviders] = useState(false);
+  const [presetSearch, setPresetSearch] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
   const modelCategory = resolveModelCategory(
     searchParams.get("tab"),
@@ -137,6 +174,21 @@ export default function ModelsPage() {
     (canOllama || canOnnx) &&
     (localPresets.grouped.length > 0 || localPresets.ungrouped.length > 0);
   const showPresetSection = showCloudTab || showLocalTab;
+  const presetSearchQuery = presetSearch.trim().toLowerCase();
+  const cloudSearchResults = useMemo(
+    () =>
+      presetSearchQuery
+        ? filterPresetCollection(
+            groupPresets(presets.filter((preset) => !isLocalPreset(preset))),
+            presetSearchQuery,
+          )
+        : null,
+    [presets, presetSearchQuery],
+  );
+  const localSearchResults = useMemo(
+    () => filterPresetCollection(localPresets, presetSearchQuery),
+    [localPresets, presetSearchQuery],
+  );
 
   const renderPresetCards = (
     grouped: PresetGroup[],
@@ -176,7 +228,11 @@ export default function ModelsPage() {
       return (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description={t("models.noPresetProvidersInTab")}
+          description={
+            presetSearchQuery
+              ? t("models.noMatchingProviders")
+              : t("models.noPresetProvidersInTab")
+          }
         />
       );
     }
@@ -188,6 +244,12 @@ export default function ModelsPage() {
   };
 
   const renderCloudPresetGrid = () => {
+    if (cloudSearchResults) {
+      return renderPresetGrid(
+        cloudSearchResults.grouped,
+        cloudSearchResults.ungrouped,
+      );
+    }
     const hasFeatured =
       cloudFeatured.grouped.length > 0 || cloudFeatured.ungrouped.length > 0;
     const hasMore = moreProvidersCount > 0;
@@ -337,9 +399,23 @@ export default function ModelsPage() {
 
           {showPresetSection && (
             <>
-              <Title level={5} style={{ marginBottom: 12 }}>
-                {t("models.presetProviders")}
-              </Title>
+              <div className={styles.presetSectionHeader}>
+                <Title level={5} style={{ margin: 0 }}>
+                  {t("models.presetProviders")}
+                </Title>
+                <Input
+                  allowClear
+                  prefix={<Search size={14} />}
+                  className={styles.presetSearch}
+                  placeholder={t("models.searchPresetProviders")}
+                  value={presetSearch}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setPresetSearch(value);
+                    if (!value.trim()) setShowMoreProviders(false);
+                  }}
+                />
+              </div>
               <Tabs
                 items={[
                   showCloudTab
@@ -354,8 +430,8 @@ export default function ModelsPage() {
                         key: "local",
                         label: t("models.presetLocal"),
                         children: renderPresetGrid(
-                          localPresets.grouped,
-                          localPresets.ungrouped,
+                          localSearchResults.grouped,
+                          localSearchResults.ungrouped,
                         ),
                       }
                     : null,

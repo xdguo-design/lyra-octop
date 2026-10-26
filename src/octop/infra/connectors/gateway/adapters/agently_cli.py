@@ -191,6 +191,7 @@ def _run(creds: dict[str, Any], command: list[str], *, cwd: Path | None = None) 
             env=prepare_env(creds),
             cwd=str(cwd) if cwd is not None else None,
             timeout_s=60,
+            encoding="utf-8",
         )
     except (OSError, ValueError):
         # CLI errors can contain instructions to bypass this gateway using the shell.
@@ -396,6 +397,8 @@ def _write(
 
 
 def call_tool(creds: dict[str, Any], name: str, args: dict[str, Any]) -> str:
+    if name == "agently_send" and isinstance(args, dict) and args.get("body_format") == "text":
+        args = {**args, "body_format": "plain"}
     _validate(name, args)
     root = (
         PathLayout.from_env().ensure_connector_cli_instance_dir(

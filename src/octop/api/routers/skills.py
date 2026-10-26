@@ -46,6 +46,7 @@ from pydantic import BaseModel
 
 from octop.api.common.agent import require_agent_owner_row, require_agent_row
 from octop.api.deps import current_user, get_server, require_permission
+from octop.i18n import tr
 from octop.infra.agents.manager import (
     skill_package_ids_list,
 )
@@ -1414,6 +1415,7 @@ async def hub_rankings(
 async def hub_install_skill(
     agent_id: str,
     body: HubInstallBody,
+    request: Request,
     as_user: int | None = None,
     user: Any = Depends(current_user),
     server: Any = Depends(get_server),
@@ -1437,12 +1439,13 @@ async def hub_install_skill(
         download_skillhub_package,
     )
 
+    locale = resolve_request_locale(request)
     try:
         skill_name = validate_skill_slug(body.skill_name)
     except SkillPackageError:
         raise HTTPException(
             status_code=400,
-            detail="skill_name is required and must not contain path separators or start with .",
+            detail=tr("api.validation.skill_name_invalid", locale),
         ) from None
     display_name = (body.display_name or "").strip()
     icon_url = (body.icon_url or "").strip()
@@ -1457,13 +1460,25 @@ async def hub_install_skill(
         else {}
     )
     if len(display_name) > 200:
-        raise HTTPException(status_code=400, detail="display_name is too long")
+        raise HTTPException(
+            status_code=400,
+            detail=tr("api.validation.skill_display_name_too_long", locale),
+        )
     if any(len(value) > 200 for value in label.values()):
-        raise HTTPException(status_code=400, detail="localized skill label is too long")
+        raise HTTPException(
+            status_code=400,
+            detail=tr("api.validation.skill_label_too_long", locale),
+        )
     if any(len(value) > 1024 for value in summary.values()):
-        raise HTTPException(status_code=400, detail="localized skill summary is too long")
+        raise HTTPException(
+            status_code=400,
+            detail=tr("api.validation.skill_summary_too_long", locale),
+        )
     if len(icon_url) > 2048 or (icon_url and not valid_skillhub_icon_url(icon_url)):
-        raise HTTPException(status_code=400, detail="icon_url must be an HTTP(S) URL")
+        raise HTTPException(
+            status_code=400,
+            detail=tr("api.validation.skill_icon_url_invalid", locale),
+        )
 
     ctx = await _ctx(agent_id, user=user, as_user=as_user, server=server)
     target = _AgentWorkspaceInstallTarget(

@@ -75,6 +75,7 @@ class AgentRow:
     knowledge_base_ids: str | None = None
     mcp_servers: str | None = None
     kind: str = "expert"
+    chat_visible: int = 1
 
     @classmethod
     def from_row(cls, r: DbRow) -> AgentRow:
@@ -89,6 +90,10 @@ class AgentRow:
         kind = str(kind_raw).strip() if kind_raw else "expert"
         if kind not in {"expert", "team"}:
             kind = "expert"
+        try:
+            chat_visible = int(r["chat_visible"])
+        except (KeyError, IndexError):
+            chat_visible = 1
         return cls(
             id=r["id"],
             agent_id=r["agent_id"],
@@ -116,6 +121,7 @@ class AgentRow:
             knowledge_base_ids=_opt_str(r, "knowledge_base_ids"),
             mcp_servers=_opt_str(r, "mcp_servers"),
             kind=kind,
+            chat_visible=chat_visible,
         )
 
 
@@ -237,11 +243,18 @@ class AgentRepo:
                 (bool_int(shared), now_ts(), agent_id),
             )
 
+    def set_chat_visible(self, agent_id: str, visible: bool) -> None:
+        with self._db.transaction() as conn:
+            conn.execute(
+                "UPDATE agents SET chat_visible = ?, updated_at = ? WHERE agent_id = ?",
+                (bool_int(visible), now_ts(), agent_id),
+            )
+
     def list_shared(self, *, exclude_user_id: int | None = None) -> list[AgentRow]:
         sql = "SELECT * FROM agents WHERE is_shared = 1 AND enabled = 1"
         params: list[object] = []
         if exclude_user_id is not None:
-            sql += " AND user_id != ?"
+            sql += " AND (user_id IS NULL OR user_id != ?)"
             params.append(exclude_user_id)
         sql += " ORDER BY created_at ASC, id ASC"
         with self._db.connect() as conn:

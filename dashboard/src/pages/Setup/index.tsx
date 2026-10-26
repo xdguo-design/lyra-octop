@@ -260,7 +260,7 @@ export default function SetupPage() {
                 src={
                   isDark
                     ? "/logo_horizontal_white.png"
-                    : "/logo_horizontal_dark.png"
+                    : "/logo_horizontal_octop.png"
                 }
                 alt="Octop"
                 className={styles.wizardHeaderLogo}

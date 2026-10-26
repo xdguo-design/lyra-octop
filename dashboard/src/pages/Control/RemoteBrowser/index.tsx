@@ -7,7 +7,7 @@
  * Frames arrive over WebSocket (/browser-stream/ws) instead of screenshot polling.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import {
   Alert,
   App,
@@ -127,8 +127,6 @@ const BROWSER_AI_PANEL_MIN_HEIGHT = 200;
 const BROWSER_AI_PANEL_MAX_HEIGHT = 520;
 /** Kids workbench app (planet) served locally by the workbench plugin. */
 const PLANET_APP_URL = "http://127.0.0.1:8130/";
-/** Fallback agent when dispatching a task from the workbench home. */
-const DEFAULT_AGENT_ID = "MBFGMY";
 
 function profileStorageKey(userId?: number): string {
   return userId == null
@@ -296,7 +294,6 @@ export default function RemoteBrowserPage({
   const { modal, message: antMessage } = App.useApp();
   const isMobile = useIsMobile();
   const currentUser = useCurrentUser();
-  const navigate = useNavigate();
   const browserProfile = resolveBrowserProfile(currentUser?.id);
   const { activeAgent, activeAgentId, agents } = useAgent();
   const [searchParams] = useSearchParams();
@@ -436,14 +433,13 @@ export default function RemoteBrowserPage({
       ? agents.find((agent) => agent.agent_id === activeAgentId) ?? null
       : null);
 
-  /** Dispatch a task typed on the workbench home to the agent's chat page. */
-  const handleSubmitTask = useCallback(
-    (task: string) => {
-      const agentId = effectiveActiveAgent?.agent_id ?? DEFAULT_AGENT_ID;
-      navigate(`/chat/${agentId}`, { state: { prefillInput: task } });
-    },
-    [navigate, effectiveActiveAgent],
-  );
+  const [homeTask, setHomeTask] = useState<string | null>(null);
+  /** Dispatch a task typed on the workbench home to the AI assistant panel. */
+  const handleSubmitTask = useCallback((task: string) => {
+    // 就地交给右侧 AI 助手（当前专家）处理，不再跳走去聊天页。
+    setIsAiPanelOpen(true);
+    setHomeTask(task);
+  }, []);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1491,7 +1487,6 @@ export default function RemoteBrowserPage({
                   starting={creating}
                   onSubmitTask={handleSubmitTask}
                   onOpenPlanet={() => setPlanetPanelOpen(true)}
-                  onOpenTasks={() => navigate("/tasks")}
                   onStartBrowser={() =>
                     envReady ? void createSession() : openEnvModal()
                   }
@@ -1531,6 +1526,8 @@ export default function RemoteBrowserPage({
                 browserSessionActive={!!session}
                 browserStarting={creating}
                 onStartBrowser={() => void createSession()}
+                injectedTask={homeTask}
+                onInjectedTaskDone={() => setHomeTask(null)}
               />
             </div>
           )}

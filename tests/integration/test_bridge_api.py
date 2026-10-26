@@ -53,7 +53,8 @@ async def test_bridge_probe_returns_expert_list(env: Any) -> None:
             "/api/bridge/probe",
             headers=auth,
             json={
-                "peer_base_url": "https://demo.octop.chat",
+                # Keep the mocked probe DNS-independent and offline.
+                "peer_base_url": "https://127.0.0.1",
                 "peer_username": "peer",
                 "password": "secret",
             },
@@ -77,6 +78,6 @@ async def test_bridge_probe_validation(env: Any) -> None:
     r = await client.post(
         "/api/bridge/probe",
         headers=auth,
-        json={"peer_base_url": "https://demo.octop.chat", "peer_username": "", "password": "x"},
+        json={"peer_base_url": "https://127.0.0.1", "peer_username": "", "password": "x"},
     )
     assert r.status_code == 422

@@ -66,6 +66,8 @@ export interface ChatInputHandle {
   setPrefillText: (text: string) => void;
   setPrefillComposer: (text: string, attachments?: ChatAttachment[]) => void;
   focusComposer: () => void;
+  /** Start composer dictation as if the mic button was pressed. */
+  startVoiceInput: () => void;
 }
 
 interface ChatInputProps {
@@ -268,6 +270,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     });
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const {
+      items: uploadItems,
       attachments,
       uploading,
       dragOver,
@@ -277,6 +280,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       handleFolderSelect,
       handleFileChange,
       removeAttachment,
+      removeUpload,
+      retryUpload,
       clearAttachments,
       restoreAttachments,
       handlePaste,
@@ -333,8 +338,18 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           el.focus();
           el.setSelectionRange(el.value.length, el.value.length);
         },
+        startVoiceInput: () => {
+          if (recording || transcribing) return;
+          void startVoice();
+        },
       }),
-      [clearAttachments, restoreAttachments],
+      [
+        clearAttachments,
+        restoreAttachments,
+        recording,
+        startVoice,
+        transcribing,
+      ],
     );
 
     // When the parent passes a non-empty initialText after mount (e.g. navigated
@@ -810,6 +825,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           <ChatInputPreviewBar
             attachments={attachments}
             uploading={uploading}
+            uploadItems={uploadItems}
+            onRemoveUpload={removeUpload}
+            onRetryUpload={retryUpload}
             selectedConnectors={selectedConnectors}
             selectedModel={selectedModel}
             availableConnectors={availableConnectors}
@@ -929,7 +947,11 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             recording={recording}
             transcribing={transcribing}
             voiceHoldToTalk={realtimeVoice}
-            onVoiceStart={() => void startVoice()}
+            onVoiceStart={() => {
+              // Auto-started dictation (speech-page entry) may still be live;
+              // a second getUserMedia here would leak the first capture.
+              if (!recording) void startVoice();
+            }}
             onVoiceStop={() => void stopVoice()}
             browserRecording={browserRecording}
             browserReplayBusy={browserReplayBusy}

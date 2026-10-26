@@ -74,3 +74,18 @@ async def test_probe_stt_success_over_http(
     )
     assert r.status_code == 200
     assert r.json() == {"ok": True, "mode": "tencent"}
+
+
+async def test_voice_provider_api_never_returns_saved_api_key(
+    env: tuple[httpx.AsyncClient, Any, dict[str, str]],
+) -> None:
+    client, server, auth = env
+    server.services.voice_provider_repo.create(
+        name="doubao", kind="doubao", capability="both", api_key="secret-doubao-key"
+    )
+    response = await client.get("/api/voice/providers", headers=auth)
+    assert response.status_code == 200
+    provider = next(item for item in response.json() if item["name"] == "doubao")
+    assert provider["api_key"] is None
+    assert provider["api_key_configured"] is True
+    assert "secret-doubao-key" not in response.text

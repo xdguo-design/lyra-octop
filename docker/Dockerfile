@@ -57,6 +57,16 @@ RUN mkdir -p ../src/octop/dashboard
 # 镜像构建跳过完整 tsc；生产打包由 vite/esbuild 完成（使用 lockfile 中的 vite，不用 npx）
 RUN NODE_ENV=production NODE_OPTIONS="--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}" npm run build:docker
 
+# The admission-registration creation is a separate Vue app served from the
+# Dashboard static root. Build it after Dashboard because the latter clears
+# the shared output directory.
+WORKDIR /build/demos/admission-registration/frontend
+COPY demos/admission-registration/frontend/package.json demos/admission-registration/frontend/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm ci --no-audit
+COPY demos/admission-registration/frontend/ ./
+RUN NODE_OPTIONS="--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}" npm run build:dashboard
+
 
 # ---------------------------------------------------------------------------
 # 阶段 2 — Python 运行时

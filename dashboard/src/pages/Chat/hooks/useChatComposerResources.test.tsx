@@ -40,7 +40,7 @@ vi.mock("../../../api/modules/provider", () => ({
 }));
 vi.mock("../../../api/modules/preferences", () => ({
   preferencesApi: {
-    get: vi.fn().mockResolvedValue(null),
+    get: vi.fn().mockResolvedValue({}),
     set: vi.fn().mockResolvedValue(undefined),
   },
 }));
@@ -67,7 +67,11 @@ vi.mock("../../../hooks/useCurrentUser", () => ({
 vi.mock("../../../context/AgentContext", () => ({
   useAgent: () => ({
     agents: [
-      { agent_id: "expertA", knowledge_base_ids: ["k1"] },
+      {
+        agent_id: "expertA",
+        knowledge_base_ids: ["k1"],
+        config: { reasoning: { mode: "disabled", effort: "high" } },
+      },
       { agent_id: "expertB", knowledge_base_ids: ["k3"] },
     ],
   }),
@@ -80,6 +84,12 @@ beforeEach(() => {
 });
 
 describe("useChatComposerResources — per-expert KB selection", () => {
+  it("uses the agent reasoning default for a new conversation", async () => {
+    const { result } = renderHook(() => useChatComposerResources("expertA"));
+    await waitFor(() => expect(result.current.reasoningMode).toBe("disabled"));
+    expect(result.current.reasoningEffort).toBe("high");
+  });
+
   it("restores expert A's manual selection after switching A -> B -> A", async () => {
     const threadId = "thread-existing"; // existing session → saved prefs apply
     const { result, rerender } = renderHook(

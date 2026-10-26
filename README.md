@@ -449,6 +449,8 @@ After `octop run`, open **http://127.0.0.1:8088**.
 - **ACP** — configure outbound coding-agent runners
 - **Settings** — users, security, TLS, system
 
+Product and test docs: **[Feature overview](docs/features.html)** · [Full feature list](docs/features.md) · [October 2026 release notes](docs/release-notes-2026-10.md) · [Offline test guide](docs/testing/offline-test-guide.md)
+
 Interactive API docs: **http://127.0.0.1:8088/api/docs** (disabled by default — enable by setting `"enable_api_docs": true` in `config.json`)
 
 ## 📁 Data directory

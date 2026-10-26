@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getWsUrl } from "../api/config";
 import { voiceApi, type ActiveVoice } from "../api/modules/voice";
@@ -71,12 +71,14 @@ const WAV_SAMPLE_RATE = 16000;
  * for every provider. Falls back to the original blob when the browser cannot
  * decode it.
  */
-async function recordedBlobToWav(blob: Blob): Promise<Blob> {
+async function recordedBlobToWav(
+  blob: Blob,
+): Promise<{ blob: Blob; peak: number | null }> {
   const Ctor =
     window.AudioContext ??
     (window as Window & { webkitAudioContext?: typeof AudioContext })
       .webkitAudioContext;
-  if (!Ctor) return blob;
+  if (!Ctor) return { blob, peak: null };
   const ctx = new Ctor();
   try {
     const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
@@ -89,8 +91,10 @@ async function recordedBlobToWav(blob: Blob): Promise<Blob> {
     const rendered = await offline.startRendering();
     const samples = rendered.getChannelData(0);
     const pcm = new Int16Array(samples.length);
+    let peak = 0;
     for (let i = 0; i < samples.length; i += 1) {
       const s = Math.max(-1, Math.min(1, samples[i]));
+      peak = Math.max(peak, Math.abs(s));
       pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
     }
     const header = new ArrayBuffer(44);
@@ -113,9 +117,12 @@ async function recordedBlobToWav(blob: Blob): Promise<Blob> {
     view.setUint16(34, 16, true);
     writeStr(36, "data");
     view.setUint32(40, pcm.byteLength, true);
-    return new Blob([header, pcm.buffer], { type: "audio/wav" });
+    return {
+      blob: new Blob([header, pcm.buffer], { type: "audio/wav" }),
+      peak,
+    };
   } catch {
-    return blob;
+    return { blob, peak: null };
   } finally {
     void ctx.close();
   }
@@ -252,6 +259,22 @@ export interface VoiceInputOptions {
   onInterim?: (text: string) => void;
   /** Cumulative transcript of the session; the realtime path calls it per sentence. */
   onText: (text: string) => void;
+  /** Optional local microphone level in the range 0–1. */
+  onLevel?: (level: number) => void;
+}
+
+function rmsLevel(samples: Float32Array): number {
+  let total = 0;
+  for (const sample of samples) total += sample * sample;
+  return Math.min(1, Math.sqrt(total / samples.length) * 12);
+}
+
+interface LevelMonitor {
+  context: AudioContext;
+  source: MediaStreamAudioSourceNode;
+  analyser: AnalyserNode;
+  sink: GainNode;
+  frameId: number;
 }
 
 /** Live 16 kHz capture feeding the realtime STT WebSocket. */
@@ -289,6 +312,7 @@ export function useVoiceInput(options: VoiceInputOptions) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const captureRef = useRef<RealtimeCapture | null>(null);
+  const levelMonitorRef = useRef<LevelMonitor | null>(null);
   // A press-and-hold release can land while `startRealtime` is still awaiting
   // getUserMedia; remember it so the capture is not left running.
   const pendingStopRef = useRef(false);
@@ -311,7 +335,58 @@ export function useVoiceInput(options: VoiceInputOptions) {
     capture.sink.disconnect();
     capture.stream.getTracks().forEach((track) => track.stop());
     void capture.ctx.close();
+    optionsRef.current.onLevel?.(0);
   }, []);
+
+  const stopLevelMonitor = useCallback(() => {
+    const monitor = levelMonitorRef.current;
+    levelMonitorRef.current = null;
+    if (monitor) {
+      cancelAnimationFrame(monitor.frameId);
+      monitor.source.disconnect();
+      monitor.analyser.disconnect();
+      monitor.sink.disconnect();
+      void monitor.context.close().catch(() => undefined);
+    }
+    optionsRef.current.onLevel?.(0);
+  }, []);
+
+  const startLevelMonitor = useCallback((stream: MediaStream) => {
+    const Ctor = audioContextCtor();
+    if (!Ctor || !optionsRef.current.onLevel) return;
+    let context: AudioContext | null = null;
+    try {
+      context = new Ctor();
+      const source = context.createMediaStreamSource(stream);
+      const analyser = context.createAnalyser();
+      const sink = context.createGain();
+      const samples = new Float32Array(analyser.fftSize);
+      sink.gain.value = 0;
+      source.connect(analyser);
+      analyser.connect(sink);
+      sink.connect(context.destination);
+      const monitor: LevelMonitor = {
+        context,
+        source,
+        analyser,
+        sink,
+        frameId: 0,
+      };
+      const sample = () => {
+        analyser.getFloatTimeDomainData(samples);
+        optionsRef.current.onLevel?.(rmsLevel(samples));
+        monitor.frameId = requestAnimationFrame(sample);
+      };
+      levelMonitorRef.current = monitor;
+      void context.resume().catch(() => undefined);
+      sample();
+    } catch {
+      if (context) void context.close().catch(() => undefined);
+      optionsRef.current.onLevel?.(0);
+    }
+  }, []);
+
+  useEffect(() => () => stopLevelMonitor(), [stopLevelMonitor]);
 
   const finishRealtime = useCallback(() => {
     teardownRealtime();
@@ -329,42 +404,53 @@ export function useVoiceInput(options: VoiceInputOptions) {
     });
     const Ctor = audioContextCtor();
     if (!Ctor) throw new Error("AudioContext unavailable");
-    const ctx = new Ctor();
-    const source = ctx.createMediaStreamSource(stream);
-    const processor = ctx.createScriptProcessor(1024, 1, 1);
-    const sink = ctx.createGain();
-    sink.gain.value = 0; // keep the graph running without echoing the mic
+    let ctx: AudioContext | null = null;
+    try {
+      const audioContext = new Ctor();
+      ctx = audioContext;
+      const source = audioContext.createMediaStreamSource(stream);
+      const processor = audioContext.createScriptProcessor(1024, 1, 1);
+      const sink = audioContext.createGain();
+      sink.gain.value = 0; // keep the graph running without echoing the mic
 
-    const client = new RealtimeSttClient(realtimeSttUrl(language), {
-      onInterim: (text) => optionsRef.current.onInterim?.(text),
-      onFinal: (text) => {
-        if (text) optionsRef.current.onText(text);
-      },
-      onDone: finishRealtime,
-      onError: (message) => {
-        finishRealtime();
-        antMessage.error(message || t("voice.realtimeFailed"));
-      },
-    });
+      const client = new RealtimeSttClient(realtimeSttUrl(language), {
+        onInterim: (text) => optionsRef.current.onInterim?.(text),
+        onFinal: (text) => {
+          if (text) optionsRef.current.onText(text);
+        },
+        onDone: finishRealtime,
+        onError: (message) => {
+          finishRealtime();
+          antMessage.error(message || t("voice.realtimeFailed"));
+        },
+      });
 
-    captureRef.current = { client, stream, ctx, source, processor, sink };
-    const frames = new PcmFrameBuffer();
-    processor.onaudioprocess = (event) => {
-      const pcm = downsampleToPcm16(
-        event.inputBuffer.getChannelData(0),
-        ctx.sampleRate,
-      );
-      for (const frame of frames.push(pcm)) client.send(frame);
-    };
-    source.connect(processor);
-    processor.connect(sink);
-    sink.connect(ctx.destination);
+      captureRef.current = { client, stream, ctx, source, processor, sink };
+      const frames = new PcmFrameBuffer();
+      processor.onaudioprocess = (event) => {
+        const samples = event.inputBuffer.getChannelData(0);
+        const pcm = downsampleToPcm16(samples, audioContext.sampleRate);
+        optionsRef.current.onLevel?.(rmsLevel(samples));
+        for (const frame of frames.push(pcm)) client.send(frame);
+      };
+      source.connect(processor);
+      processor.connect(sink);
+      sink.connect(audioContext.destination);
+      void audioContext.resume().catch(() => undefined);
 
-    // Frames are buffered until the server reports ready; failures surface
-    // through `onError`, so the connect rejection needs no extra handling.
-    void client.connect().catch(() => undefined);
-    setRecording(true);
-  }, [finishRealtime, language, t]);
+      // Frames are buffered until the server reports ready; failures surface
+      // through `onError`, so the connect rejection needs no extra handling.
+      void client.connect().catch(() => undefined);
+      setRecording(true);
+    } catch (err) {
+      if (captureRef.current?.stream === stream) teardownRealtime();
+      else {
+        stream.getTracks().forEach((track) => track.stop());
+        if (ctx) void ctx.close().catch(() => undefined);
+      }
+      throw err;
+    }
+  }, [finishRealtime, language, t, teardownRealtime]);
 
   const stopRealtime = useCallback(() => {
     const capture = captureRef.current;
@@ -376,6 +462,7 @@ export function useVoiceInput(options: VoiceInputOptions) {
     capture.stream.getTracks().forEach((track) => track.stop());
     setRecording(false);
     setTranscribing(true);
+    optionsRef.current.onLevel?.(0);
     // `end` makes the server flush its final sentences, then `onDone` clears.
     capture.client.end();
   }, []);
@@ -392,17 +479,21 @@ export function useVoiceInput(options: VoiceInputOptions) {
       return;
     }
     await new Promise<void>((resolve) => {
-      recorder.onstop = () => resolve();
+      recorder.addEventListener("stop", () => resolve(), { once: true });
       recorder.stop();
     });
     mediaRecorderRef.current = null;
     setRecording(false);
+    stopLevelMonitor();
 
     const blob = new Blob(chunksRef.current, {
       type: chunksRef.current[0]?.type || "audio/webm",
     });
     chunksRef.current = [];
-    if (!blob.size) return;
+    if (!blob.size) {
+      antMessage.error(t("voice.micNoInput"));
+      return;
+    }
 
     setTranscribing(true);
     try {
@@ -414,7 +505,11 @@ export function useVoiceInput(options: VoiceInputOptions) {
         antMessage.error(t("voice.sttProviderRequired"));
         return;
       }
-      const upload = await recordedBlobToWav(blob);
+      const { blob: upload, peak } = await recordedBlobToWav(blob);
+      if (peak !== null && peak < 0.0001) {
+        antMessage.error(t("voice.micNoInput"));
+        return;
+      }
       const result = await voiceApi.transcribe(upload, language);
       const text = result.text?.trim() ?? "";
       if (text) optionsRef.current.onText(text);
@@ -429,7 +524,7 @@ export function useVoiceInput(options: VoiceInputOptions) {
     } finally {
       setTranscribing(false);
     }
-  }, [t, language, stopRealtime]);
+  }, [t, language, stopLevelMonitor, stopRealtime]);
 
   const startRecording = useCallback(async () => {
     // Read cached config synchronously to stay in the user-gesture stack.
@@ -475,26 +570,40 @@ export function useVoiceInput(options: VoiceInputOptions) {
       return;
     }
 
+    let stream: MediaStream | null = null;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+      });
+      stream = mediaStream;
       const mimeType = pickRecorderMimeType();
       const recorder = mimeType
-        ? new MediaRecorder(stream, { mimeType })
-        : new MediaRecorder(stream);
+        ? new MediaRecorder(mediaStream, { mimeType })
+        : new MediaRecorder(mediaStream);
       chunksRef.current = [];
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
       recorder.onstop = () => {
-        stream.getTracks().forEach((track) => track.stop());
+        mediaStream.getTracks().forEach((track) => track.stop());
       };
       mediaRecorderRef.current = recorder;
       recorder.start();
+      startLevelMonitor(mediaStream);
       setRecording(true);
     } catch {
+      stream?.getTracks().forEach((track) => track.stop());
+      stopLevelMonitor();
       antMessage.error(t("voice.micDenied"));
     }
-  }, [t, language, startRealtime, stopRealtime]);
+  }, [
+    t,
+    language,
+    startLevelMonitor,
+    startRealtime,
+    stopLevelMonitor,
+    stopRealtime,
+  ]);
 
   const toggle = useCallback(() => {
     if (transcribing) return;

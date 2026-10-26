@@ -295,6 +295,33 @@ def test_langchain_tools_accept_recipient_and_attachment_strings(cli: list[dict[
     assert "--to=b@example.com" in cli[0]["argv"]
 
 
+def test_send_accepts_text_body_format_alias_for_model_calls(cli: list[dict[str, Any]]) -> None:
+    result = json.loads(
+        agently_cli.call_tool(
+            {"instance_id": "one"},
+            "agently_send",
+            {
+                "to": "a@example.com",
+                "subject": "hello",
+                "body": "hi",
+                "body_format": "text",
+            },
+        )
+    )
+    assert result["result"]["data"]["confirmation_required"] is True
+    assert cli[0]["argv"] == [
+        fake_bin_path("agently-cli"),
+        "message",
+        "+send",
+        "--to=a@example.com",
+        "--subject=hello",
+        "--body=hi",
+        "--body-format=plain",
+        "--dry-run",
+    ]
+    assert cli[0]["encoding"] == "utf-8"
+
+
 def test_cli_errors_do_not_leak_credentials_in_protocol_logs(cli, monkeypatch, caplog):
     def fail(*args, **kwargs):
         raise ValueError("access_token=secret-canary; run agently-cli auth login")

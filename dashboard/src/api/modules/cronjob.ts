@@ -14,6 +14,17 @@ export interface CronTaskExamples {
   en?: string[];
 }
 
+export interface OctopCronRun {
+  run_id: string;
+  cron_id: string;
+  agent_id: string;
+  trigger_kind: "manual" | "scheduled" | "mail";
+  status: "running" | "ok" | "error" | "cancelled" | "interrupted";
+  started_at: number;
+  finished_at: number | null;
+  error: string | null;
+}
+
 export const octopCronApi = {
   settings: () => request<OctopCronSettings>("/cron/settings"),
 
@@ -38,7 +49,21 @@ export const octopCronApi = {
     request<void>(`/agents/${agentId}/cron/${cronId}`, { method: "DELETE" }),
 
   runNow: (agentId: string, cronId: string) =>
-    request<void>(`/agents/${agentId}/cron/${cronId}/run-now`, {
-      method: "POST",
-    }),
+    request<{ run_id: string; status: "running" }>(
+      `/agents/${agentId}/cron/${cronId}/run-now`,
+      {
+        method: "POST",
+      },
+    ),
+
+  runs: (agentId: string, cronId: string, limit = 20, offset = 0) =>
+    request<OctopCronRun[]>(
+      `/agents/${agentId}/cron/${cronId}/runs?limit=${limit}&offset=${offset}`,
+    ),
+
+  cancelRun: (agentId: string, cronId: string, runId: string) =>
+    request<{ cancelled: boolean }>(
+      `/agents/${agentId}/cron/${cronId}/runs/${runId}/cancel`,
+      { method: "POST" },
+    ),
 };

@@ -6,7 +6,7 @@ import json
 from typing import Any
 
 from octop.infra.connectors.catalog import get_catalog_entry, get_mcp_oauth_remote
-from octop.infra.connectors.custom_mcp import CUSTOM_MCP_KIND
+from octop.infra.connectors.custom_mcp import CUSTOM_MCP_KIND, static_oauth_client_from_spec
 from octop.infra.connectors.oauth.discovery import discover_oauth_from_mcp_url
 from octop.infra.connectors.oauth.mcp import (
     build_authorize_url,
@@ -135,11 +135,19 @@ async def _start_mcp_oauth_from_discovery(
     server_name: str | None = None,
     mcp_url: str | None = None,
     scope: str | None = None,
+    static_client: dict[str, Any] | None = None,
 ) -> tuple[str, str, dict[str, Any]]:
     verifier, challenge = new_pkce_pair()
-    reg = await register_dynamic_client(metadata, issuer=issuer, redirect_uri=redirect_uri)
-    client_id = str(reg["client_id"])
-    client_secret = str(reg.get("client_secret") or "") or None
+    static_id = str((static_client or {}).get("client_id") or "").strip()
+    if static_id:
+        # Pre-registered OAuth client (server without dynamic registration,
+        # e.g. GitHub MCP): skip DCR and use the supplied credentials.
+        client_id = static_id
+        client_secret = str((static_client or {}).get("client_secret") or "").strip() or None
+    else:
+        reg = await register_dynamic_client(metadata, issuer=issuer, redirect_uri=redirect_uri)
+        client_id = str(reg["client_id"])
+        client_secret = str(reg.get("client_secret") or "") or None
     url = build_authorize_url(
         metadata,
         client_id=client_id,
@@ -199,6 +207,7 @@ async def start_oauth_for_target(
     state: str,
     settings_repo: Any,
     mcp_url: str | None = None,
+    custom_spec: dict[str, Any] | None = None,
 ) -> tuple[str, str, dict[str, Any]]:
     """Unified OAuth start for catalog connectors and custom MCP servers."""
     target_type = str(target.get("type") or "").strip()
@@ -219,11 +228,13 @@ async def start_oauth_for_target(
             raise ValueError("custom_mcp target requires server_name")
         if not url:
             raise ValueError("custom MCP server url is required; save the server first")
+        spec = custom_spec if isinstance(custom_spec, dict) else None
         return await start_custom_mcp_oauth(
             server_name=server_name,
             mcp_url=url,
             redirect_uri=redirect_uri,
             state=state,
+            static_client=static_oauth_client_from_spec(spec) if spec else None,
         )
     raise ValueError(f"unsupported oauth target type: {target_type!r}")
 
@@ -252,6 +263,7 @@ async def start_custom_mcp_oauth(
     redirect_uri: str,
     state: str,
     discovery: dict[str, Any] | None = None,
+    static_client: dict[str, Any] | None = None,
 ) -> tuple[str, str, dict[str, Any]]:
     """Start OAuth for a user-defined MCP server (issuer discovered from MCP URL)."""
     found = discovery if discovery is not None else await discover_oauth_from_mcp_url(mcp_url)
@@ -262,12 +274,34 @@ async def start_custom_mcp_oauth(
     metadata = found.get("metadata")
     if not isinstance(metadata, dict):
         metadata = await fetch_authorization_metadata(issuer)
-    scopes_raw = metadata.get("scopes_supported")
-    scope = (
-        " ".join(str(s) for s in scopes_raw if s)
-        if isinstance(scopes_raw, list) and scopes_raw
-        else None
-    )
+
+    # Scope preference: resource-specific RFC 9728 scopes describe what the MCP
+    # server actually needs (GitHub's AS-wide list is only offline_access).
+    # Append offline_access when the AS advertises it so refresh tokens work.
+    resource_scopes = found.get("resource_scopes")
+    as_scopes = metadata.get("scopes_supported")
+    parts: list[str] = []
+    if isinstance(resource_scopes, list) and resource_scopes:
+        parts = [str(s) for s in resource_scopes if s]
+    elif isinstance(as_scopes, list) and as_scopes:
+        parts = [str(s) for s in as_scopes if s]
+    if (
+        isinstance(as_scopes, list)
+        and "offline_access" in as_scopes
+        and "offline_access" not in parts
+    ):
+        parts.append("offline_access")
+    scope = " ".join(parts) if parts else None
+
+    has_static = bool(str((static_client or {}).get("client_id") or "").strip())
+    if not has_static and not found.get(
+        "dcr_supported", bool(metadata.get("registration_endpoint"))
+    ):
+        raise ValueError(
+            "此 MCP 的授权服务器不支持动态客户端注册，请在服务器配置中填写预注册的 "
+            "OAuth Client ID / Client Secret 后再授权（如 GitHub MCP）"
+        )
+
     return await _start_mcp_oauth_from_discovery(
         flow="custom_mcp",
         kind=CUSTOM_MCP_KIND,
@@ -279,6 +313,7 @@ async def start_custom_mcp_oauth(
         server_name=server_name,
         mcp_url=mcp_url,
         scope=scope,
+        static_client=static_client,
     )
 
 

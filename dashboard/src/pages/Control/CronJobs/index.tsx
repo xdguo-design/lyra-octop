@@ -150,12 +150,15 @@ function CronJobsPage() {
     if (fresh) setDetailJob(fresh);
   }, [jobs, detailDrawerOpen, detailJob]);
 
+  // 创建即对话：跳到聊天页跟主 Agent 说一句话，由它调 cronjob_create 生成任务，
+  // 不再弹表单/旁路解析弹窗。表单抽屉只留给「编辑已有任务」。
   const handleCreate = () => {
-    setEditingJob(null);
-    form.resetFields();
-    setDrawerOpen(true);
+    const prefill = t("cronJobs.createChatPrefill", "帮我创建一个定时任务：");
+    setPendingPrefillText(prefill);
+    navigate("/chat", { state: { prefillInput: prefill } });
   };
 
+  // 示例一句话直接带去聊天页，由主 Agent 对话式生成任务。
   const handleSuggestionClick = (text: string) => {
     setPendingPrefillText(text);
     navigate("/chat", { state: { prefillInput: text } });
@@ -404,6 +407,7 @@ function CronJobsPage() {
       <JobDetailDrawer
         open={detailDrawerOpen}
         job={detailJob}
+        agentId={activeAgentId}
         timeZone={cronTimezone}
         onClose={handleDetailClose}
       />

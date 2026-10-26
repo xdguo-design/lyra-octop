@@ -1757,7 +1757,8 @@ export default function UsersListPanel() {
   const togglePatch = async (
     row: UserRow,
     patch: Partial<Pick<UserRow, "role" | "disabled" | "permissions">>,
-  ): Promise<boolean> => {    if (
+  ): Promise<boolean> => {
+    if (
       patch.role === "user" &&
       row.id === currentUserId &&
       row.role === "admin"
@@ -1800,7 +1801,8 @@ export default function UsersListPanel() {
     }
   };
 
-  const onEditSubmit = async (values: EditValues) => {    if (!editTarget) return;
+  const onEditSubmit = async (values: EditValues) => {
+    if (!editTarget) return;
     setEditSubmitting(true);
     try {
       await request(`/users/${editTarget.id}`, {

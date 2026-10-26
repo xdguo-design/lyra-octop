@@ -61,6 +61,23 @@ export function useChatComposerResources(
   const expertDefaultMode = parseConversationMode(
     expert?.config?.conversation_mode,
   );
+  const rawExpertReasoning = expert?.config?.reasoning;
+  const expertReasoning =
+    rawExpertReasoning && typeof rawExpertReasoning === "object"
+      ? (rawExpertReasoning as {
+          mode?: "auto" | "enabled" | "disabled";
+          effort?: string | null;
+        })
+      : undefined;
+  const expertReasoningMode = ["auto", "enabled", "disabled"].includes(
+    expertReasoning?.mode ?? "",
+  )
+    ? expertReasoning?.mode
+    : undefined;
+  const expertReasoningEffort =
+    typeof expertReasoning?.effort === "string"
+      ? expertReasoning.effort
+      : undefined;
   const teamHost = isTeamAgent(expert);
   const bridgeConnectionId =
     expert?.bridge && expert.bridge_connection_id
@@ -161,6 +178,7 @@ export function useChatComposerResources(
       local
         ? local.mode
         : stickyReasoningMode ||
+            expertReasoningMode ||
             defaults?.mode ||
             capability?.default_mode ||
             "auto",
@@ -169,6 +187,7 @@ export function useChatComposerResources(
       local
         ? local.effort
         : stickyReasoningEffort ||
+            expertReasoningEffort ||
             defaults?.effort ||
             capability?.default_effort ||
             null,
@@ -181,6 +200,8 @@ export function useChatComposerResources(
     modelReasoning,
     availableModels,
     conversationOverrides,
+    expertReasoningMode,
+    expertReasoningEffort,
   ]);
 
   useEffect(() => {
@@ -455,8 +476,16 @@ export function useChatComposerResources(
       const capability = availableModels.find(
         (item) => `${item.provider_name}/${item.model}` === model,
       )?.reasoning_config;
-      const nextMode = defaults?.mode || capability?.default_mode || "auto";
-      const nextEffort = defaults?.effort || capability?.default_effort || null;
+      const nextMode =
+        expertReasoningMode ||
+        defaults?.mode ||
+        capability?.default_mode ||
+        "auto";
+      const nextEffort =
+        expertReasoningEffort ||
+        defaults?.effort ||
+        capability?.default_effort ||
+        null;
       setReasoningMode(nextMode);
       setReasoningEffort(nextEffort);
       if (activeThreadId) {
@@ -481,7 +510,14 @@ export function useChatComposerResources(
         });
       }
     },
-    [activeThreadId, availableModels, modelReasoning, resolvedAgentId],
+    [
+      activeThreadId,
+      availableModels,
+      expertReasoningEffort,
+      expertReasoningMode,
+      modelReasoning,
+      resolvedAgentId,
+    ],
   );
 
   const handleReasoningChange = useCallback(

@@ -79,6 +79,42 @@ describe("useSlashMentionInput skills", () => {
 });
 
 describe("useSlashMentionInput workspace files", () => {
+  it("opens the @ menu while agent options are still unavailable", () => {
+    const { result, rerender } = renderHook(
+      ({ experts }: { experts: { agent_id: string; name: string }[] }) =>
+        useSlashMentionInput({
+          text: "",
+          setText: vi.fn(),
+          textareaRef: { current: null },
+          slashCommands: [stopCommand],
+          labelFor: (spec) => spec.label_en,
+          locale: "en",
+          availableExperts: experts,
+          selectedConnectors: [],
+          onSend: vi.fn(),
+          onNewChat: vi.fn(),
+          onCancel: vi.fn(),
+          isStreaming: false,
+          onSubmitRef: { current: vi.fn() },
+        }),
+      { initialProps: { experts: [] } },
+    );
+
+    act(() => result.current.handleTextChange("@"));
+
+    expect(result.current.mentionMenuOpen).toBe(true);
+    rerender({
+      experts: [
+        { agent_id: "A1", name: "主Agent" },
+        { agent_id: "A2", name: "研究员" },
+      ],
+    });
+    expect(result.current.mentionItems.map((item) => item.label)).toEqual([
+      "主Agent",
+      "研究员",
+    ]);
+  });
+
   it("keeps empty @ as a hint-only file section and inserts the workspace path", () => {
     const setText = vi.fn();
     const { result } = renderHook(() =>

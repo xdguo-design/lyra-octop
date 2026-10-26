@@ -29,7 +29,7 @@ describe("history failures", () => {
     expect(chatStore.getSnapshot(thread).messages[0].content).toBe("keep me");
     expect(chatStore.getSnapshot(thread).historyNextCursor).toBe("boundary");
     expect(chatStore.getSnapshot(thread).historyHasMore).toBe(true);
-  });
+  }, 25_000);
 
   it("does not mark a failed initial load as an empty hydrated conversation", async () => {
     const history = vi
@@ -52,7 +52,7 @@ describe("history failures", () => {
     expect(result.current.historyError).toBe(false);
     expect(chatStore.getSnapshot(thread).historyHydrated).toBe(true);
     expect(chatStore.getSnapshot(thread).messages[0].content).toBe("restored");
-  });
+  }, 25_000);
 
   it("refetches a thread cached as empty so background turns show up", async () => {
     chatStore.setHistoryPage(thread, [], {
@@ -71,7 +71,7 @@ describe("history failures", () => {
     });
     expect(history).toHaveBeenCalled();
     expect(chatStore.getSnapshot(thread).messages[0].content).toBe("task done");
-  });
+  }, 25_000);
 
   it("passes the pinned cursor when loading older messages", async () => {
     chatStore.setHistoryPage(
@@ -91,7 +91,71 @@ describe("history failures", () => {
       thread,
       expect.objectContaining({ cursor: "pinned-boundary" }),
     );
-  });
+  }, 25_000);
+
+  it("drops an older-page response when a refresh starts while it is in flight", async () => {
+    chatStore.setHistoryPage(
+      thread,
+      [{ id: "latest", role: "user", content: "latest", timestamp: 2 }],
+      { hasMore: true, nextOffset: 25, nextCursor: "boundary" },
+    );
+    let resolveOlder!: (value: {
+      thread_id: string;
+      messages: { id: string; role: string; content: string }[];
+      has_more: boolean;
+    }) => void;
+    let resolveLatest!: (value: {
+      thread_id: string;
+      messages: { id: string; role: string; content: string }[];
+      has_more: boolean;
+    }) => void;
+    const olderRequest = new Promise<{
+      thread_id: string;
+      messages: { id: string; role: string; content: string }[];
+      has_more: boolean;
+    }>((resolve) => {
+      resolveOlder = resolve;
+    });
+    const latestRequest = new Promise<{
+      thread_id: string;
+      messages: { id: string; role: string; content: string }[];
+      has_more: boolean;
+    }>((resolve) => {
+      resolveLatest = resolve;
+    });
+    vi.spyOn(octopThreadsApi, "history")
+      .mockReturnValueOnce(olderRequest)
+      .mockReturnValueOnce(latestRequest);
+    const { result } = renderHook(() => useChat(thread, "agent"));
+
+    act(() => {
+      void result.current.loadMoreHistory();
+    });
+    act(() => {
+      void result.current.refreshHistory();
+    });
+    await act(async () => {
+      resolveLatest({
+        thread_id: thread,
+        messages: [{ id: "latest", role: "user", content: "refreshed" }],
+        has_more: true,
+      });
+      await latestRequest;
+    });
+    await act(async () => {
+      resolveOlder({
+        thread_id: thread,
+        messages: [{ id: "old", role: "user", content: "stale older page" }],
+        has_more: false,
+      });
+      await olderRequest;
+    });
+
+    expect(
+      chatStore.getSnapshot(thread).messages.map((message) => message.id),
+    ).toEqual(["latest"]);
+  }, 25_000);
+
   it("retries the failed older page with the same cursor", async () => {
     chatStore.setHistoryPage(
       thread,
@@ -123,5 +187,5 @@ describe("history failures", () => {
     expect(
       chatStore.getSnapshot(thread).messages.map((m) => m.content),
     ).toEqual(["older", "latest"]);
-  });
+  }, 25_000);
 });

@@ -13,7 +13,8 @@ from octop.infra.errors import ErrorCode, OctopError
 
 
 def test_normalize_accepts_https_host() -> None:
-    assert normalize_peer_base_url("https://demo.octop.chat/") == "https://demo.octop.chat"
+    # TEST-NET avoids relying on live DNS in an offline unit test.
+    assert normalize_peer_base_url("https://192.0.2.1/") == "https://192.0.2.1"
 
 
 def test_normalize_rejects_metadata_ip() -> None:

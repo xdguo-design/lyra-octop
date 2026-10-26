@@ -1,7 +1,36 @@
 from octop.infra.agents.providers.reasoning import (
+    agent_reasoning_defaults,
     reasoning_capability,
     reasoning_request_parameters,
 )
+
+
+def test_modelscope_qwen_uses_chat_template_thinking_switch() -> None:
+    capability = reasoning_capability(
+        {"id": "Qwen/Qwen3.5-27B"}, base_url="https://api-inference.modelscope.cn/v1"
+    )
+    assert capability is not None
+    assert capability["efforts"] == []
+    assert reasoning_request_parameters(capability, mode="disabled", effort="high") == {
+        "extra_body": {"chat_template_kwargs": {"enable_thinking": False}}
+    }
+
+
+def test_disabled_thinking_omits_a_previously_selected_effort() -> None:
+    assert reasoning_request_parameters(
+        {"adapter": "thinking_nested_effort", "efforts": ["high"]},
+        mode="disabled",
+        effort="high",
+    ) == {"extra_body": {"thinking": {"type": "disabled"}}}
+
+
+def test_agent_reasoning_defaults_ignore_invalid_config() -> None:
+    assert agent_reasoning_defaults({"reasoning": {"mode": [], "effort": {}}}) == (None, None)
+    assert agent_reasoning_defaults({"reasoning": "high"}) == (None, None)
+    assert agent_reasoning_defaults({"reasoning": {"mode": "enabled", "effort": "HIGH"}}) == (
+        "enabled",
+        "high",
+    )
 
 
 def test_reasoning_capability_accepts_token_plan_thinking_option() -> None:
@@ -9,6 +38,20 @@ def test_reasoning_capability_accepts_token_plan_thinking_option() -> None:
     assert capability is not None
     assert capability["toggle"] is True
     assert capability["default_mode"] == "enabled"
+
+
+def test_bigmodel_glm_reasoning_is_detected_without_saved_metadata() -> None:
+    capability = reasoning_capability(
+        {"id": "glm-5.3-flash"},
+        base_url="https://open.bigmodel.cn/api/coding/paas/v4",
+    )
+    assert capability is not None
+    assert capability["adapter"] == "thinking"
+    assert capability["toggle"] is True
+    assert capability["default_mode"] == "auto"
+    assert reasoning_request_parameters(capability, mode="disabled", effort=None) == {
+        "extra_body": {"thinking": {"type": "disabled"}}
+    }
 
 
 def test_known_token_plan_model_is_detected_without_saved_metadata() -> None:

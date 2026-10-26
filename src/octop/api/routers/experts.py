@@ -148,6 +148,8 @@ class FromExpertBody(AgentRuntimeFields):
         default=None,
         description="Default Ask/Plan/Craft mode for new conversations; craft when omitted",
     )
+    reasoning_mode: Literal["auto", "enabled", "disabled"] | None = None
+    reasoning_effort: str | None = None
     file_overrides: list[ComposerFileOverrideBody] | None = None
     omit_files: list[str] | None = None
     hub_skills: list[ComposerHubSkillBody] | None = None
@@ -193,6 +195,8 @@ class InstallPublishedExpertBody(AgentRuntimeFields):
         default=None,
         description="Default Ask/Plan/Craft mode for new conversations; craft when omitted",
     )
+    reasoning_mode: Literal["auto", "enabled", "disabled"] | None = None
+    reasoning_effort: str | None = None
     file_overrides: list[ComposerFileOverrideBody] | None = None
     omit_files: list[str] | None = None
     hub_skills: list[ComposerHubSkillBody] | None = None
@@ -680,6 +684,8 @@ async def install_published_expert(
             runtime_config=runtime_field_updates(body, exclude_unset=True),
             enable_trajectory=body.enable_trajectory,
             conversation_mode=body.conversation_mode,
+            reasoning_mode=body.reasoning_mode,
+            reasoning_effort=body.reasoning_effort,
             workspace_patch=patch,
             composer_copies=copies,
             composer_report=report,
@@ -791,6 +797,8 @@ async def install_expert_hub_item(
                 mcp_servers=servers,
                 enable_trajectory=body.enable_trajectory,
                 conversation_mode=body.conversation_mode,
+                reasoning_mode=body.reasoning_mode,
+                reasoning_effort=body.reasoning_effort,
                 workspace_patch=patch,
                 composer_copies=copies,
                 composer_report=report,
@@ -878,6 +886,11 @@ async def create_agent_from_expert(
     apply_enable_trajectory(config_extra, body.enable_trajectory)
     if body.conversation_mode:
         config_extra["conversation_mode"] = body.conversation_mode
+    if body.reasoning_mode is not None:
+        config_extra["reasoning"] = {
+            "mode": body.reasoning_mode,
+            "effort": body.reasoning_effort,
+        }
 
     locale = resolve_user_locale(
         user_repo=server.services.user_repo,

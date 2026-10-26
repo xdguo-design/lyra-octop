@@ -100,6 +100,10 @@ async def test_run_records_ok(setup) -> None:
     assert row.last_status == "ok"
     assert row.last_run_at is not None
     delivery.deliver.assert_awaited_once()
+    runs = cron_repo.list_runs(cron_id=cid, user_id=1, agent_id="a1")
+    assert len(runs) == 1
+    assert runs[0]["status"] == "ok"
+    assert runs[0]["trigger_kind"] == "scheduled"
 
 
 @pytest.mark.asyncio
@@ -151,6 +155,32 @@ async def test_run_records_error_on_failure(setup) -> None:
     assert row.last_error == "nope"
     rows = audit.query(action="cron.run_failed")
     assert rows
+    run = cron_repo.list_runs(cron_id=cid, user_id=1, agent_id="a1")[0]
+    assert run["status"] == "error"
+    assert run["error"] == "nope"
+
+
+@pytest.mark.asyncio
+async def test_run_records_cancellation(setup) -> None:
+    import asyncio
+
+    cron_repo, audit, cid, session_key = setup
+    delivery = MagicMock()
+    delivery.deliver = AsyncMock(side_effect=asyncio.CancelledError)
+    job = _job(
+        cron_repo=cron_repo,
+        audit=audit,
+        cid=cid,
+        session_key=session_key,
+        delivery_service=delivery,
+    )
+    with pytest.raises(asyncio.CancelledError):
+        await job.run(run_id="cancel-me", trigger_kind="manual")
+    run = cron_repo.get_run("cancel-me", user_id=1, agent_id="a1", cron_id=cid)
+    assert run is not None
+    assert run["status"] == "cancelled"
+    assert run["finished_at"] is not None
+    assert audit.query(action="cron.run_cancelled")
 
 
 @pytest.mark.asyncio

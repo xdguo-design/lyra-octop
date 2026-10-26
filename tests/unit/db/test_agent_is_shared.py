@@ -25,7 +25,9 @@ def test_is_shared_default_zero_and_list_shared(db):
     repo = AgentRepo(db)
     repo.create(agent_id="a1", user_id=1, name="mine")
     repo.create(agent_id="a2", user_id=2, name="theirs")
+    repo.create(agent_id="system", user_id=None, name="platform expert")
     repo.set_shared("a2", True)
+    repo.set_shared("system", True)
     rows = repo.list_shared(exclude_user_id=1)
-    assert [r.agent_id for r in rows] == ["a2"]
-    assert rows[0].is_shared == 1
+    assert [r.agent_id for r in rows] == ["a2", "system"]
+    assert all(row.is_shared == 1 for row in rows)

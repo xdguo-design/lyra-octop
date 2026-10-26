@@ -32,17 +32,41 @@ export function MessageFileCard({
   filename,
   agentId,
   workspacePath,
+  readStatus,
 }: {
   url: string;
   filename?: string;
   agentId?: string | null;
   workspacePath?: string;
+  readStatus?:
+    | "ready"
+    | "partial"
+    | "needs_ocr"
+    | "unsupported"
+    | "failed"
+    | "too_large"
+    | "vision"
+    | "not_sent";
 }) {
   const { t } = useTranslation();
   const filePreview = useChatFilePreview();
   const [loading, setLoading] = useState(false);
   const needsAuth = needsAuthBlobFetch(url) || isDataUrl(url);
   const label = filename || url;
+  const readStatusLabel = readStatus
+    ? t(`chat.fileReadStatus.${readStatus}`, {
+        defaultValue: {
+          ready: "Read",
+          partial: "Partially read",
+          needs_ocr: "Scanned pages need OCR",
+          unsupported: "Format not supported for reading",
+          failed: "Could not read",
+          too_large: "File is too large to read automatically",
+          vision: "Image attached",
+          not_sent: "Image limit reached; not sent to the model",
+        }[readStatus],
+      })
+    : "";
 
   const resolvedPath = workspacePath || workspacePathFromAccessUrl(url) || "";
   const previewable = Boolean(
@@ -104,6 +128,9 @@ export function MessageFileCard({
           {label}
         </span>
       </div>
+      {readStatusLabel && (
+        <span className={styles.messageFileReadStatus}>{readStatusLabel}</span>
+      )}
       {previewable && (
         <button
           type="button"

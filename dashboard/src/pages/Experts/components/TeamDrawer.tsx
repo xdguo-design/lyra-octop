@@ -8,6 +8,7 @@ import {
   type TeamRecord,
   type TeamTemplateFile,
 } from "../../../api/modules/teams";
+import { octopAgentsApi } from "../../../api/modules/octopAgents";
 import type { OctopAgent } from "../../../context/AgentContext";
 import { useAgentFormResources } from "../../../hooks/useAgentFormResources";
 import { apiErrorMessage } from "../../../utils/apiError";
@@ -17,13 +18,14 @@ import {
   defaultModelToForm,
   MODEL_AUTO_VALUE,
 } from "../../../utils/modelOptions";
-import { TEAM_AVATAR_URL, TEAM_ICON_NAME } from "../../../utils/teamAgent";
+import { TEAM_ICON_NAME } from "../../../utils/teamAgent";
 import { metaForFile } from "./iconForName";
 import TeamMemberPicker, {
   mergeTeamPickerExperts,
   selectedRosterIds,
   type TeamMemberOption,
 } from "./TeamMemberPicker";
+import ExpertAvatarPicker from "./ExpertAvatarPicker";
 import styles from "../index.module.less";
 
 interface TeamDrawerProps {
@@ -58,6 +60,8 @@ export default function TeamDrawer({
   const [templateFiles, setTemplateFiles] = useState<TeamTemplateFile[]>([]);
   const [templateLoading, setTemplateLoading] = useState(false);
   const [rosterExtras, setRosterExtras] = useState<TeamMemberOption[]>([]);
+  const [iconUrl, setIconUrl] = useState<string | null>(null);
+  const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
   const pickerExperts = useMemo(
     () => mergeTeamPickerExperts(experts, rosterExtras),
     [experts, rosterExtras],
@@ -68,7 +72,9 @@ export default function TeamDrawer({
       setRosterExtras([]);
       return;
     }
+    setPendingAvatar(null);
     if (mode === "edit" && team) {
+      setIconUrl(team.icon_url ?? null);
       form.setFieldsValue({
         name: team.name,
         description: team.description ?? "",
@@ -88,6 +94,7 @@ export default function TeamDrawer({
             welcome_message: record.welcome_message ?? "",
             member_ids: record.members.map((member) => member.agent_id),
           });
+          setIconUrl(record.icon_url ?? null);
           setRosterExtras(
             record.members.map((member) => ({
               agent_id: member.agent_id,
@@ -115,6 +122,7 @@ export default function TeamDrawer({
       welcome_message: t("experts.teams.welcomeDefault"),
       member_ids: [],
     });
+    setIconUrl(null);
     setRosterExtras([]);
   }, [form, mode, open, t, team]);
 
@@ -148,13 +156,13 @@ export default function TeamDrawer({
       description: values.description?.trim() || null,
       default_model: defaultModelFromForm(values.default_model),
       icon_name: TEAM_ICON_NAME,
-      icon_url: TEAM_AVATAR_URL,
+      icon_url: iconUrl,
       welcome_message: values.welcome_message?.trim() || null,
       member_ids: selectedRosterIds(values.member_ids, pickerExperts),
     };
     setSubmitting(true);
     try {
-      const saved =
+      let saved =
         mode === "edit" && team
           ? await teamsApi.update(team.agent_id, body)
           : await teamsApi.create({
@@ -162,6 +170,10 @@ export default function TeamDrawer({
               name: body.name,
               member_ids: body.member_ids,
             });
+      if (mode === "create" && pendingAvatar) {
+        await octopAgentsApi.uploadAvatar(saved.agent_id, pendingAvatar);
+        saved = await teamsApi.get(saved.agent_id);
+      }
       message.success(
         mode === "edit"
           ? t("experts.teams.updated")
@@ -221,6 +233,30 @@ export default function TeamDrawer({
       )}
 
       <Form form={form} layout="vertical" size="middle">
+        <Form.Item label={t("experts.teamAvatar")}>
+          <ExpertAvatarPicker
+            iconUrl={iconUrl}
+            iconName={TEAM_ICON_NAME}
+            disabled={submitting}
+            onPick={async (file) => {
+              if (mode === "edit" && team) {
+                const uploaded = await octopAgentsApi.uploadAvatar(
+                  team.agent_id,
+                  file,
+                );
+                setIconUrl(uploaded.icon_url);
+              } else {
+                setPendingAvatar(file);
+              }
+            }}
+            onRemove={async () => {
+              if (mode === "edit" && team)
+                await octopAgentsApi.deleteAvatar(team.agent_id);
+              setIconUrl(null);
+              setPendingAvatar(null);
+            }}
+          />
+        </Form.Item>
         <Form.Item
           name="name"
           label={t("experts.agentName")}

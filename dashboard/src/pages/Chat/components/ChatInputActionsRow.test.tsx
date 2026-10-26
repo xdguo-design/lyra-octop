@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ResolvedModel } from "../../../api/types";
 import ChatInputActionsRow from "./ChatInputActionsRow";
 
@@ -312,5 +312,133 @@ describe("ChatInputActionsRow voice button", () => {
     const { mic } = renderRow({ voiceHoldToTalk: true, isStreaming: true });
 
     expect(mic).not.toBeDisabled();
+  });
+});
+
+describe("ChatInputActionsRow deep-thinking toggle", () => {
+  // The chip is desktop-only and the component falls back to the compact
+  // layout when the actions row is narrow — jsdom reports 0px, so report a
+  // wide row from the ResizeObserver stub instead.
+  class WideRowObserver {
+    constructor(private callback: ResizeObserverCallback) {}
+    observe(target: Element) {
+      this.callback(
+        [
+          {
+            target,
+            contentRect: { width: 800, height: 0 },
+          } as ResizeObserverEntry,
+        ],
+        this as unknown as ResizeObserver,
+      );
+    }
+    unobserve() {}
+    disconnect() {}
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal("ResizeObserver", WideRowObserver);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const reasoningModel: ResolvedModel = {
+    provider_id: 1,
+    provider_name: "Provider",
+    provider_kind: "openai",
+    model: "reasoner",
+    name: "Reasoner",
+    reasoning_config: {
+      supported: true,
+      toggle: true,
+      default_mode: "disabled",
+      efforts: ["medium"],
+      default_effort: "medium",
+      effort_type: "enum",
+      adapter: "thinking",
+    },
+  };
+
+  it("shows the chip for a toggle-capable model and enables from off", () => {
+    const onReasoningChange = vi.fn();
+    render(
+      <MemoryRouter>
+        <ChatInputActionsRow
+          {...baseProps}
+          availableModels={[reasoningModel]}
+          selectedModel="Provider/reasoner"
+          reasoningMode="disabled"
+          onReasoningChange={onReasoningChange}
+        />
+      </MemoryRouter>,
+    );
+
+    const chip = screen.getByTestId("composer-reasoning-toggle");
+    expect(chip).toHaveTextContent("深度思考");
+    expect(chip).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(chip);
+    expect(onReasoningChange).toHaveBeenCalledWith("enabled", null);
+  });
+
+  it("turns deep thinking off when active and keeps the effort", () => {
+    const onReasoningChange = vi.fn();
+    render(
+      <MemoryRouter>
+        <ChatInputActionsRow
+          {...baseProps}
+          availableModels={[reasoningModel]}
+          selectedModel="Provider/reasoner"
+          reasoningMode="enabled"
+          reasoningEffort="medium"
+          onReasoningChange={onReasoningChange}
+        />
+      </MemoryRouter>,
+    );
+
+    const chip = screen.getByTestId("composer-reasoning-toggle");
+    expect(chip).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(chip);
+    expect(onReasoningChange).toHaveBeenCalledWith("disabled", "medium");
+  });
+
+  it("lights up from auto when the provider default is thinking-on", () => {
+    const onReasoningChange = vi.fn();
+    const alwaysReasoning: ResolvedModel = {
+      ...reasoningModel,
+      reasoning_config: {
+        ...reasoningModel.reasoning_config!,
+        default_mode: "enabled",
+      },
+    };
+    render(
+      <MemoryRouter>
+        <ChatInputActionsRow
+          {...baseProps}
+          availableModels={[alwaysReasoning]}
+          selectedModel="Provider/reasoner"
+          reasoningMode="auto"
+          onReasoningChange={onReasoningChange}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("composer-reasoning-toggle")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("hides the chip when the effective model has no toggle capability", () => {
+    render(
+      <MemoryRouter>
+        <ChatInputActionsRow {...baseProps} />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.queryByTestId("composer-reasoning-toggle"),
+    ).not.toBeInTheDocument();
   });
 });

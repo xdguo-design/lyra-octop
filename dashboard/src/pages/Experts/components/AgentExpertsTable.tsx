@@ -34,6 +34,7 @@ import PluginCatalogDrawer from "./PluginCatalogDrawer";
 import { request } from "../../../api/request";
 import type { OctopAgent } from "../../../context/AgentContext";
 import { useAgent } from "../../../context/AgentContext";
+import { useCurrentUser } from "../../../hooks/useCurrentUser";
 import { useIsMobile } from "../../../hooks/useIsMobile";
 import MbtiPersonaTag from "../../../components/MbtiPersonaTag";
 import MbtiCatalogDrawer from "./MbtiCatalogDrawer";
@@ -47,7 +48,10 @@ import {
 import styles from "../index.module.less";
 import RemoteExpertHint from "../../Chat/components/RemoteExpertHint";
 import { expertDeleteConfirm } from "../../../utils/remoteExpert";
-import { isSharedExpertViewer } from "../../../utils/sharedExpert";
+import {
+  canManageExpert,
+  isSharedExpertViewer,
+} from "../../../utils/sharedExpert";
 import type { PublishedExpert } from "../../../api/modules/publishedExperts";
 import PublishTemplateButton from "./PublishTemplateButton";
 import AgentMoreActions from "./AgentMoreActions";
@@ -84,6 +88,7 @@ export default function AgentExpertsTable({
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const { setActiveAgent, refresh: refreshAgents } = useAgent();
+  const currentUser = useCurrentUser();
   const [localStates, setLocalStates] = useState<Record<string, string>>({});
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [workspaceAgentId, setWorkspaceAgentId] = useState<string | null>(null);
@@ -313,7 +318,7 @@ export default function AgentExpertsTable({
           <span className={styles.tableNameText}>{name}</span>
           {row.is_shared && (
             <Tag color="blue">
-              {isSharedExpertViewer(row)
+              {isSharedExpertViewer(row) && row.owner_username
                 ? t("experts.share.fromOwner", {
                     name: row.owner_username,
                   })
@@ -351,7 +356,7 @@ export default function AgentExpertsTable({
         const state = localStates[row.agent_id] ?? row.state;
         const isTransient = TRANSIENT.has(state);
         const switchChecked = state === "running" || state === "starting";
-        const isOwner = row.is_owner !== false;
+        const canManage = canManageExpert(row, currentUser?.role === "admin");
         const friendlyError =
           state === "failed" && row.last_error
             ? formatAgentError(row.last_error, t)
@@ -365,7 +370,7 @@ export default function AgentExpertsTable({
               >
                 {formatAgentState(state, t)}
               </Tag>
-              {isOwner && (
+              {canManage && (
                 <Switch
                   size="small"
                   checked={switchChecked}
@@ -418,7 +423,7 @@ export default function AgentExpertsTable({
         <MbtiPersonaTag
           value={value}
           onClick={
-            row.is_owner !== false
+            canManageExpert(row, currentUser?.role === "admin")
               ? () => openMbtiCatalog(row.agent_id)
               : undefined
           }
@@ -434,11 +439,11 @@ export default function AgentExpertsTable({
         const state = localStates[row.agent_id] ?? row.state;
         const isTransient = TRANSIENT.has(state);
         const chatReady = isAgentChatReady(state);
-        const isOwner = row.is_owner !== false;
+        const canManage = canManageExpert(row, currentUser?.role === "admin");
         const deleteConfirm = expertDeleteConfirm(row, t);
         return (
           <div className={styles.tableActions}>
-            {isOwner && (
+            {canManage && (
               <>
                 <Tooltip
                   title={
@@ -530,7 +535,7 @@ export default function AgentExpertsTable({
                 {t("experts.openChat", "对话")}
                 <ChevronRight size={13} />
               </button>
-            ) : isOwner &&
+            ) : canManage &&
               (state === "failed" ||
                 state === "stopped" ||
                 state === "created") ? (

@@ -264,7 +264,9 @@ def model_retry_failure_prompt(exc: Exception, locale: str | Locale = "en") -> s
     """
     detail = unwrap_model_retry_message(exception_display_message(exc))
     classified = classify_stream_error_message(detail)
-    if classified is not None:
+    if classified == PATH_OUTSIDE_ROOT:
+        guidance = tr("stream_errors.path_outside_root_recovery", locale)
+    elif classified is not None:
         guidance = tr(classified.removeprefix(_PREFIX), locale)
     else:
         guidance = _format_template("stream_errors.model_call_failed_detail", locale, detail=detail)

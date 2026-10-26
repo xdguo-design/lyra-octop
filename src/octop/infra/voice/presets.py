@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 VoiceCapability = Literal["stt", "tts", "both"]
 
-_BUILTIN_PRESET_IDS = frozenset({"browser", "edge", "tencent", "openai", "mimo"})
+_BUILTIN_PRESET_IDS = frozenset({"browser", "edge", "tencent", "openai", "mimo", "doubao"})
 
 
 def is_builtin_preset(name: str) -> bool:
@@ -41,6 +41,15 @@ def load_voice_presets() -> list[dict[str, Any]]:
             "free": True,
             "requires_key": True,
             "description": "Tencent ASR + TTS with free trial quota for new accounts.",
+        },
+        {
+            "id": "doubao",
+            "name": "Doubao Voice",
+            "kind": "doubao",
+            "capability": "both",
+            "free": False,
+            "requires_key": True,
+            "description": "Volcengine Doubao ASR and natural TTS; usage billed by your account plan.",
         },
         {
             "id": "openai",

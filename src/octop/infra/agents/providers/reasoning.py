@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlparse
 
 REASONING_MODES = frozenset({"auto", "enabled", "disabled"})
 REASONING_ADAPTERS = frozenset(
@@ -14,6 +15,7 @@ REASONING_ADAPTERS = frozenset(
         "anthropic_adaptive",
         "anthropic_budget",
         "dashscope",
+        "chat_template",
         "openrouter",
     }
 )
@@ -41,9 +43,14 @@ def _string_list(value: Any) -> list[str]:
 def _legacy_adapter(model_id: str, *, base_url: str | None) -> str:
     """Choose a conservative adapter for legacy ``reasoning: true`` metadata."""
     url = (base_url or "").lower()
+    # Compare the parsed host, not a substring: "...?u=maas.aliyuncs.com" must
+    # not select the dashscope adapter (py/incomplete-url-substring-sanitization).
+    base_host = urlparse(url if "://" in url else f"https://{url}").hostname or ""
+    if "modelscope.cn" in url and model_id.startswith("qwen/qwen3.5-"):
+        return "chat_template"
     if "openrouter.ai" in url:
         return "openrouter"
-    if "dashscope" in url or "maas.aliyuncs.com" in url:
+    if "dashscope" in url or base_host == "maas.aliyuncs.com":
         return "dashscope"
     if model_id.startswith("deepseek-v4-") and any(
         host in url for host in ("lkeap.cloud.tencent.com", "tencentmaas.com")
@@ -70,14 +77,23 @@ def reasoning_capability(
     thinking_option = options.get("thinking") if isinstance(options, dict) else None
     model_id = str(model.get("id") or "").strip().lower()
     known_token_plan_model = model_id in TOKEN_PLAN_REASONING_MODELS
+    url = (base_url or "").lower()
+    modelscope_qwen = "modelscope.cn" in url and model_id.startswith("qwen/qwen3.5-")
+    bigmodel_glm = "bigmodel.cn" in url and model_id.startswith(("glm-4.7", "glm-5"))
     if not isinstance(raw, dict):
-        if not legacy and not isinstance(thinking_option, dict) and not known_token_plan_model:
+        if (
+            not legacy
+            and not isinstance(thinking_option, dict)
+            and not known_token_plan_model
+            and not modelscope_qwen
+            and not bigmodel_glm
+        ):
             return None
         raw = {
             "default_mode": thinking_option.get("type", "enabled")
             if isinstance(thinking_option, dict)
             else "enabled"
-            if known_token_plan_model
+            if known_token_plan_model or modelscope_qwen
             else "auto",
             "adapter": _legacy_adapter(model_id, base_url=base_url),
         }
@@ -192,6 +208,9 @@ def reasoning_request_parameters(
             model_fields["thinking"] = {"type": "enabled", "budget_tokens": budget}
         elif selected_mode == "disabled":
             model_fields["thinking"] = None
+    elif adapter == "chat_template":
+        if selected_mode != "auto":
+            extra_body["chat_template_kwargs"] = {"enable_thinking": selected_mode == "enabled"}
     elif adapter == "dashscope":
         if selected_mode != "auto":
             extra_body["enable_thinking"] = selected_mode == "enabled"
@@ -211,7 +230,7 @@ def reasoning_request_parameters(
     elif adapter in {"thinking", "thinking_nested_effort"}:
         if selected_mode != "auto":
             extra_body["thinking"] = {"type": selected_mode}
-        if selected_effort:
+        if selected_effort and selected_mode != "disabled":
             if adapter == "thinking_nested_effort":
                 thinking = dict(extra_body.get("thinking") or {"type": "enabled"})
                 thinking["reasoning_effort"] = selected_effort
@@ -227,7 +246,19 @@ def reasoning_request_parameters(
     return overrides
 
 
+def agent_reasoning_defaults(config: dict[str, Any]) -> tuple[str | None, str | None]:
+    raw = config.get("reasoning")
+    if not isinstance(raw, dict):
+        return None, None
+    mode, effort = raw.get("mode"), raw.get("effort")
+    return (
+        mode if isinstance(mode, str) and mode in REASONING_MODES else None,
+        effort.strip().lower() if isinstance(effort, str) and effort.strip() else None,
+    )
+
+
 __all__ = [
+    "agent_reasoning_defaults",
     "EFFORT_TYPES",
     "REASONING_ADAPTERS",
     "reasoning_capability",

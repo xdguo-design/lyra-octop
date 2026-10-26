@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Octop",
-  "short_name": "Octop",
-  "description": "Smarter self-hosted AI assistant — multi-user, multi-agent",
+  "name": "LYRA 私有云工作台",
+  "short_name": "LYRA",
+  "description": "LYRA 私有云工作台 — 自托管的多人多 Agent 智能伙伴",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

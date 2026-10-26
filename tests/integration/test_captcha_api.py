@@ -267,6 +267,7 @@ async def test_admin_captcha_get_put_and_null_delete(env: Any) -> None:
     assert body["active"] == "slider"
     assert body["available"] == [
         "slider",
+        "image",
         "tencent",
         "turnstile",
         "hcaptcha",

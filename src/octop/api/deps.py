@@ -35,6 +35,7 @@ _JWT_EXEMPT_PREFIXES = (
     "/api/i18n/",
     "/api/connectors/oauth/callback",
     "/api/internal/mcp/",
+    "/api/workbench-shares/",
 )
 _JWT_EXEMPT_EXACT = (
     "/api/health",
@@ -42,6 +43,7 @@ _JWT_EXEMPT_EXACT = (
     "/api/auth/captcha",
     "/api/auth/captcha/challenge",
     "/api/auth/register",
+    "/api/auth/register/code",
     "/api/auth/oidc/status",
     "/api/auth/oidc/start",
     "/api/auth/oidc/callback",

@@ -41,6 +41,8 @@ class ThreadRow:
     created_at: int
     pinned: bool = False
     model_ref: str | None = None
+    acp_runner: str | None = None
+    acp_model: str | None = None
     reasoning_mode: str | None = None
     reasoning_effort: str | None = None
     artifacts: tuple[ThreadArtifact, ...] = field(default_factory=tuple)
@@ -78,6 +80,8 @@ class ThreadRow:
             created_at=r["created_at"],
             pinned=bool(r["pinned"]),
             model_ref=r["model_ref"],
+            acp_runner=r["acp_runner"],
+            acp_model=r["acp_model"],
             reasoning_mode=r["reasoning_mode"],
             reasoning_effort=r["reasoning_effort"],
             artifacts=tuple(parse_thread_artifacts(raw_artifacts)),
@@ -272,6 +276,8 @@ class ThreadRepo:
         thread_id: str,
         *,
         model_ref: str | None | object = ...,
+        acp_runner: str | None | object = ...,
+        acp_model: str | None | object = ...,
         reasoning_mode: str | None | object = ...,
         reasoning_effort: str | None | object = ...,
         conversation_mode: str | None | object = ...,
@@ -282,6 +288,8 @@ class ThreadRepo:
         params: list[object] = []
         for column, value in (
             ("model_ref", model_ref),
+            ("acp_runner", acp_runner),
+            ("acp_model", acp_model),
             ("reasoning_mode", reasoning_mode),
             ("reasoning_effort", reasoning_effort),
             ("conversation_mode", conversation_mode),

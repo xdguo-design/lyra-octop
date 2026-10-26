@@ -496,10 +496,11 @@ async def test_extract_config_rejects_unusable_aux_model(env_with_main_agent) ->
     client, _srv, auth, aid = env_with_main_agent
     r = await client.put(
         f"/api/agents/{aid}/memory/extract-config",
-        headers=auth,
+        headers={**auth, "Accept-Language": "zh-CN"},
         json={"aux_model": "no-such-provider/model"},
     )
     assert r.status_code == 400, r.text
+    assert r.json() == {"detail": "辅助模型 no-such-provider/model 未在可用服务商中启用。"}
 
 
 @pytest.mark.asyncio
@@ -507,10 +508,11 @@ async def test_extract_config_rejects_bad_mode(env_with_main_agent) -> None:
     client, _srv, auth, aid = env_with_main_agent
     r = await client.put(
         f"/api/agents/{aid}/memory/extract-config",
-        headers=auth,
+        headers={**auth, "Accept-Language": "zh-CN"},
         json={"extract_trigger_mode": "bogus"},
     )
     assert r.status_code == 400, r.text
+    assert r.json() == {"detail": "记忆提取触发模式必须为 idle 或 interval。"}
 
 
 @pytest.mark.asyncio

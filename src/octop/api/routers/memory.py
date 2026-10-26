@@ -38,13 +38,15 @@ import json
 import logging
 from typing import Any, cast
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from octop.api.common.agent import assert_agent_owner, require_agent_owner_row
 from octop.api.common.memory_client import call_memory_rpc
 from octop.api.deps import current_user, get_server
+from octop.i18n import tr
 from octop.infra.errors import ErrorCode, OctopError
+from octop.infra.utils.locale import resolve_request_locale
 
 logger = logging.getLogger(__name__)
 
@@ -823,7 +825,7 @@ def _coerce_seconds(value: Any, *, minimum: float) -> float:
     return seconds
 
 
-def _validated_aux_model(value: Any, providers: Any) -> str | None:
+def _validated_aux_model(value: Any, providers: Any, locale: str) -> str | None:
     """Normalize an ``aux_model`` patch value: empty / "auto" → None (AUTO)."""
     ref = str(value).strip()
     if not ref or ref.lower() == "auto":
@@ -831,7 +833,7 @@ def _validated_aux_model(value: Any, providers: Any) -> str | None:
     if not providers.is_model_ref_usable(ref):
         raise HTTPException(
             status_code=400,
-            detail=f"aux_model {ref!r} is not an enabled model on a usable provider",
+            detail=tr("api.validation.memory_aux_model_unavailable", locale, model=ref),
         )
     return ref
 
@@ -852,10 +854,13 @@ def _coerce_aux_max_tokens(value: Any) -> int | None:
     return min(tokens, _MAX_AUX_TOKENS)
 
 
-def _coerce_aux_extra_body(value: Any) -> dict[str, Any] | None:
+def _coerce_aux_extra_body(value: Any, locale: str) -> dict[str, Any] | None:
     """Normalize the aux ``extra_body``; empty object resets to unset."""
     if not isinstance(value, dict):
-        raise HTTPException(status_code=400, detail="extract_extra_body must be a JSON object")
+        raise HTTPException(
+            status_code=400,
+            detail=tr("api.validation.memory_extract_extra_body_object", locale),
+        )
     return dict(value) or None
 
 
@@ -874,6 +879,7 @@ async def get_extract_config(
 @router.put("/agents/{agent_id}/memory/extract-config")
 async def put_extract_config(
     agent_id: str,
+    request: Request,
     body: _ExtractConfigBody = Body(default_factory=_ExtractConfigBody),
     user: Any = Depends(current_user),
     server: Any = Depends(get_server),
@@ -883,6 +889,7 @@ async def put_extract_config(
     Only owner or admin may write. Unknown/omitted fields keep their stored
     value; seconds are clamped to safe bounds and ``trigger_mode`` validated.
     """
+    locale = resolve_request_locale(request)
     registry = server.app_runtime.agent_registry
     row = registry.get_row(agent_id)
     if row is None:
@@ -900,7 +907,8 @@ async def put_extract_config(
         mode = str(patch["extract_trigger_mode"])
         if mode not in ("idle", "interval"):
             raise HTTPException(
-                status_code=400, detail="extract_trigger_mode must be 'idle' or 'interval'"
+                status_code=400,
+                detail=tr("api.validation.memory_extract_trigger_mode_invalid", locale),
             )
         merged["extract_trigger_mode"] = mode
     if "extract_idle_seconds" in patch:
@@ -912,7 +920,7 @@ async def put_extract_config(
             patch["extract_interval_seconds"], minimum=_MIN_INTERVAL_SECONDS
         )
     if "aux_model" in patch:
-        merged["aux_model"] = _validated_aux_model(patch["aux_model"], registry.providers)
+        merged["aux_model"] = _validated_aux_model(patch["aux_model"], registry.providers, locale)
     if "extract_light_timeout_s" in patch:
         merged["extract_light_timeout_s"] = _coerce_aux_timeout(patch["extract_light_timeout_s"])
     if "extract_heavy_timeout_s" in patch:
@@ -920,7 +928,7 @@ async def put_extract_config(
     if "extract_max_tokens" in patch:
         merged["extract_max_tokens"] = _coerce_aux_max_tokens(patch["extract_max_tokens"])
     if "extract_extra_body" in patch:
-        merged["extract_extra_body"] = _coerce_aux_extra_body(patch["extract_extra_body"])
+        merged["extract_extra_body"] = _coerce_aux_extra_body(patch["extract_extra_body"], locale)
 
     try:
         cfg = json.loads(row.config_json or "{}")

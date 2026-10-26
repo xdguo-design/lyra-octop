@@ -18,7 +18,6 @@ import {
 import { apiErrorMessage } from "../../utils/apiError";
 import { refreshServerLabels } from "../../i18n";
 import { applyUserLocale, applyGuestLocale } from "../../utils/locale";
-import { useTheme } from "../../context/ThemeContext";
 import {
   isSsoPopup,
   isSsoPopupMessage,
@@ -32,6 +31,8 @@ import googleIcon from "../../assets/providers/google.svg";
 import CaptchaField, { type CaptchaFieldHandle } from "./CaptchaField";
 import ForgotPasswordModal from "./ForgotPasswordModal";
 import { type PublicCaptchaConfig } from "./captchaAdapters";
+
+const LOGIN_USERNAME_KEY = "login_username";
 
 function providerLabel(
   provider: OauthProviderStatus,
@@ -74,12 +75,13 @@ function providerIcon(provider: OauthProviderStatus): ReactNode {
 
 export default function LoginPage() {
   const { t } = useTranslation();
-  const { isDark } = useTheme();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(
+    () => localStorage.getItem(LOGIN_USERNAME_KEY) ?? "",
+  );
   const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(true);
+  const [rememberUsername, setRememberUsername] = useState(true);
   const [loading, setLoading] = useState(false);
   const [providers, setProviders] = useState<OauthProviderStatus[]>([]);
   const [ldap, setLdap] = useState<LdapStatus | null>(null);
@@ -91,6 +93,14 @@ export default function LoginPage() {
     provider: "slider",
   });
   const captchaRef = useRef<CaptchaFieldHandle>(null);
+
+  useEffect(() => {
+    if (rememberUsername && username) {
+      localStorage.setItem(LOGIN_USERNAME_KEY, username);
+    } else {
+      localStorage.removeItem(LOGIN_USERNAME_KEY);
+    }
+  }, [rememberUsername, username]);
 
   useEffect(() => {
     void applyGuestLocale();
@@ -186,7 +196,7 @@ export default function LoginPage() {
 
   const onSso = async (kind: string) => {
     setSsoLoadingKind(kind);
-    setRememberLoginPreference(remember);
+    setRememberLoginPreference(true);
     let popup: Window | null = null;
     if (kind !== "oidc") {
       popup = openSsoPopup();
@@ -218,12 +228,12 @@ export default function LoginPage() {
   };
 
   const handleLogin = async () => {
-    if (!username || !password || !captchaReady) return;
+    if (loading || !username || !password || !captchaReady) return;
     setLoading(true);
     try {
       const token = await captchaRef.current?.getToken();
       const res = await authApi.login(username, password, token);
-      setAuthToken(res.access_token, remember);
+      setAuthToken(res.access_token);
       await applyUserLocale(res.user.locale);
       void refreshServerLabels(res.user.locale);
       navigate("/home", { replace: true });
@@ -269,19 +279,52 @@ export default function LoginPage() {
           margin: "0 16px",
         }}
       >
-        <img
-          src={
-            isDark ? "/logo_horizontal_white.png" : "/logo_horizontal_dark.png"
-          }
-          alt="Octop"
+        <div
+          role="img"
+          aria-label="LYRA 私有云工作台"
           style={{
-            height: 48,
-            width: "auto",
-            maxWidth: 260,
-            objectFit: "contain",
-            display: "block",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
           }}
-        />
+        >
+          <img
+            src="/lyra-dino.svg"
+            alt=""
+            style={{
+              height: 56,
+              width: 56,
+              objectFit: "contain",
+              display: "block",
+            }}
+          />
+          <span
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: 3,
+              color: "var(--fn-text-primary)",
+              fontSize: 25,
+              fontWeight: 800,
+              lineHeight: 1.05,
+              letterSpacing: "0.02em",
+            }}
+          >
+            LYRA
+            <small
+              style={{
+                fontSize: 12,
+                fontWeight: 400,
+                lineHeight: 1.3,
+                letterSpacing: "0.08em",
+                color: "var(--fn-text-tertiary)",
+              }}
+            >
+              私有云工作台
+            </small>
+          </span>
+        </div>
 
         <h2
           style={{
@@ -303,6 +346,7 @@ export default function LoginPage() {
           size="large"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
+          onPressEnter={handleLogin}
           autoFocus
           style={{ borderRadius: 10 }}
         />
@@ -345,6 +389,7 @@ export default function LoginPage() {
           slideVerifiedLabel={t("login.slideVerified")}
           unsupportedLabel={t("login.unsupportedCaptcha")}
           onReadyChange={setCaptchaReady}
+          onEnter={handleLogin}
         />
 
         <Button
@@ -377,8 +422,8 @@ export default function LoginPage() {
             }}
           >
             <Checkbox
-              checked={remember}
-              onChange={(e) => setRemember(e.target.checked)}
+              checked={rememberUsername}
+              onChange={(e) => setRememberUsername(e.target.checked)}
               style={{
                 margin: 0,
                 fontSize: 13,

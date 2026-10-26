@@ -22,7 +22,17 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 _BUILTIN_RUNNERS = frozenset(
-    {"opencode", "codebuddy", "claude_code", "codex", "kimi_code", "cursor_cli", "pi"}
+    {
+        "opencode",
+        "codebuddy",
+        "claude_code",
+        "codex",
+        "kimi_code",
+        "cursor_cli",
+        "pi",
+        "kilo_code",
+        "kiro_cli",
+    }
 )
 _ALLOWED_PARSE_MODES = frozenset({"call_title", "update_detail", "call_detail"})
 _DEFAULT_STDIO_BUFFER = 50 * 1024 * 1024
@@ -46,6 +56,10 @@ class ACPConfigBody(BaseModel):
     tool_enabled: bool = Field(
         default=False,
         description="Register the acp_runner built-in tool on this agent",
+    )
+    default_model: str | None = Field(
+        default=None,
+        description="Default OpenCode model for direct workbench chats",
     )
     runners: dict[str, ACPRunnerBody] | None = Field(
         default=None,
@@ -92,8 +106,11 @@ def _read_agent_tool_enabled(cfg: dict[str, Any]) -> bool:
 
 
 def _combined_acp_view(*, registry: Any, user_id: int, agent_cfg: dict[str, Any]) -> dict[str, Any]:
+    acp = agent_cfg.get("acp")
+    default_model = acp.get("default_model") if isinstance(acp, dict) else None
     return {
         "tool_enabled": _read_agent_tool_enabled(agent_cfg),
+        "default_model": default_model if isinstance(default_model, str) else None,
         "runners": registry.acp_settings.load_runners(user_id),
     }
 
@@ -167,6 +184,36 @@ async def put_global_acp_runners(
     saved = registry.acp_settings.save_runners(user.id, runners)
     _schedule_reload_user_agents(server, user.id)
     return {"runners": saved}
+
+
+@router.post("/acp/opencode/install", summary="Install OpenCode on the Octop host")
+async def install_opencode_on_host(
+    user: Any = Depends(require_admin()),
+    server: Any = Depends(get_server),
+) -> dict[str, Any]:
+    """Install OpenCode for the service account and enable it as an ACP runner."""
+    from octop.infra.agents.opencode_setup import install_opencode  # noqa: PLC0415
+
+    try:
+        command = await install_opencode()
+    except RuntimeError as exc:
+        raise OctopError(ErrorCode.INTERNAL_ERROR, str(exc)) from exc
+    registry = _registry(server)
+    runners = registry.acp_settings.load_runners(user.id)
+    runner = runners.get("opencode", {})
+    runner.update(
+        {
+            "enabled": True,
+            "command": command,
+            "args": ["acp"],
+            "trusted": False,
+            "tool_parse_mode": "update_detail",
+        }
+    )
+    runners["opencode"] = runner
+    registry.acp_settings.save_runners(user.id, runners)
+    _schedule_reload_user_agents(server, user.id)
+    return {"command": command, "runner": runner}
 
 
 @router.get("/acp/{runner_name}", summary="Get global ACP runner")
@@ -246,8 +293,54 @@ async def put_acp_config(
         registry.acp_settings.save_runners(user.id, runners)
         _schedule_reload_user_agents(server, user.id)
     await _persist_agent_tool_enabled(server, agent_id=agent_id, tool_enabled=body.tool_enabled)
+    if "default_model" in body.model_fields_set:
+        model = (body.default_model or "").strip() or None
+        if model is not None:
+            from octop.infra.agents.acp_direct import list_model_options  # noqa: PLC0415
+
+            options = await list_model_options(
+                registry=registry,
+                user_id=user.id,
+                agent_id=agent_id,
+            )
+            if model not in {item["value"] for item in options}:
+                raise OctopError(ErrorCode.SLASH_BAD_ARGS, "Unknown OpenCode model")
+        cfg = registry.get_config(agent_id)
+        acp = cfg.get("acp")
+        if not isinstance(acp, dict):
+            acp = {}
+        if model:
+            acp["default_model"] = model
+        else:
+            acp.pop("default_model", None)
+        if acp:
+            cfg["acp"] = acp
+        else:
+            cfg.pop("acp", None)
+        await registry.update_config_json(agent_id, json.dumps(cfg, ensure_ascii=False))
     cfg = registry.get_config(agent_id)
     return _combined_acp_view(registry=registry, user_id=user.id, agent_cfg=cfg)
+
+
+@router.get(
+    "/agents/{agent_id}/acp/opencode/models",
+    summary="List OpenCode models",
+    description="Read model choices from the enabled OpenCode ACP runner.",
+)
+async def get_opencode_models(
+    agent_id: str,
+    user: Any = Depends(current_user),
+    server: Any = Depends(get_server),
+) -> dict[str, Any]:
+    _agent_row(server, agent_id, user)
+    from octop.infra.agents.acp_direct import list_model_options  # noqa: PLC0415
+
+    options = await list_model_options(
+        registry=_registry(server),
+        user_id=user.id,
+        agent_id=agent_id,
+    )
+    return {"models": options}
 
 
 @router.put("/agents/{agent_id}/acp/tool", summary="Update acp_runner tool toggle")

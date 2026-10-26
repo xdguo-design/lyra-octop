@@ -158,3 +158,158 @@ async def test_discover_oauth_from_mcp_url_uses_cache(monkeypatch: pytest.Monkey
     bypass = await discover_oauth_from_mcp_url("https://example.com/mcp", use_cache=False)
     assert bypass == cached_result
     assert calls == 2
+
+
+def test_authorization_metadata_url_forms() -> None:
+    from octop.infra.connectors.oauth.mcp import _authorization_metadata_urls
+
+    assert _authorization_metadata_urls("https://mcp.notion.com") == [
+        "https://mcp.notion.com/.well-known/oauth-authorization-server",
+    ]
+    # RFC 8414 path-insertion fallback for issuers with a path (e.g. GitHub).
+    assert _authorization_metadata_urls("https://github.com/login/oauth") == [
+        "https://github.com/login/oauth/.well-known/oauth-authorization-server",
+        "https://github.com/.well-known/oauth-authorization-server/login/oauth",
+    ]
+
+
+def test_static_oauth_client_roundtrip_and_redaction() -> None:
+    from octop.infra.connectors.custom_mcp import (
+        normalize_server_spec,
+        static_oauth_client_from_spec,
+    )
+
+    spec = normalize_server_spec(
+        "gh",
+        {
+            "transport": "streamable_http",
+            "url": "https://api.githubcopilot.com/mcp/",
+            "oauth_client_id": "Iv1.abc",
+            "oauth_client_secret": "shh",
+        },
+    )
+    assert spec["oauth_client_id"] == "Iv1.abc"
+    assert spec["oauth_client_secret"] == "shh"
+    assert static_oauth_client_from_spec(spec) == {
+        "client_id": "Iv1.abc",
+        "client_secret": "shh",
+    }
+    harness = harness_spec_for_server(spec)
+    assert "oauth_client_id" not in harness
+    assert "oauth_client_secret" not in harness
+    preview = redact_server_for_api(spec)
+    assert preview["oauth_client_id"] == "Iv1.abc"
+    assert preview["oauth_client_secret_configured"] is True
+    assert "oauth_client_secret" not in preview
+
+
+def test_merge_preserved_oauth_keeps_static_secret_when_unset() -> None:
+    existing = {
+        "srv": {
+            "transport": "streamable_http",
+            "url": "https://example.com/mcp",
+            "oauth_client_id": "cid",
+            "oauth_client_secret": "shh",
+        }
+    }
+    incoming = {
+        "srv": {
+            "transport": "streamable_http",
+            "url": "https://example.com/mcp",
+            "oauth_client_id": "cid",
+        }
+    }
+    merged = merge_preserved_oauth(incoming, existing)
+    assert merged["srv"]["oauth_client_secret"] == "shh"
+    dropped = merge_preserved_oauth(
+        {"srv": {"transport": "streamable_http", "url": "https://example.com/mcp"}},
+        existing,
+    )
+    assert "oauth_client_secret" not in dropped["srv"]
+
+
+@pytest.mark.asyncio
+async def test_discovery_tolerates_missing_registration_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import octop.infra.connectors.oauth.discovery as discovery_module
+
+    clear_oauth_discovery_cache()
+
+    async def fake_probe(url: str) -> None:
+        return None
+
+    async def fake_prm(url: str) -> dict[str, object]:
+        assert url.endswith("/.well-known/oauth-protected-resource/mcp/")
+        return {
+            "resource": "https://api.githubcopilot.com/mcp/",
+            "authorization_servers": ["https://github.com/login/oauth"],
+            "scopes_supported": ["repo", "read:org"],
+        }
+
+    async def fake_metadata(issuer: str) -> dict[str, object]:
+        assert issuer == "https://github.com/login/oauth"
+        return {
+            "issuer": issuer,
+            "authorization_endpoint": "https://github.com/login/oauth/authorize",
+            "token_endpoint": "https://github.com/login/oauth/access_token",
+            "scopes_supported": ["offline_access"],
+        }
+
+    monkeypatch.setattr(discovery_module, "_probe_401_resource_metadata", fake_probe)
+    monkeypatch.setattr(discovery_module, "_fetch_prm_document", fake_prm)
+    monkeypatch.setattr(discovery_module, "fetch_authorization_metadata", fake_metadata)
+
+    found = await discover_oauth_from_mcp_url("https://api.githubcopilot.com/mcp/")
+    assert found["available"] is True
+    assert found["dcr_supported"] is False
+    assert found["resource_scopes"] == ["repo", "read:org"]
+    assert found["issuer"] == "https://github.com/login/oauth"
+
+
+@pytest.mark.asyncio
+async def test_start_custom_mcp_oauth_static_client_scope_and_guard(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import octop.infra.connectors.oauth.registry as registry_module
+
+    found = {
+        "available": True,
+        "issuer": "https://github.com/login/oauth",
+        "resource": "https://api.githubcopilot.com/mcp/",
+        "metadata": {
+            "issuer": "https://github.com/login/oauth",
+            "authorization_endpoint": "https://github.com/login/oauth/authorize",
+            "token_endpoint": "https://github.com/login/oauth/access_token",
+            "scopes_supported": ["offline_access"],
+        },
+        "scopes_supported": ["offline_access"],
+        "resource_scopes": ["repo", "read:org"],
+        "dcr_supported": False,
+    }
+
+    async def fake_discover(url: str) -> dict[str, object]:
+        return found
+
+    monkeypatch.setattr(registry_module, "discover_oauth_from_mcp_url", fake_discover)
+
+    redirect = "http://127.0.0.1:8200/api/connectors/oauth/callback"
+    url, _verifier, ctx = await registry_module.start_custom_mcp_oauth(
+        server_name="github",
+        mcp_url="https://api.githubcopilot.com/mcp/",
+        redirect_uri=redirect,
+        state="st",
+        static_client={"client_id": "cid", "client_secret": "shh"},
+    )
+    assert url.startswith("https://github.com/login/oauth/authorize?")
+    assert "scope=repo+read%3Aorg+offline_access" in url
+    assert ctx["client_id"] == "cid"
+    assert ctx["client_secret"] == "shh"
+
+    with pytest.raises(ValueError, match="不支持动态客户端注册"):
+        await registry_module.start_custom_mcp_oauth(
+            server_name="github",
+            mcp_url="https://api.githubcopilot.com/mcp/",
+            redirect_uri=redirect,
+            state="st",
+        )

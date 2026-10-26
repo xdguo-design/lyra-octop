@@ -23,6 +23,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.websockets import WebSocketState
 
+from octop.api.common.upload_limit import read_upload_capped
 from octop.api.deps import (
     current_user,
     get_server,
@@ -38,6 +39,7 @@ from octop.infra.voice.presets import load_voice_presets
 
 router = APIRouter()
 admin_router = APIRouter()
+_MAX_STT_UPLOAD_BYTES = 16 * 1024 * 1024
 
 
 def _voice_manager(server: Any) -> VoiceManager:
@@ -65,7 +67,8 @@ def _row_to_dict(r: Any) -> dict[str, Any]:
         "kind": r.kind,
         "capability": r.capability,
         "base_url": r.base_url,
-        "api_key": r.api_key,
+        "api_key": None,
+        "api_key_configured": bool(r.api_key),
         "extra": r.get_extra(),
         "note": r.note,
         "enabled": bool(r.enabled),
@@ -152,7 +155,11 @@ async def transcribe_audio(
     _: Any = Depends(current_user),
     server: Any = Depends(get_server),
 ) -> dict[str, Any]:
-    data = await audio.read()
+    data = await read_upload_capped(
+        audio,
+        max_bytes=_MAX_STT_UPLOAD_BYTES,
+        code=ErrorCode.ATTACHMENT_TOO_LARGE,
+    )
     if not data:
         raise OctopError(ErrorCode.SLASH_BAD_ARGS, "audio file is empty")
     mime = audio.content_type or "audio/webm"

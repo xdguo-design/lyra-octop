@@ -548,6 +548,10 @@ def test_format_agent_start_error_unknown_passthrough() -> None:
     assert format_agent_start_error(exc) == "disk full"
 
 
+def test_memory_extract_settings_defaults_enabled_without_memory_config() -> None:
+    assert _memory_extract_settings({}) == {"memory_enabled": True}
+
+
 def test_memory_extract_settings_supports_legacy_harness(caplog: pytest.LogCaptureFixture) -> None:
     settings = _memory_extract_settings(
         {
@@ -679,11 +683,15 @@ def test_build_harness_config_accepts_memory_extract_settings(manager: AgentMana
             {
                 "memory": {
                     "memory_enabled": False,
+                    "memory_jsonl_enabled": False,
                     "extract_on_session_end": True,
                     "extract_trigger_mode": "interval",
                     "extract_idle_seconds": 60,
                     "extract_interval_seconds": 600,
-                }
+                },
+                "checkpointer": False,
+                "session_log_enabled": False,
+                "team_enabled": False,
             }
         )
     )
@@ -691,11 +699,28 @@ def test_build_harness_config_accepts_memory_extract_settings(manager: AgentMana
     cfg = manager._build_harness_config(row)
 
     assert cfg.memory_enabled is False
+    assert cfg.memory_jsonl_enabled is False
+    assert cfg.checkpointer is False
+    assert cfg.session_log_enabled is False
+    assert cfg.team_enabled is False
     if hasattr(cfg, "memory_extract_trigger_mode"):
         assert cfg.memory_extract_trigger_mode == "interval"
         assert cfg.memory_extract_interval_seconds == 600.0
     else:
         assert cfg.memory_extract_idle_seconds == 600.0
+
+
+def test_agent_can_opt_out_of_global_langfuse(manager: AgentManager, monkeypatch) -> None:
+    agent = MagicMock()
+    monkeypatch.setattr(
+        manager,
+        "get_config",
+        lambda _agent_id: {"observability": {"langfuse": False}},
+    )
+
+    manager._disable_agent_langfuse_if_opted_out("admission-demo", agent)
+
+    agent.set_langfuse_callbacks.assert_called_once_with(None)
 
 
 def test_format_agent_start_error_unwraps_exception_group() -> None:
@@ -1373,6 +1398,17 @@ def test_build_harness_config_respects_config_json_backend(manager: AgentManager
         _row(config_json=json.dumps({"backend": custom})),
     )
     assert cfg.backend == custom
+
+
+def test_build_harness_config_can_disable_model_retry(manager: AgentManager) -> None:
+    from langchain.agents.middleware import ModelRetryMiddleware
+
+    cfg = manager._build_harness_config(
+        _row(config_json=json.dumps({"model_retry_enabled": False}))
+    )
+
+    assert not cfg.model_retry_enabled
+    assert not any(isinstance(item, ModelRetryMiddleware) for item in (cfg.middleware or []))
 
 
 def test_backend_spec_for_row_neutralizes_host_root_on_windows(
