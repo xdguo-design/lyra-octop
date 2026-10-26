@@ -1,6 +1,9 @@
 import Markdown from "../../components/Markdown";
 import PageShell from "../../layouts/PageShell";
-import content from "../../../../docs/features.md?raw";
+// Vendored copy of docs/features.md: the Docker build context only contains
+// dashboard/ (.dockerignore strips root *.md, the Dockerfile never COPYs docs/),
+// so a repo-root ?raw import breaks image builds.
+import content from "./content/features.md?raw";
 
 const dashboardContent = content
   .replaceAll(
