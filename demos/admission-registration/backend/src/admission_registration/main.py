@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import os
@@ -488,24 +487,19 @@ async def ai_candidates(
                     exc,
                 )
                 region_tree = REGIONS
-            pages = (1, 2) if body.page == 0 else (body.page,)
-            platform_responses = await asyncio.gather(
-                *(
-                    client.post(
-                        f"{OCTOP_API_BASE_URL}/api/admission-demo/extract",
-                        json={"text": prompt, "page": page},
-                        headers={"Authorization": upstream_authorization},
-                    )
-                    for page in pages
-                )
+            # page=0 lets the platform Skill extract both field groups in one model call.
+            platform_response = await client.post(
+                f"{OCTOP_API_BASE_URL}/api/admission-demo/extract",
+                json={"text": prompt, "page": body.page},
+                headers={"Authorization": upstream_authorization},
             )
-            for platform_response in platform_responses:
-                if getattr(platform_response, "status_code", 200) == 401:
-                    raise HTTPException(status_code=401, detail="平台登录已失效，请重新登录")
-                platform_response.raise_for_status()
-                renewed_token = platform_response.headers.get("X-Octop-Access-Token")
-                if renewed_token:
-                    response.headers["X-Octop-Access-Token"] = renewed_token
+            if getattr(platform_response, "status_code", 200) == 401:
+                raise HTTPException(status_code=401, detail="平台登录已失效，请重新登录")
+            platform_response.raise_for_status()
+            renewed_token = platform_response.headers.get("X-Octop-Access-Token")
+            if renewed_token:
+                response.headers["X-Octop-Access-Token"] = renewed_token
+            platform_responses = [platform_response]
     except HTTPException:
         raise
     except httpx.HTTPStatusError as exc:
