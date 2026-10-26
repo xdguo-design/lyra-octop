@@ -21,7 +21,12 @@ router = APIRouter()
 
 class AdmissionExtractionBody(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
-    page: int = Field(default=1, ge=1, le=2, description="表单页码（1 或 2），限定可抽取的字段范围")
+    page: int = Field(
+        default=1,
+        ge=0,
+        le=2,
+        description="页码：0=全部字段，1/2=对应页面",
+    )
 
 
 class AdmissionExtractionResponse(BaseModel):
