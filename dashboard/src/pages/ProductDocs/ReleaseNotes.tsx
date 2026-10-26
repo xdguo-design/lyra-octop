@@ -1,6 +1,8 @@
 import Markdown from "../../components/Markdown";
 import PageShell from "../../layouts/PageShell";
-import content from "../../../../docs/release-notes-2026-10.md?raw";
+// Vendored copy of docs/release-notes-2026-10.md — see FeatureOverview.tsx for
+// why the repo-root ?raw import cannot be used (Docker build context).
+import content from "./content/release-notes-2026-10.md?raw";
 
 export default function ReleaseNotesPage() {
   return (
