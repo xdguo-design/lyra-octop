@@ -1,5 +1,5 @@
 import Ajv2020 from 'ajv/dist/2020.js'
-import schema from '../../../contracts/admission-fields.schema.json'
+import schema from './contracts/admission-fields.schema.json'
 
 const ajv = new Ajv2020({ allErrors: true, strict: false })
 const validateContract = ajv.compile(schema)
