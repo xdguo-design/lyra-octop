@@ -645,6 +645,9 @@
     "USER_REJECTED": "账号未通过审核，请联系管理员。"
   },
   "nav": {
+    "featureOverview": "功能介绍",
+    "releaseNotes": "更新日志",
+    "more": "更多",
     "chat": "对话",
     "admissionDemo": "住院登记 Demo",
     "ehrWorkbench": "EHR 工作台",

@@ -18,6 +18,12 @@ const ACPPage = lazy(() => import("../pages/Agent/ACP"));
 const TokenUsagePage = lazy(() => import("../pages/Control/TokenUsage"));
 const CreationsPage = lazy(() => import("../pages/Creations"));
 const EhrWorkbenchPage = lazy(() => import("../pages/EhrWorkbench"));
+const FeatureOverviewPage = lazy(
+  () => import("../pages/ProductDocs/FeatureOverview"),
+);
+const ReleaseNotesPage = lazy(
+  () => import("../pages/ProductDocs/ReleaseNotes"),
+);
 
 // Lazy-loaded pages — Control
 const RemoteDesktopPage = lazy(() => import("../pages/Control/RemoteDesktop"));
@@ -62,6 +68,8 @@ export const pathToKey: Record<string, string> = {
   "/skill-packages/manage": "skill-packages",
   "/knowledge-bases": "knowledge-bases",
   "/ehr": "ehr",
+  "/features": "feature-overview",
+  "/release-notes": "release-notes",
   "/bridge": "bridge",
   "/personalization": "personalization",
   "/personalization/skills": "personalization",
@@ -166,6 +174,8 @@ export const routeConfigs: RouteConfig[] = [
   { path: "/skill-packages/manage", element: <SkillPackagesPage /> },
   { path: "/knowledge-bases", element: <KnowledgeBasesPage /> },
   { path: "/ehr", element: <EhrWorkbenchPage /> },
+  { path: "/features", element: <FeatureOverviewPage /> },
+  { path: "/release-notes", element: <ReleaseNotesPage /> },
   { path: "/creations", element: <CreationsPage /> },
   { path: "/bridge", element: <BridgePage /> },
   {

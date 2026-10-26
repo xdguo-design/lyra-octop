@@ -15,6 +15,8 @@ import {
   Ellipsis,
   FolderPlus,
   Bot,
+  BookOpen,
+  History,
 } from "lucide-react";
 import { Popover } from "antd";
 import { useLayoutMode } from "../context/LayoutModeContext";
@@ -709,6 +711,15 @@ export default function Sidebar({
             <span>{t(item.labelKey)}</span>
           </button>
         ))}
+      <div className={styles.productMoreDivider} />
+      <button type="button" onClick={() => handleNavigate("/features")}>
+        <BookOpen size={17} />
+        <span>{t("nav.featureOverview")}</span>
+      </button>
+      <button type="button" onClick={() => handleNavigate("/release-notes")}>
+        <History size={17} />
+        <span>{t("nav.releaseNotes")}</span>
+      </button>
     </div>
   );
   const productNavBody = (
@@ -746,11 +757,16 @@ export default function Sidebar({
       >
         <button
           type="button"
-          className={styles.productNavButton}
+          className={
+            selectedKey === "feature-overview" ||
+            selectedKey === "release-notes"
+              ? styles.productNavActive
+              : styles.productNavButton
+          }
           aria-expanded={moreOpen}
         >
           <Ellipsis size={17} />
-          <span>更多</span>
+          <span>{t("nav.more")}</span>
         </button>
       </Popover>
       <div className={styles.productGroupLabel}>项目</div>

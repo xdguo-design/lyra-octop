@@ -59,6 +59,7 @@ npm exec tsc -- -b
 | F1   | 上传 TXT/CSV/可搜索 PDF/DOCX/XLSX/PPTX 和扫描 PDF              | 已支持内容显示实际读取结果；未支持/OCR 缺失/超范围必须显示部分或未支持状态 |      |
 | F2   | 上传音频与视频，查看消息/历史/附件                             | 上传和受保护预览可测；当前不把路径提示当作已转写/理解                      |      |
 | G1   | 在 HTTPS 页面允许麦克风并配置有效 STT/TTS Provider 后录音/试听 | Provider 已配置时走真实端到端；无凭据明确标记未测                          |      |
+| H1   | 打开侧栏“更多”，分别进入“功能介绍”和“更新日志”                 | 两项均可从控制台菜单进入；页面内容、返回导航与当前语言显示正常             |      |
 
 既有 A–D 详细步骤（分页竞态、代码权限、草稿生命周期、搜索来源）也可参照 [P0/OCT 汇总验收单](p0-oct-005-summary-acceptance.md)。
 
@@ -82,6 +83,7 @@ npm exec tsc -- -b
 | 后端全量非 live pytest                | 未完成/自动审查拦截 | 测试进程启动后触发对 Microsoft 遥测的外连；自动审查指出载荷未知并拒绝继续。没有绕过或再次尝试；中断前输出出现失败标记，因此不能登记全量通过。 |
 | Dashboard 全量 Vitest                 | 通过                | `npm run test -- --reporter=dot`：264 个测试文件、1,432 项通过；存在 jsdom/React 测试提示。                                                   |
 | Dashboard 生产构建                    | 通过                | `npm run build`：TypeScript 构建与 Vite/PWA 构建完成；构建日志有既有 chunk size 和静态/动态导入提示。                                         |
+| 功能介绍/更新日志菜单与路由           | 通过                | 路由和菜单关联测试 15 项通过；页面代码通过 TypeScript、生产构建及 ESLint。                                                                    |
 | Provider、浏览器、PostgreSQL 人工验收 | 未测                | 当前工作区没有执行真实 Provider、多实例、浏览器登录或 PostgreSQL 实例验收。                                                                   |
 
 此记录对应本地提交前工作区，不等于 GitHub CI 或目标机器验收结果。

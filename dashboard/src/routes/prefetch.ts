@@ -18,6 +18,8 @@ const ROUTE_PREFETCHERS: Record<string, () => Promise<unknown>> = {
   "/remote-phone": () => import("../pages/Control/RemoteDesktop"),
   "/remote-android": () => import("../pages/Control/RemoteDesktop"),
   "/acp": () => import("../pages/Agent/ACP"),
+  "/features": () => import("../pages/ProductDocs/FeatureOverview"),
+  "/release-notes": () => import("../pages/ProductDocs/ReleaseNotes"),
   "/personalization": () => import("../pages/Agent/Personalization"),
   "/personalization/skills": () => import("../pages/Agent/Personalization"),
   "/personalization/tools": () => import("../pages/Agent/Personalization"),

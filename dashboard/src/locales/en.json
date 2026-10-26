@@ -645,6 +645,9 @@
     "USER_REJECTED": "This account was not approved. Contact an administrator."
   },
   "nav": {
+    "featureOverview": "Feature overview",
+    "releaseNotes": "Release notes",
+    "more": "More",
     "chat": "Conversation",
     "admissionDemo": "Admission Demo",
     "ehrWorkbench": "EHR Workbench",

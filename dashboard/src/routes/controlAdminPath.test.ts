@@ -17,6 +17,15 @@ describe("pathPermissionKeys", () => {
     ).toBe(true);
   });
 
+  it("exposes product feature and release note pages", () => {
+    expect(resolveSelectedKey("/features")).toBe("feature-overview");
+    expect(resolveSelectedKey("/release-notes")).toBe("release-notes");
+    expect(routeConfigs.some((route) => route.path === "/features")).toBe(true);
+    expect(routeConfigs.some((route) => route.path === "/release-notes")).toBe(
+      true,
+    );
+  });
+
   it("matches workbench and legacy aliases", () => {
     expect(isWorkbenchPath("/workbench")).toBe(true);
     expect(pathPermissionKeys("/workbench")).toEqual([...PERM.workbench]);
