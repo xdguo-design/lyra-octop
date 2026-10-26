@@ -124,6 +124,25 @@ async def test_file_read_returns_every_parsed_segment(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_cached_file_read_rechecks_source_integrity(tmp_path: Path) -> None:
+    original = b"original content"
+    repo = _file_repo(tmp_path, original)
+    service = FileService(repo)
+    kwargs = {
+        "file_id": "file-1",
+        "revision_id": "rev-1",
+        "user_id": 1,
+        "agent_id": "agent",
+        "thread_id": "thread",
+    }
+
+    await service.read(workspace=_Workspace(original), **kwargs)
+
+    with pytest.raises(ValueError, match="integrity"):
+        await service.read(workspace=_Workspace(b"changed after parse"), **kwargs)
+
+
+@pytest.mark.asyncio
 async def test_concurrent_reads_commit_one_copy_of_each_segment(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

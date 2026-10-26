@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
+from contextlib import suppress
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any
+from uuid import uuid4
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.date import DateTrigger
 
 from octop.i18n import tr
 from octop.infra.connectors.crypto import decrypt_credentials
@@ -73,6 +77,8 @@ class CronManager:
         self._mail_watch = AgentlyWatchManager()
         # Process-level jobs (e.g. TLS auto-renew) that must survive reload_from_db.
         self._system_job_ids: set[str] = set()
+        self._active_runs: dict[str, asyncio.Task[None]] = {}
+        self._instance_id = uuid4().hex
 
     def replace_repos(self, repos: RepoBundle) -> None:
         """Point cron persistence at a rebound control-plane pool."""
@@ -80,7 +86,21 @@ class CronManager:
         self._delivery_service.replace_repos(repos)
 
     async def boot(self) -> None:
+        now = int(time.time())
+        self._repos.cron_repo.touch_instance(self._instance_id, heartbeat_at=now)
+        recovered = self._repos.cron_repo.mark_interrupted_runs(
+            finished_at=now,
+            stale_before=now - 300,
+            current_instance_id=self._instance_id,
+        )
+        if recovered:
+            logger.warning("Marked %d interrupted Cron runs", recovered)
         self._scheduler.start()
+        self.schedule_system_job(
+            f"sys-cron-heartbeat-{self._instance_id}",
+            trigger="interval:60",
+            func=self._heartbeat,
+        )
         rows = self._repos.cron_repo.list_all(include_disabled=False)
         for row in rows:
             self._schedule(row)
@@ -107,9 +127,16 @@ class CronManager:
 
     async def shutdown(self) -> None:
         await self._mail_watch.close()
+        for run_id in list(self._active_runs):
+            await self.cancel_run(run_id)
+        self.unschedule_system_job(f"sys-cron-heartbeat-{self._instance_id}")
         if self._scheduler.running:
             self._scheduler.shutdown(wait=False)
             logger.info("CronManager shut down")
+        self._repos.cron_repo.remove_instance(self._instance_id)
+
+    def _heartbeat(self) -> None:
+        self._repos.cron_repo.touch_instance(self._instance_id, heartbeat_at=int(time.time()))
 
     async def create(self, spec: CronCreateSpec | None = None, **kwargs: Any) -> CronJobRow:
         if spec is None:
@@ -226,17 +253,70 @@ class CronManager:
             self._repos.audit_repo.write(actor=ACTOR_SYSTEM, action="cron.delete", target=cron_id)
             logger.info("CronJob %s deleted", cron_id)
 
-    async def run_now(self, cron_id: str, *, wait: bool = False) -> None:
+    async def run_now(self, cron_id: str, *, wait: bool = False) -> str:
         """Trigger a run; embedded callers wait for bookkeeping and receive failures."""
         row = self._repos.cron_repo.get(cron_id)
         if row is None:
             raise OctopError(ErrorCode.NOT_FOUND, f"cron job {cron_id!r} not found")
-        job = self._make_job(row)
         logger.info("CronJob %s triggered manually", cron_id)
+        run_id = uuid4().hex
+        task = asyncio.create_task(
+            self._run_tracked(row, run_id=run_id, trigger_kind="manual", raise_on_error=wait)
+        )
+        self._active_runs[run_id] = task
         if wait:
-            await job.run(raise_on_error=True)
-        else:
-            asyncio.ensure_future(job.run())
+            await task
+        return run_id
+
+    async def cancel_run(self, run_id: str) -> bool:
+        """Cancel an in-flight run in this process; completed history is immutable."""
+        task = self._active_runs.get(run_id)
+        if task is None or task.done():
+            return False
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+        return True
+
+    def list_runs(
+        self,
+        cron_id: str,
+        *,
+        user_id: int,
+        agent_id: str,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> list[dict[str, object]]:
+        return self._repos.cron_repo.list_runs(
+            cron_id=cron_id,
+            user_id=user_id,
+            agent_id=agent_id,
+            limit=limit,
+            offset=offset,
+        )
+
+    def get_run(self, run_id: str, *, cron_id: str, user_id: int, agent_id: str) -> Any:
+        return self._repos.cron_repo.get_run(
+            run_id, user_id=user_id, agent_id=agent_id, cron_id=cron_id
+        )
+
+    async def _run_tracked(
+        self,
+        row: Any,
+        *,
+        run_id: str,
+        trigger_kind: str,
+        raise_on_error: bool = False,
+    ) -> None:
+        try:
+            await self._make_job(row).run(
+                raise_on_error=raise_on_error,
+                run_id=run_id,
+                instance_id=self._instance_id,
+                trigger_kind=trigger_kind,
+            )
+        finally:
+            self._active_runs.pop(run_id, None)
 
     def _make_job(self, row: Any) -> CronJob:
         return CronJob.from_row(
@@ -269,11 +349,33 @@ class CronManager:
 
             self._mail_watch.subscribe(source.instance_id, row.cron_id, creds, on_mail)
             return
-        job = self._make_job(row)
         if self._scheduler.get_job(row.cron_id):
             self._scheduler.remove_job(row.cron_id)
+
+        async def scheduled_run() -> None:
+            run_id = uuid4().hex
+            task = asyncio.current_task()
+            if task is not None:
+                self._active_runs[run_id] = task
+            await self._run_tracked(row, run_id=run_id, trigger_kind="scheduled")
+
+        scheduled_callable = scheduled_run
+        if isinstance(trigger, DateTrigger):
+
+            async def run_one_shot() -> None:
+                # Persist consumption before invoking user work. APScheduler removes
+                # DateTrigger jobs after firing, so leaving the row enabled would
+                # re-register an already-fired task after a process restart.
+                self._repos.cron_repo.update(row.cron_id, enabled=False)
+                run_id = uuid4().hex
+                task = asyncio.current_task()
+                if task is not None:
+                    self._active_runs[run_id] = task
+                await self._run_tracked(row, run_id=run_id, trigger_kind="scheduled")
+
+            scheduled_callable = run_one_shot
         self._scheduler.add_job(
-            job.run,
+            scheduled_callable,
             trigger=trigger,
             id=row.cron_id,
             replace_existing=True,
@@ -339,7 +441,11 @@ class CronManager:
             prompt=prompt,
             mcp_servers=list(dict.fromkeys([source.mcp_server_name, *row.mcp_servers])),
         )
-        await self._make_job(event_row).run()
+        run_id = uuid4().hex
+        task = asyncio.current_task()
+        if task is not None:
+            self._active_runs[run_id] = task
+        await self._run_tracked(event_row, run_id=run_id, trigger_kind="mail")
 
     async def reload_mail_watches(self) -> None:
         """Rebuild every mailbox watch after a full cron reload."""

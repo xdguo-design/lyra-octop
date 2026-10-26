@@ -1709,7 +1709,8 @@
       "unsupported": "当前格式无法解析读取",
       "failed": "读取失败",
       "too_large": "文件过大，无法自动读取",
-      "vision": "已附加图片"
+      "vision": "已附加图片",
+      "not_sent": "图片数量超限，未发送给模型"
     },
     "sharedExpert": {
       "banner": "共享专家 · 由 {{name}} 提供",
@@ -2686,6 +2687,26 @@
     "operationFailed": "操作失败",
     "triggeredSuccess": "任务已触发，结果稍后显示",
     "executeFailed": "触发执行失败",
+    "runHistory": "运行历史",
+    "runHistoryFailed": "运行历史加载失败，请稍后重试",
+    "noRuns": "暂无运行记录",
+    "cancelRun": "取消运行",
+    "runCancelled": "已请求取消运行",
+    "runNoLongerActive": "此运行已结束",
+    "runCancelUnavailable": "此运行不在当前服务进程中，无法从此处取消",
+    "runCancelFailed": "取消运行失败",
+    "runStatus": {
+      "running": "运行中",
+      "ok": "成功",
+      "error": "失败",
+      "cancelled": "已取消",
+      "interrupted": "进程中断"
+    },
+    "runTrigger": {
+      "manual": "手动",
+      "scheduled": "定时",
+      "mail": "邮件触发"
+    },
     "totalItems": "共 {{count}} 项",
     "loadingJobs": "正在加载当前专家的任务…",
     "syncing": "正在同步…",
@@ -6033,6 +6054,7 @@
       "cron.delete": "删除定时任务",
       "cron.run_ok": "定时任务执行成功",
       "cron.run_failed": "定时任务执行失败",
+      "cron.run_cancelled": "定时任务已取消",
       "security.policy.update": "更新安全策略",
       "security.tool_guard_rules.update": "更新工具防护规则",
       "security.tool_guard_rules.reset": "重置工具防护规则",

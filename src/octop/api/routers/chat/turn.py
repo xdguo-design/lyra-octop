@@ -32,6 +32,7 @@ from octop.infra.files.service import (
 )
 from octop.infra.files.worker import FileWorkerError
 from octop.infra.gateway.media.attachment_hints import (
+    VISION_MAX_COUNT,
     inbound_attachments_from_parts,
     is_vision_attachment,
 )
@@ -55,6 +56,23 @@ __all__ = [
     "prepare_dashboard_turn",
     "turn_has_content",
 ]
+
+
+def _mark_vision_attachment_status(attachments: list[dict[str, Any]]) -> None:
+    """Reflect the harness image-count limit in persisted attachment status."""
+    sent = 0
+    for attachment in attachments:
+        if not is_vision_attachment(
+            kind=str(attachment.get("kind") or ""),
+            media_type=str(attachment.get("media_type") or ""),
+            path=str(attachment.get("workspace_path") or ""),
+        ):
+            continue
+        if sent < VISION_MAX_COUNT:
+            attachment["read_status"] = "vision"
+            sent += 1
+        else:
+            attachment["read_status"] = "not_sent"
 
 
 @dataclass
@@ -356,6 +374,7 @@ async def prepare_dashboard_turn(
     )
     inbound_content = content_parts_from_dashboard_turn(turn)
     inbound_attachments = inbound_attachments_from_parts(inbound_content)
+    _mark_vision_attachment_status(inbound_attachments)
     context_files: list[dict[str, Any]] = []
     if file_refs:
         workspace = await require_running_workspace(
@@ -368,8 +387,11 @@ async def prepare_dashboard_turn(
             if attachment is None:
                 continue
             attachment.update(file_ref)
-            if str(attachment.get("media_type", "")).startswith("image/"):
-                attachment["read_status"] = "vision"
+            if is_vision_attachment(
+                kind=str(attachment.get("kind") or ""),
+                media_type=str(attachment.get("media_type") or ""),
+                path=str(attachment.get("workspace_path") or ""),
+            ):
                 continue
             try:
                 read_result = await file_service.read(

@@ -271,6 +271,28 @@ class ChatFileRepo:
             ).fetchall()
         return [ChatFileRevisionRow.from_row(row) for row in rows]
 
+    def has_registered_workspace_path(
+        self, *, agent_id: str, workspace_path: str, include_descendants: bool = False
+    ) -> bool:
+        """Return whether a workspace path belongs to any registered file revision."""
+        path = workspace_path.replace("\\", "/").strip("/")
+        if not path:
+            return False
+        descendant_prefix = f"{path}/"
+        descendant_clause = " OR substr(r.workspace_path, 1, ?) = ?" if include_descendants else ""
+        params: tuple[object, ...] = (agent_id, path)
+        if include_descendants:
+            params += (len(descendant_prefix), descendant_prefix)
+        with self._db.connect() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM chat_file_revisions r "
+                "JOIN chat_files f ON f.file_id = r.file_id "
+                f"WHERE f.agent_id = ? AND f.deleted_at IS NULL "
+                f"AND (r.workspace_path = ?{descendant_clause}) LIMIT 1",
+                params,
+            ).fetchone()
+        return row is not None
+
     def bind_thread(
         self,
         file_id: str,

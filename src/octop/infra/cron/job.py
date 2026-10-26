@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from octop.infra.cron.delivery import CronDeliveryCommand
 from octop.infra.cron.task_type import normalize_cron_task_type
@@ -75,11 +77,28 @@ class CronJob:
             audit_repo=audit_repo,
         )
 
-    async def run(self, *, raise_on_error: bool = False) -> None:
+    async def run(
+        self,
+        *,
+        raise_on_error: bool = False,
+        run_id: str | None = None,
+        instance_id: str = "local",
+        trigger_kind: str = "scheduled",
+    ) -> str:
         from octop.infra.metrics import METRICS  # noqa: PLC0415
 
         METRICS.inc("cron_runs_total")
         ts = int(time.time())
+        run_id = run_id or uuid4().hex
+        self._cron_repo.start_run(
+            run_id=run_id,
+            cron_id=self._cron_id,
+            agent_id=self._agent_id,
+            user_id=self._user_id,
+            instance_id=instance_id,
+            trigger_kind=trigger_kind,
+            started_at=ts,
+        )
 
         try:
             await self._delivery_service.deliver(
@@ -96,10 +115,23 @@ class CronJob:
                     mcp_servers=tuple(self._mcp_servers),
                 )
             )
+        except asyncio.CancelledError:
+            self._cron_repo.finish_run(run_id, status="cancelled", finished_at=int(time.time()))
+            self._cron_repo.set_run_status(self._cron_id, ts=ts, status="cancelled", error=None)
+            self._audit_repo.write(
+                actor=ACTOR_SYSTEM,
+                action="cron.run_cancelled",
+                target=self._cron_id,
+                payload=run_id,
+            )
+            raise
         except Exception as exc:
             METRICS.inc("cron_errors_total")
             logger.exception("cron job %s failed", self._cron_id)
-            err = str(exc)
+            err = str(exc)[:1000]
+            self._cron_repo.finish_run(
+                run_id, status="error", finished_at=int(time.time()), error=err
+            )
             self._cron_repo.set_run_status(self._cron_id, ts=ts, status="error", error=err)
             self._audit_repo.write(
                 actor=ACTOR_SYSTEM,
@@ -109,10 +141,12 @@ class CronJob:
             )
             if raise_on_error:
                 raise
-            return
+            return run_id
+        self._cron_repo.finish_run(run_id, status="ok", finished_at=int(time.time()))
         self._cron_repo.set_run_status(self._cron_id, ts=ts, status="ok", error=None)
         self._audit_repo.write(
             actor=ACTOR_SYSTEM,
             action="cron.run_ok",
             target=self._cron_id,
         )
+        return run_id

@@ -497,6 +497,14 @@ class OctopServer:
         )
         await cron_mgr.boot()
 
+        from octop.infra.admission_session_cleanup import (
+            install_admission_session_cleanup_job,
+            purge_expired_admission_sessions,
+        )
+
+        await purge_expired_admission_sessions(self.services.admission_session_repo)
+        install_admission_session_cleanup_job(cron_mgr, self.services.admission_session_repo)
+
         from octop.infra.setup.tls.renewal import install_auto_renewal_job
 
         install_auto_renewal_job(cron_mgr, paths=self.paths)

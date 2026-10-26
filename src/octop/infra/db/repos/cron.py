@@ -220,6 +220,98 @@ class CronJobRepo:
                 (ts, status, error, now_ts(), cron_id),
             )
 
+    def start_run(
+        self,
+        *,
+        run_id: str,
+        cron_id: str,
+        agent_id: str,
+        user_id: int,
+        instance_id: str,
+        trigger_kind: str,
+        started_at: int,
+    ) -> None:
+        with self._db.transaction() as conn:
+            conn.execute(
+                "INSERT INTO cron_runs(run_id, cron_id, agent_id, user_id, instance_id, "
+                "trigger_kind, status, started_at) VALUES (?, ?, ?, ?, ?, ?, 'running', ?)",
+                (run_id, cron_id, agent_id, user_id, instance_id, trigger_kind, started_at),
+            )
+
+    def finish_run(
+        self,
+        run_id: str,
+        *,
+        status: str,
+        finished_at: int,
+        error: str | None = None,
+    ) -> bool:
+        if status not in {"ok", "error", "cancelled", "interrupted"}:
+            raise ValueError("invalid cron run terminal status")
+        with self._db.transaction() as conn:
+            changed = conn.execute(
+                "UPDATE cron_runs SET status = ?, finished_at = ?, error = ? "
+                "WHERE run_id = ? AND status = 'running'",
+                (status, finished_at, error[:1000] if error else None, run_id),
+            ).rowcount
+        return int(changed or 0) == 1
+
+    def touch_instance(self, instance_id: str, *, heartbeat_at: int) -> None:
+        with self._db.transaction() as conn:
+            conn.execute(
+                "INSERT INTO cron_instances(instance_id, heartbeat_at) VALUES (?, ?) "
+                "ON CONFLICT(instance_id) DO UPDATE SET heartbeat_at = excluded.heartbeat_at",
+                (instance_id, heartbeat_at),
+            )
+
+    def remove_instance(self, instance_id: str) -> None:
+        with self._db.transaction() as conn:
+            conn.execute("DELETE FROM cron_instances WHERE instance_id = ?", (instance_id,))
+
+    def mark_interrupted_runs(
+        self, *, finished_at: int, stale_before: int, current_instance_id: str
+    ) -> int:
+        """Close runs whose server instance has not renewed its heartbeat."""
+        with self._db.transaction() as conn:
+            changed = conn.execute(
+                "UPDATE cron_runs SET status = 'interrupted', finished_at = ?, "
+                "error = 'Process stopped before the run completed' WHERE status = 'running' "
+                "AND instance_id != ? AND NOT EXISTS (SELECT 1 FROM cron_instances i "
+                "WHERE i.instance_id = cron_runs.instance_id AND i.heartbeat_at >= ?)",
+                (finished_at, current_instance_id, stale_before),
+            ).rowcount
+        return int(changed or 0)
+
+    def get_run(
+        self, run_id: str, *, user_id: int, agent_id: str, cron_id: str
+    ) -> dict[str, object] | None:
+        with self._db.connect() as conn:
+            row = conn.execute(
+                "SELECT run_id, cron_id, agent_id, trigger_kind, status, started_at, "
+                "finished_at, error FROM cron_runs WHERE run_id = ? AND user_id = ? "
+                "AND agent_id = ? AND cron_id = ?",
+                (run_id, user_id, agent_id, cron_id),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def list_runs(
+        self,
+        *,
+        cron_id: str,
+        user_id: int,
+        agent_id: str,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> list[dict[str, object]]:
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT run_id, cron_id, agent_id, trigger_kind, status, started_at, "
+                "finished_at, error FROM cron_runs WHERE cron_id = ? AND user_id = ? "
+                "AND agent_id = ? ORDER BY started_at DESC, run_id DESC LIMIT ? OFFSET ?",
+                (cron_id, user_id, agent_id, max(1, min(limit, 100)), max(0, offset)),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def update(
         self,
         cron_id: str,

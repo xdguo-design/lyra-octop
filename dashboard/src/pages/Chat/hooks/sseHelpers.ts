@@ -60,7 +60,8 @@ export interface ChatAttachment {
     | "unsupported"
     | "failed"
     | "too_large"
-    | "vision";
+    | "vision"
+    | "not_sent";
   kind: "image" | "file" | "video" | "audio";
 }
 

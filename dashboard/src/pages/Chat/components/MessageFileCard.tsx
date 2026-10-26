@@ -45,7 +45,8 @@ export function MessageFileCard({
     | "unsupported"
     | "failed"
     | "too_large"
-    | "vision";
+    | "vision"
+    | "not_sent";
 }) {
   const { t } = useTranslation();
   const filePreview = useChatFilePreview();
@@ -62,6 +63,7 @@ export function MessageFileCard({
           failed: "Could not read",
           too_large: "File is too large to read automatically",
           vision: "Image attached",
+          not_sent: "Image limit reached; not sent to the model",
         }[readStatus],
       })
     : "";

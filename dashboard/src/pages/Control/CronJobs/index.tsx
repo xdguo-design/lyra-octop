@@ -407,6 +407,7 @@ function CronJobsPage() {
       <JobDetailDrawer
         open={detailDrawerOpen}
         job={detailJob}
+        agentId={activeAgentId}
         timeZone={cronTimezone}
         onClose={handleDetailClose}
       />

@@ -54,6 +54,16 @@ def _assert_workspace_mutable(path: str) -> str:
     return rel
 
 
+def _assert_not_registered_chat_file(
+    server: Any, agent_id: str, path: str, *, descendants: bool = False
+) -> None:
+    repo = getattr(getattr(server, "services", None), "chat_file_repo", None)
+    if repo is not None and repo.has_registered_workspace_path(
+        agent_id=agent_id, workspace_path=path, include_descendants=descendants
+    ):
+        raise OctopError(ErrorCode.FORBIDDEN, "cannot modify a registered chat file revision")
+
+
 def _map_workspace_fs_error(exc: Exception, *, operation: str, path: str) -> OctopError:
     if isinstance(exc, BackendOperationNotSupportedError):
         return OctopError(ErrorCode.WORKSPACE_OP_UNSUPPORTED, str(exc))
@@ -181,6 +191,9 @@ async def write_file(
     server: Any = Depends(get_server),
 ) -> dict[str, Any]:
     """Overwrite ``path`` with ``body.content`` (text)."""
+    _ = from_workspace  # Mutating endpoints always treat paths as workspace-relative.
+    rel = _assert_workspace_mutable(path)
+    _assert_not_registered_chat_file(server, agent_id, rel)
     ws = await require_running_workspace(
         agent_id, user=user, as_user=as_user, server=server, owner_only=True
     )
@@ -200,7 +213,7 @@ async def write_file(
     else:
         data = body.content.encode("utf-8")
     try:
-        await ws.aupload_bytes(_workspace_io_path(path, from_workspace=from_workspace), data)
+        await ws.aupload_bytes(rel, data)
     except Exception as exc:
         raise OctopError(ErrorCode.NOT_FOUND, f"cannot write {path!r}: {exc}") from exc
     return {"path": path, "size": len(data)}
@@ -260,6 +273,7 @@ async def delete_workspace_file(
     """Remove a file or directory tree from the agent workspace."""
     _ = from_workspace
     rel = _assert_workspace_mutable(path)
+    _assert_not_registered_chat_file(server, agent_id, rel, descendants=True)
     ws = await require_running_workspace(
         agent_id, user=user, as_user=as_user, server=server, owner_only=True
     )
@@ -290,6 +304,8 @@ async def move_workspace_file(
     _ = from_workspace
     src = _assert_workspace_mutable(path)
     dest = _assert_workspace_mutable(body.destination)
+    _assert_not_registered_chat_file(server, agent_id, src, descendants=True)
+    _assert_not_registered_chat_file(server, agent_id, dest)
     ws = await require_running_workspace(
         agent_id, user=user, as_user=as_user, server=server, owner_only=True
     )
@@ -316,10 +332,12 @@ async def upload_file(
         agent_id, user=user, as_user=as_user, server=server, owner_only=True
     )
     target = path or f"/{file.filename or 'upload.bin'}"
+    target_rel = _assert_workspace_mutable(target)
+    _assert_not_registered_chat_file(server, agent_id, target_rel)
     data = await file.read()
     try:
         await ws.aupload_bytes(
-            _workspace_io_path(target, from_workspace=from_workspace),
+            target_rel,
             data,
         )
     except Exception as exc:
@@ -408,6 +426,7 @@ async def write_doc(
     """Convert Markdown *content* back to the document format and overwrite *path*."""
     _ = from_workspace  # Mutations always use workspace-relative paths.
     rel = _assert_workspace_mutable(path)
+    _assert_not_registered_chat_file(server, agent_id, rel)
     converter = _ensure_editable_doc(path)
     ws = await require_running_workspace(agent_id, user=user, as_user=as_user, server=server)
     try:

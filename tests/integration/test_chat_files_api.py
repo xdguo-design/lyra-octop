@@ -160,6 +160,47 @@ async def test_read_surface_rejects_unbound_draft(env_with_agent: Any) -> None:
         assert response.status_code == 404, response.text
 
 
+async def test_workspace_mutations_cannot_change_registered_file_revision(
+    env_with_agent: Any,
+) -> None:
+    client, srv, auth, aid = env_with_agent
+    body = await _upload_and_bind(client, srv, auth, aid)
+    revision = srv.services.chat_file_repo.get_revision(body["revision_id"])
+    assert revision is not None
+    path = f"/{revision.workspace_path}"
+
+    overwritten = await client.put(
+        f"/api/agents/{aid}/workspace/file",
+        params={"path": path, "from_workspace": "true"},
+        headers=auth,
+        json={"content": "tampered replacement"},
+    )
+    assert overwritten.status_code == 403, overwritten.text
+
+    deleted = await client.delete(
+        f"/api/agents/{aid}/workspace/file",
+        params={"path": path, "from_workspace": "true"},
+        headers=auth,
+    )
+    assert deleted.status_code == 403, deleted.text
+
+    moved = await client.post(
+        f"/api/agents/{aid}/workspace/move",
+        params={"path": path, "from_workspace": "true"},
+        headers=auth,
+        json={"destination": "/inbound/renamed.txt"},
+    )
+    assert moved.status_code == 403, moved.text
+
+    read = await client.get(
+        f"/api/agents/{aid}/workspace/download",
+        params={"path": path, "from_workspace": "true"},
+        headers=auth,
+    )
+    assert read.status_code == 200, read.text
+    assert read.content == b"alpha beta\n\ngamma beta\n"
+
+
 async def test_delete_draft_only_deletes_owned_unbound_files(env_with_agent: Any) -> None:
     client, srv, auth, aid = env_with_agent
     upload = await client.post(

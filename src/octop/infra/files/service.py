@@ -83,14 +83,13 @@ class FileService:
         if owned is None:
             raise PermissionError("file is not available in this thread")
         file_row, revision = owned
-        if revision.parse_version is not None:
-            return self._stored_result(revision_id)
-
         data = workspace.download_bytes(revision.workspace_path)
         if data is None:
             raise FileNotFoundError("stored file content is unavailable")
         if len(data) != revision.byte_size or hashlib.sha256(data).hexdigest() != revision.sha256:
             raise FileIntegrityError("file integrity check failed")
+        if revision.parse_version is not None:
+            return self._stored_result(revision_id)
         if len(data) > DEFAULT_PARSE_LIMITS.max_input_bytes:
             raise FileTooLargeError("file exceeds the automatic read size limit")
 

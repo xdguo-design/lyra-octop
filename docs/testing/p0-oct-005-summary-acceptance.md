@@ -1,7 +1,7 @@
-# Lyra Octop P0 + OCT-005 汇总线下测试验收单
+# Lyra Octop P0 + OCT-004 + OCT-005 汇总线下测试验收单
 
 **用途：** 在包含对应开发改动的 Lyra Octop 测试实例上进行人工验收。  
-**覆盖范围：** OCT-001 聊天历史并发、OCT-002 工作台代码浏览权限、OCT-003 附件草稿生命周期、OCT-005 搜索来源展示与历史恢复。  
+**覆盖范围：** OCT-001 聊天历史并发、OCT-002 工作台代码浏览权限、OCT-003 附件草稿生命周期、OCT-004 文件/语音/媒体/Cron、OCT-005 搜索来源展示与历史恢复。
 **代码基线：** 本分支从 GitHub `origin/dev` 的 `644095b78ee710d5ab2a991f9c9d71c8d5f5ece6` 重建。之前临时云端 worktree 未保留，因此此分支是按已记录的改动摘要重建的提交，不能视作找回原临时工作区的逐字节版本。部署验收前记录实际 SHA；不要在生产环境或生产数据上测试。
 
 ## 1. 测试前准备
@@ -70,7 +70,24 @@
 
 **来源验收原则：** 每条来源都能追溯到工具原始结果；仅接受 HTTP(S) URL；标题不能为空；不根据助手回答补造来源。
 
-## 6. 自动化验证记录（供对照，不替代本次人工验收）
+## 6. E 组：文件、语音、媒体与 Cron 闭环（OCT-004）
+
+| 编号 | 操作 | 预期结果 | 结果/备注 |
+|---|---|---|---|
+| E1 | 上传 TXT、CSV、可搜索 PDF、DOCX、XLSX、PPTX，分别让助手读取 | 支持格式显示真实解析状态和来源位置；超预算、扫描页或不支持格式明确显示 partial/needs_ocr/unsupported，不得声称完整阅读 | |
+| E2 | 上传并读取附件后，通过 workspace 文件编辑接口尝试覆盖，再尝试删除和移动同一路径 | 服务端拒绝修改已登记 revision（403）；原内容和片段保持一致 | |
+| E3 | 上传一张图片并询问图片内容；再上传超过单轮视觉数量限制的图片 | 实际送给模型的图像数与 UI 状态一致；未送达模型的图片不能显示为已视觉读取 | |
+| E4 | 上传音频和视频附件，检查聊天回答、附件状态、历史和预览/播放 | 当前自动化覆盖上传及受保护预览；音视频内容转写/抽帧理解若尚未接入，记录为未支持，不得将路径提示当成已理解内容 | |
+| E5 | 在 HTTPS 测试站点允许麦克风，录制短语音并提交；再拒绝麦克风权限 | 配有可用 STT Provider 时能返回识别文本；拒绝权限时给出可恢复错误；无 Provider Key 时记录为“Provider 未测” | |
+| E6 | 向 STT 上传超过服务端上限的音频（16 MiB） | 返回 413；请求不会被转发给 Provider | |
+| E7 | 在管理员配置页切换 STT/TTS Provider，分别试听和转写 | 配置成功时端到端工作；缺失凭据、browser-only 路径或上游错误有明确提示，不得显示成功 | |
+| E8 | 创建 Cron，先用 `run now` 执行，再停用/删除，另以普通用户读取其他用户任务 | 只能读取本人或授权任务；停用/删除阻止未来调度；run-now 返回 202 和 run_id；详情抽屉能看到运行历史和终态；普通用户不能读取其他用户历史 | |
+| E10 | 启动一个可控长任务，在详情抽屉点击取消；重启服务后查看未完成记录 | 本进程内任务记录 cancelled；取消不能回滚已经发生的外部副作用；重启后残留 running 记录显示 interrupted，不自动重放 | |
+| E9 | 创建一次性 `date:` Cron，等待触发后重启测试服务，再检查任务列表和调度 | 触发时先持久化停用；重启后不会重新执行已触发的单次任务 | |
+
+**OCT-004 当前已知边界：** 本轮新增自动化保护覆盖已登记聊天文件通过 workspace 写入、删除、移动的绕过路径、STT 文件上传上限、一次性 Cron 触发后的重启重复调度、Admission 会话过期清理，以及 Cron 持久运行历史/同进程取消。音频附件转写和视频抽帧仍未交付。Cron 取消只作用于当前服务进程，不能撤销已发出的外部副作用；跨实例协调取消仍未实现。真实语音服务需要 Provider 凭据；默认 `browser` Voice Provider 不会自动为演示页完成 STT/TTS，需先配置可用云 Provider 才能跑 E5/E7。
+
+## 7. 自动化验证记录（供对照，不替代本次人工验收）
 
 以下是本分支重建后在本地工作区的验证记录；推送后请以 CI 与实际部署 SHA 为准。
 
@@ -78,21 +95,65 @@
 |---|---|---|
 | OCT-005 来源解析、聚合、卡片定向测试 | 6 项通过 | 本次通过 |
 | 附件草稿前端定向测试 | 12 项通过 | 本次通过 |
-| 聊天历史分页/刷新竞态前端测试 | 6 项通过 | 与其他目标前端测试合并运行后，5 个测试文件共 24 项通过；React act 警告仍存在于两项历史测试 |
+| 聊天历史分页/刷新竞态前端测试 | 6 项通过 | 与其他目标前端测试合并运行后，5 个测试文件共 24 项通过；两项历史测试仍有 React act 警告 |
 | TypeScript 构建检查 (`npx tsc -b`) | 通过 | 本次通过 |
 | P0 后端定向测试 | 29 项通过 | 2026-10-23 本地重跑通过，耗时约 63 秒；2 条第三方弃用警告 |
 | Ruff 变更文件检查 | 通过 | 本次通过 |
 | ESLint 变更前端文件 | 通过 | 本次通过 |
+| OCT-004 文件/语音/媒体/Cron 既有集成回归 | 65 项通过 | 文件、Cron、Voice、Media API 与文件单测；使用 mock，不替代真实 Provider |
+| 文件 revision 写保护、缓存完整性、STT 上传上限 | 15 项通过 | workspace PUT/DELETE/MOVE 拒绝、缓存重读 SHA-256、16 MiB 超限返回 413；2 条第三方弃用警告 |
+| Workspace API 回归 | 38 项通过 | 新保护规则合并后 workspace API 与文件 API 回归通过；2 条第三方弃用警告 |
+| Cron 一次性 date 触发停用 | 3 项通过 | 触发前持久化 `enabled=0`，避免重启后重新注册已触发任务 |
+| 图片视觉数量上限状态 | 1 项通过 | 最多 4 张显示为视觉输入；超额图片明确标为未发送，并展示中英文提示 |
+| Admission 会话过期清理 | 8 项通过 | 启动时执行一次、之后每小时执行；DB 删除会级联清理对话 turn 记录 |
+| Cron 持久运行历史/取消回归 | 105 项通过 | SQLite 迁移、运行记录、手动运行 ID、同进程取消、API 所有权、删除后历史保留及跨实例心跳判定；PostgreSQL 真实数据库尚未验证 |
+| Cron 详情抽屉运行历史交互 | 1 项通过 | 加载 running 状态并请求取消；jsdom/Ant Design 输出已知的 getComputedStyle(pseudoElt) 非实现提示 |
+| 本轮完整定向回归 | 107 项通过 | `tests/unit/files`、chat file binding、Cron manager、workspace、chat files、voice upload；141.67 秒，2 条第三方弃用警告 |
 | 后端全量非 live 测试 | 未完成 | 此前自动审核拦截了对 Microsoft 的遥测连接；没有绕过或再次尝试 |
 
-后端全量门禁仍应标记为“未完成”，不能据此宣称全量通过。历史竞态前端测试当前失败，不能将该功能标记为自动化通过。
+后端全量门禁仍应标记为“未完成”，不能据此宣称全量通过。当前改动没有运行全量前端套件，也没有真实 Provider 或浏览器端到端验收。
 
-## 7. 结果汇总与签字
+### 可复制的本轮定向命令
+
+在仓库根目录执行：
+
+```bash
+uv run --no-sync pytest \
+  tests/unit/files \
+  tests/integration/test_chat_files_api.py \
+  tests/integration/test_workspace_api.py \
+  tests/integration/test_voice_stt_upload.py \
+  tests/unit/api/test_chat_file_binding.py \
+  tests/unit/cron/test_cron_manager.py -q
+
+uv run --no-sync pytest \
+  tests/unit/db/test_admission_sessions_repo.py \
+  tests/unit/test_admission_session_cleanup.py \
+  tests/integration/test_server_lifecycle.py \
+  tests/integration/test_admission_registration_api.py -q
+
+uv run --no-sync pytest tests/unit/i18n -q
+```
+
+在 `dashboard/` 执行：
+
+```bash
+npm run test -- --run src/pages/Chat/components/MessageFileCard.test.tsx
+npx tsc -b
+npx eslint src/pages/Chat/hooks/sseHelpers.ts \
+  src/pages/Chat/components/MessageFileCard.tsx \
+  src/pages/Chat/components/MessageFileCard.test.tsx
+```
+
+本地使用 `--no-sync` 是因为当前运行环境的依赖同步会尝试编译 `evdev`，但容器没有 `clang`。在已有完整依赖的测试实例中可改用项目标准的 `uv run pytest`。
+
+## 8. 结果汇总与签字
 
 - A 聊天历史：☐通过 ☐失败 ☐未测
 - B 工作台代码权限：☐通过 ☐失败 ☐未测
 - C 附件草稿：☐通过 ☐失败 ☐未测
 - D 搜索来源：☐通过 ☐失败 ☐未测
+- E OCT-004 文件/语音/媒体/Cron：☐通过 ☐失败 ☐未测
 - 后端全量非 live 自动测试：☐通过 ☐失败 ☐未完成
 - 缺陷编号及复现步骤：________________________________________________
 - 截图 / 脱敏日志位置：________________________________________________

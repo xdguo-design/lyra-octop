@@ -1709,7 +1709,8 @@
       "unsupported": "Format not supported for reading",
       "failed": "Could not read",
       "too_large": "File is too large to read automatically",
-      "vision": "Image attached"
+      "vision": "Image attached",
+      "not_sent": "Image limit reached; not sent to the model"
     },
     "sharedExpert": {
       "banner": "Shared expert · provided by {{name}}",
@@ -2687,6 +2688,26 @@
     "operationFailed": "Operation failed",
     "triggeredSuccess": "Task triggered, result will appear shortly",
     "executeFailed": "Failed to trigger execution",
+    "runHistory": "Run history",
+    "runHistoryFailed": "Could not load run history. Try again later.",
+    "noRuns": "No runs yet",
+    "cancelRun": "Cancel run",
+    "runCancelled": "Run cancellation requested",
+    "runNoLongerActive": "This run has already finished",
+    "runCancelUnavailable": "This run is not active in this server process and cannot be cancelled here",
+    "runCancelFailed": "Failed to cancel run",
+    "runStatus": {
+      "running": "Running",
+      "ok": "Succeeded",
+      "error": "Failed",
+      "cancelled": "Cancelled",
+      "interrupted": "Interrupted"
+    },
+    "runTrigger": {
+      "manual": "Manual",
+      "scheduled": "Scheduled",
+      "mail": "Mail event"
+    },
     "totalItems": "Total {{count}} items",
     "loadingJobs": "Loading this expert's tasks…",
     "syncing": "Syncing…",
@@ -6033,6 +6054,7 @@
       "cron.delete": "Delete Cron Job",
       "cron.run_ok": "Cron Job Succeeded",
       "cron.run_failed": "Cron Job Failed",
+      "cron.run_cancelled": "Cron Job Cancelled",
       "security.policy.update": "Update Security Policy",
       "security.tool_guard_rules.update": "Update Tool Guard Rules",
       "security.tool_guard_rules.reset": "Reset Tool Guard Rules",
