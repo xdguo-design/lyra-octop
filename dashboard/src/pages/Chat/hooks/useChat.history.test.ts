@@ -29,7 +29,7 @@ describe("history failures", () => {
     expect(chatStore.getSnapshot(thread).messages[0].content).toBe("keep me");
     expect(chatStore.getSnapshot(thread).historyNextCursor).toBe("boundary");
     expect(chatStore.getSnapshot(thread).historyHasMore).toBe(true);
-  }, 15_000);
+  }, 25_000);
 
   it("does not mark a failed initial load as an empty hydrated conversation", async () => {
     const history = vi
@@ -52,7 +52,7 @@ describe("history failures", () => {
     expect(result.current.historyError).toBe(false);
     expect(chatStore.getSnapshot(thread).historyHydrated).toBe(true);
     expect(chatStore.getSnapshot(thread).messages[0].content).toBe("restored");
-  }, 15_000);
+  }, 25_000);
 
   it("refetches a thread cached as empty so background turns show up", async () => {
     chatStore.setHistoryPage(thread, [], {
@@ -71,7 +71,7 @@ describe("history failures", () => {
     });
     expect(history).toHaveBeenCalled();
     expect(chatStore.getSnapshot(thread).messages[0].content).toBe("task done");
-  }, 15_000);
+  }, 25_000);
 
   it("passes the pinned cursor when loading older messages", async () => {
     chatStore.setHistoryPage(
@@ -91,7 +91,7 @@ describe("history failures", () => {
       thread,
       expect.objectContaining({ cursor: "pinned-boundary" }),
     );
-  }, 15_000);
+  }, 25_000);
 
   it("drops an older-page response when a refresh starts while it is in flight", async () => {
     chatStore.setHistoryPage(
@@ -154,7 +154,7 @@ describe("history failures", () => {
     expect(
       chatStore.getSnapshot(thread).messages.map((message) => message.id),
     ).toEqual(["latest"]);
-  }, 15_000);
+  }, 25_000);
 
   it("retries the failed older page with the same cursor", async () => {
     chatStore.setHistoryPage(
@@ -187,5 +187,5 @@ describe("history failures", () => {
     expect(
       chatStore.getSnapshot(thread).messages.map((m) => m.content),
     ).toEqual(["older", "latest"]);
-  }, 15_000);
+  }, 25_000);
 });

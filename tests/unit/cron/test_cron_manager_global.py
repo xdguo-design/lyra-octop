@@ -42,7 +42,8 @@ async def test_boot_empty(tmp_path: Path) -> None:
     mgr._scheduler = MagicMock()
     mgr._scheduler.get_job = MagicMock(return_value=None)
     await mgr.boot()
-    mgr._scheduler.add_job.assert_not_called()
+    assert mgr._scheduler.add_job.call_count == 1
+    assert mgr._scheduler.add_job.call_args.kwargs["id"].startswith("sys-cron-heartbeat-")
     await mgr.shutdown()
 
 
@@ -81,7 +82,9 @@ async def test_add_and_remove(tmp_path: Path) -> None:
     mgr._scheduler = MagicMock()
     mgr._scheduler.get_job = MagicMock(return_value=None)
     await mgr.boot()
-    mgr._scheduler.add_job.assert_called_once()
+    assert mgr._scheduler.add_job.call_count == 2
+    scheduled_ids = {call.kwargs["id"] for call in mgr._scheduler.add_job.call_args_list}
+    assert "c1" in scheduled_ids
 
     await mgr.delete("c1")
     assert services.cron_repo.get("c1") is None
