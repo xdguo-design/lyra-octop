@@ -57,6 +57,7 @@ import { isFileToolName } from "./constants";
 import { browserApi } from "../../api/modules/browser";
 import { octopThreadsApi } from "../../api/modules/octopThreads";
 import type { TokenUsage } from "../../api/types";
+import type { TodoListItem } from "../../utils/parseWriteTodos";
 import type { ChatAttachment } from "./hooks/useChat";
 import MessageList from "./components/MessageList";
 import ChatInput, { type ChatInputHandle } from "./components/ChatInput";
@@ -791,6 +792,27 @@ function ChatPageInner() {
     ],
   );
 
+  const handleSyncTodos = useCallback(
+    (items: readonly TodoListItem[]) => {
+      const normalized = items
+        .filter((item) => item.content.trim())
+        .map((item) => ({
+          content: item.content.trim(),
+          status: item.status,
+        }));
+      if (normalized.length === 0) return;
+      const prompt = [
+        "请将下面这份 Todo 清单作为当前会话的权威任务清单。",
+        "先调用 write_todos 同步清单，保持条目顺序和状态；然后从第一项未完成任务继续执行。",
+        "每项任务完成并经过实际验证后再标记 completed；遇到阻塞请说明原因，不要虚报完成。",
+        "",
+        ...normalized.map((item, index) => (index + 1) + ". [" + item.status + "] " + item.content),
+      ].join("\n");
+      wrappedHandleSend(prompt, undefined, { conversationMode: "craft" });
+    },
+    [wrappedHandleSend],
+  );
+
   const flushQueuedItem = useCallback(
     (item: QueuedChatItem, ctx: ChatQueueFlushContext): boolean => {
       if (!ctx.threadId) {
@@ -1493,6 +1515,7 @@ function ChatPageInner() {
                     forkDisabledHint={forkDisabledHint}
                     onAcpPermissionSelect={handleAcpPermissionSelect}
                     onHitlDecision={handleHitlDecision}
+                    onSyncTodos={handleSyncTodos}
                     onTurnRailVisibilityChange={setTurnRailVisible}
                     onOpenBrowser={hasBrowserTool ? openBrowserTab : undefined}
                     onEditFile={
