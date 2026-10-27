@@ -208,6 +208,7 @@ lint:
 	@echo "[lint] Ruff check..."
 	$(RUN) ruff check src tests
 	@echo "[lint] Ruff format check..."
+	$(RUN) ruff format --diff src/octop/infra/agents/context/budget.py
 	$(RUN) ruff format --check src tests
 
 .PHONY: format
