@@ -2312,6 +2312,8 @@
     "todoContentPlaceholder": "Enter a task",
     "todoContentLabel": "Task {{number}}",
     "todoStatusLabel": "Status for task {{number}}",
+    "todoMoveUp": "Move task {{number}} up",
+    "todoMoveDown": "Move task {{number}} down",
     "todoStatus": {
       "pending": "Pending",
       "in_progress": "In progress",

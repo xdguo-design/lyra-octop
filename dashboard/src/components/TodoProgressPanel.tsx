@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import {
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Circle,
   CircleDot,
   Loader2,
@@ -137,6 +139,17 @@ export function TodoProgressPanel({
     setDraftItems((current) => current.filter((item) => item.id !== id));
   };
 
+  const handleMove = (index: number, offset: -1 | 1) => {
+    setDraftItems((current) => {
+      const nextIndex = index + offset;
+      if (nextIndex < 0 || nextIndex >= current.length) return current;
+      const next = [...current];
+      const [moved] = next.splice(index, 1);
+      next.splice(nextIndex, 0, moved);
+      return next;
+    });
+  };
+
   const handleCancel = () => {
     setDraftItems([...items]);
     setEditing(false);
@@ -215,6 +228,30 @@ export function TodoProgressPanel({
                   value={item.content}
                   onChange={(event) => updateItem(item.id, { content: event.currentTarget.value })}
                 />
+                <button
+                  type="button"
+                  className={styles.todoMoveButton}
+                  aria-label={t("chatUsage.todoMoveUp", {
+                    number: index + 1,
+                    defaultValue: "上移第{{number}}项",
+                  })}
+                  disabled={index === 0}
+                  onClick={() => handleMove(index, -1)}
+                >
+                  <ChevronUp size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className={styles.todoMoveButton}
+                  aria-label={t("chatUsage.todoMoveDown", {
+                    number: index + 1,
+                    defaultValue: "下移第{{number}}项",
+                  })}
+                  disabled={index === draftItems.length - 1}
+                  onClick={() => handleMove(index, 1)}
+                >
+                  <ChevronDown size={14} aria-hidden="true" />
+                </button>
                 <button
                   type="button"
                   className={styles.todoRemoveButton}

@@ -39,6 +39,19 @@ describe("TodoProgressPanel editing", () => {
     ]);
   });
 
+  it("keeps task order when a user moves a task", () => {
+    const onSyncTodos = vi.fn();
+    render(<TodoProgressPanel items={initialItems} onSyncTodos={onSyncTodos} />);
+    fireEvent.click(screen.getByRole("button", { name: "编辑任务" }));
+    fireEvent.click(screen.getByRole("button", { name: "下移第1项" }));
+    fireEvent.click(screen.getByRole("button", { name: "同步给 Agent" }));
+
+    expect(onSyncTodos).toHaveBeenCalledWith([
+      { id: "1", content: "补充回归测试", status: "pending" },
+      { id: "2", content: "检查现有 API", status: "completed" },
+    ]);
+  });
+
   it("prevents syncing while the Agent is still working", () => {
     render(<TodoProgressPanel items={initialItems} onSyncTodos={vi.fn()} isAgentBusy />);
     fireEvent.click(screen.getByRole("button", { name: "编辑任务" }));

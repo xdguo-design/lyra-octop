@@ -2312,6 +2312,8 @@
     "todoContentPlaceholder": "输入任务内容",
     "todoContentLabel": "第{{number}}项任务",
     "todoStatusLabel": "第{{number}}项状态",
+    "todoMoveUp": "上移第{{number}}项",
+    "todoMoveDown": "下移第{{number}}项",
     "todoStatus": {
       "pending": "待处理",
       "in_progress": "进行中",
