@@ -3614,6 +3614,9 @@ class AgentManager:
         from octop.infra.agents.middleware.connected_tools_hint import (
             ConnectedToolsHintMiddleware,
         )
+        from octop.infra.agents.middleware.context_observability import (
+            ContextObservabilityMiddleware,
+        )
         from octop.infra.agents.middleware.octop_ui_offload import OctopUiOffloadMiddleware
         from octop.infra.agents.middleware.reasoning import ReasoningRequestMiddleware
         from octop.infra.agents.middleware.thread_artifacts import ThreadArtifactsMiddleware
@@ -3637,6 +3640,7 @@ class AgentManager:
                 usage_repo=self._repos.usage_repo,
             ),
             ReasoningRequestMiddleware(),
+            ContextObservabilityMiddleware(agent_id=row.agent_id),
             ConnectedToolsHintMiddleware(),
             KnowledgeSearchHintMiddleware(),
             BrowserProfileMiddleware(),
