@@ -3,6 +3,7 @@ import { ChevronRight, FilePen, Globe } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { HitlDecisionHandler } from "../../../api/types/hitl";
 import type { ChatMessage } from "../hooks/useChat";
+import type { TodoListItem } from "../../../utils/parseWriteTodos";
 import {
   splitAssistantTurn,
   toAnswerOnlyMessage,
@@ -58,6 +59,8 @@ interface AssistantTurnViewProps {
   shellCommandDisabled?: boolean;
   shellCommandDisabledTitle?: string;
   compactProcess?: boolean;
+  isAgentBusy?: boolean;
+  onSyncTodos?: (items: readonly TodoListItem[]) => void;
 }
 
 function hasProcessContent(
@@ -98,6 +101,8 @@ export default function AssistantTurnView({
   shellCommandDisabled,
   shellCommandDisabledTitle,
   compactProcess = false,
+  isAgentBusy = false,
+  onSyncTodos,
 }: AssistantTurnViewProps) {
   const { t } = useTranslation();
   const { activeAgentId } = useAgent();
@@ -195,6 +200,8 @@ export default function AssistantTurnView({
         items={todoItems}
         isStreaming={todoStreaming}
         followingProcessSummary={anyProcessShown}
+        isAgentBusy={isAgentBusy || turnStreaming}
+        onSyncTodos={onSyncTodos}
       />
     ) : null;
   const todoAtTop = todoPanel && !anyProcessShown ? todoPanel : null;

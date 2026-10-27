@@ -38,5 +38,5 @@ jobs:
         run: npm run build
         working-directory: dashboard
       - name: Test workbench routing and security boundaries
-        run: npm run test -- src/pages/Home src/components/ThemeGallery.test.tsx src/components/AvatarDropdown.displayName.test.tsx src/styles/appearanceStorage.test.ts src/styles/bootTheme.test.ts src/styles/visualSkins.test.ts
+        run: npm run test -- src/pages/Home src/components/TodoProgressPanel.test.tsx src/components/ThemeGallery.test.tsx src/components/AvatarDropdown.displayName.test.tsx src/styles/appearanceStorage.test.ts src/styles/bootTheme.test.ts src/styles/visualSkins.test.ts
         working-directory: dashboard

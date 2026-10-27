@@ -14,6 +14,7 @@ import { Virtuoso, type Components, type VirtuosoHandle } from "react-virtuoso";
 import { useTranslation } from "react-i18next";
 import type { HitlDecisionHandler } from "../../../api/types/hitl";
 import type { ChatMessage } from "../hooks/useChat";
+import type { TodoListItem } from "../../../utils/parseWriteTodos";
 import type { ComposerTagLookups } from "./UserMessageComposerTags";
 import MessageBubble from "./MessageBubble";
 import AssistantTurnView from "./AssistantTurnView";
@@ -109,6 +110,7 @@ interface MessageListProps {
   onHitlDecision?: HitlDecisionHandler;
   onOpenBrowser?: () => void;
   onEditFile?: () => void;
+  onSyncTodos?: (items: readonly TodoListItem[]) => void;
   onRunShellCommand?: (code: string) => void;
   shellCommandDisabled?: boolean;
   shellCommandDisabledTitle?: string;
@@ -135,6 +137,7 @@ interface GroupRenderContext {
   onHitlDecision?: HitlDecisionHandler;
   onOpenBrowser?: () => void;
   onEditFile?: () => void;
+  onSyncTodos?: (items: readonly TodoListItem[]) => void;
   onRunShellCommand?: (code: string) => void;
   shellCommandDisabled?: boolean;
   shellCommandDisabledTitle?: string;
@@ -184,6 +187,8 @@ function renderMessageGroup(
             onHitlDecision={ctx.onHitlDecision}
             onOpenBrowser={openBrowserHandler}
             onEditFile={ctx.onEditFile}
+            isAgentBusy={Boolean(ctx.isStreaming)}
+            onSyncTodos={ctx.onSyncTodos}
             onRunShellCommand={ctx.onRunShellCommand}
             shellCommandDisabled={ctx.shellCommandDisabled}
             shellCommandDisabledTitle={ctx.shellCommandDisabledTitle}
@@ -239,6 +244,8 @@ function renderMessageGroup(
         onHitlDecision={ctx.onHitlDecision}
         onOpenBrowser={openBrowserHandler}
         onEditFile={ctx.onEditFile}
+        isAgentBusy={Boolean(ctx.isStreaming)}
+        onSyncTodos={ctx.onSyncTodos}
         onRunShellCommand={ctx.onRunShellCommand}
         shellCommandDisabled={ctx.shellCommandDisabled}
         shellCommandDisabledTitle={ctx.shellCommandDisabledTitle}
@@ -273,6 +280,7 @@ export default function MessageList(props: MessageListProps) {
     onHitlDecision,
     onOpenBrowser,
     onEditFile,
+    onSyncTodos,
     onRunShellCommand,
     shellCommandDisabled,
     shellCommandDisabledTitle,
@@ -724,6 +732,7 @@ export default function MessageList(props: MessageListProps) {
       onHitlDecision,
       onOpenBrowser,
       onEditFile,
+      onSyncTodos,
       onRunShellCommand,
       shellCommandDisabled,
       shellCommandDisabledTitle,
@@ -748,6 +757,7 @@ export default function MessageList(props: MessageListProps) {
       onHitlDecision,
       onOpenBrowser,
       onEditFile,
+      onSyncTodos,
       onRunShellCommand,
       shellCommandDisabled,
       shellCommandDisabledTitle,

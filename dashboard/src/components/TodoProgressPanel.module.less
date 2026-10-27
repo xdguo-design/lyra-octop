@@ -107,3 +107,36 @@
 .todoStatusCancelled {
   color: #ff4d4f;
 }
+
+
+.todoHeaderActions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+.todoActionButton, .todoSyncButton, .todoRemoveButton {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  min-height: 30px; padding: 4px 8px; border: 1px solid var(--fn-border-primary);
+  border-radius: 7px; background: var(--fn-bg-elevated, #fff); color: var(--fn-text-secondary);
+  font-size: 12px; line-height: 1.2; white-space: nowrap; cursor: pointer;
+  transition: color var(--fn-transition-fast, 0.15s ease), border-color var(--fn-transition-fast, 0.15s ease), background var(--fn-transition-fast, 0.15s ease);
+}
+.todoActionButton:hover, .todoRemoveButton:hover { color: var(--fn-text-primary); border-color: var(--fn-color-brand); }
+.todoSyncButton { border-color: var(--fn-color-brand); background: var(--fn-color-brand); color: #fff; }
+.todoSyncButton:hover:not(:disabled) { filter: brightness(0.96); }
+.todoActionButton:focus-visible, .todoSyncButton:focus-visible, .todoRemoveButton:focus-visible, .todoContentInput:focus-visible, .todoStatusSelect:focus-visible {
+  outline: 2px solid var(--fn-color-brand); outline-offset: 2px;
+}
+.todoSyncButton:disabled { opacity: 0.55; cursor: not-allowed; }
+.todoEditorItems { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.todoEditorItem { display: grid; grid-template-columns: 112px minmax(0, 1fr) 30px; align-items: center; gap: 6px; }
+.todoStatusSelect, .todoContentInput {
+  box-sizing: border-box; width: 100%; min-width: 0; height: 32px; padding: 0 8px;
+  border: 1px solid var(--fn-border-primary); border-radius: 7px;
+  background: var(--fn-bg-elevated, #fff); color: var(--fn-text-primary); font: inherit; font-size: 12px;
+}
+.todoRemoveButton { width: 30px; min-width: 30px; padding: 0; color: var(--fn-text-tertiary); }
+.todoEditorFooter { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.todoEditorActions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.todoSyncHint { margin-top: 8px; color: var(--fn-text-tertiary); font-size: 11px; line-height: 1.45; }
+@media (max-width: 520px) {
+  .todoHeaderActions { gap: 5px; }
+  .todoEditorItem { grid-template-columns: minmax(0, 1fr) 30px; }
+  .todoStatusSelect { grid-column: 1 / -1; }
+}
