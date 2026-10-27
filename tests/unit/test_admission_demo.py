@@ -151,6 +151,141 @@ async def test_active_intent_calls_only_router_skill(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_active_intent_prefers_exact_route_without_calling_models(monkeypatch) -> None:
+    call = AsyncMock()
+    vector = AsyncMock()
+    decider = AsyncMock()
+    monkeypatch.setattr("octop.infra.admission_demo._call_admission_skill", call)
+    monkeypatch.setattr("octop.infra.admission_demo._admission_intent_vector_candidates", vector)
+    monkeypatch.setattr("octop.infra.admission_demo._classify_with_groq_decider", decider)
+
+    result = await classify_active_admission_intent(SimpleNamespace(), "住院登记！")
+
+    assert result[0] == "begin_admission"
+    call.assert_not_awaited()
+    vector.assert_not_awaited()
+    decider.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_active_intent_uses_vectors_and_groq_then_bound_model_for_answers(
+    monkeypatch,
+) -> None:
+    candidates = [{"intent": "answer_question", "similarity": 0.81}]
+    vector = AsyncMock(return_value=candidates)
+    decider = AsyncMock(return_value="answer_question")
+    primary = AsyncMock(return_value='{"intent":"answer_question","reply":"先确认身份。"}')
+    monkeypatch.setattr("octop.infra.admission_demo._admission_intent_vector_candidates", vector)
+    monkeypatch.setattr("octop.infra.admission_demo._classify_with_groq_decider", decider)
+    monkeypatch.setattr("octop.infra.admission_demo._call_admission_skill", primary)
+
+    result = await classify_active_admission_intent(SimpleNamespace(), "入院流程是什么")
+
+    assert result == ("answer_question", "先确认身份。")
+    primary.assert_awaited_once()
+    assert primary.await_args.kwargs["payload"]["intent_hint"] == "answer_question"
+    assert primary.await_args.kwargs["payload"]["vector_candidates"] == candidates
+
+
+@pytest.mark.asyncio
+async def test_active_intent_falls_back_to_bound_model_when_groq_is_unavailable(
+    monkeypatch,
+) -> None:
+    vector = AsyncMock(return_value=[])
+    decider = AsyncMock(return_value=None)
+    primary = AsyncMock(return_value='{"intent":"unsupported","reply":""}')
+    monkeypatch.setattr("octop.infra.admission_demo._admission_intent_vector_candidates", vector)
+    monkeypatch.setattr("octop.infra.admission_demo._classify_with_groq_decider", decider)
+    monkeypatch.setattr("octop.infra.admission_demo._call_admission_skill", primary)
+
+    result = await classify_active_admission_intent(SimpleNamespace(), "查检查报告")
+
+    assert result[0] == "unsupported"
+    assert primary.await_args.kwargs["payload"] == {"text": "查检查报告"}
+
+
+@pytest.mark.asyncio
+async def test_local_intent_vectors_rank_the_closest_example(monkeypatch) -> None:
+    from octop.infra.admission_demo import _admission_intent_vector_candidates
+    from octop.infra.agents.providers import onnx_service
+
+    settings_repo = SimpleNamespace(get=Mock(return_value=None))
+    server = SimpleNamespace(services=SimpleNamespace(settings_repo=settings_repo))
+    vectors = [[1.0, 0.0]] + [[0.0, 1.0]] * 9 + [[1.0, 0.0]] * 3 + [[0.0, 1.0]] * 3
+    monkeypatch.setattr(onnx_service, "embedding_prerequisites_ok", lambda _get: True)
+    monkeypatch.setattr(onnx_service, "load_config", lambda _get: SimpleNamespace(model="local"))
+    embed = Mock(return_value=vectors)
+    monkeypatch.setattr(onnx_service, "embed_texts", embed)
+
+    candidates = await _admission_intent_vector_candidates(server, "我要查报告")
+
+    assert candidates[0] == {"intent": "unsupported", "similarity": 1.0}
+    assert len(candidates) == 2
+    embed.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_groq_decider_masks_pii_and_rejects_low_confidence(monkeypatch) -> None:
+    from octop.infra.admission_demo import _classify_with_groq_decider
+
+    provider = SimpleNamespace(
+        enabled=True,
+        base_url="https://api.groq.com/openai/v1",
+        api_key="test-key",
+        get_models=lambda: [{"id": "qwen/qwen3.8-27b", "enabled": True}],
+    )
+    server = SimpleNamespace(
+        services=SimpleNamespace(provider_repo=SimpleNamespace(get_by_name=lambda _name: provider))
+    )
+    monkeypatch.setattr("octop.infra.admission_demo._mask_admission_pii", lambda _text: "已脱敏")
+    request = AsyncMock(return_value={"intent": "begin_admission", "confidence": 0.89})
+    monkeypatch.setattr("octop.infra.admission_demo._post_groq_decision", request)
+
+    result = await _classify_with_groq_decider(server, "我是张三，要入院", [])
+
+    assert result is None
+    assert request.await_args.args[2]["utterance"] == "已脱敏"
+
+
+@pytest.mark.asyncio
+async def test_groq_request_uses_structured_decision_schema(monkeypatch) -> None:
+    from octop.infra import admission_demo
+
+    call: dict[str, object] = {}
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {"choices": [{"message": {"content": '{"intent":"greeting","confidence":0.9}'}}]}
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def post(self, url, *, headers, json):
+            call.update(url=url, headers=headers, body=json)
+            return FakeResponse()
+
+    monkeypatch.setattr(admission_demo.httpx, "AsyncClient", lambda **_kwargs: FakeClient())
+
+    result = await admission_demo._post_groq_decision(
+        "https://api.groq.com/openai/v1",
+        "test-key",
+        {"utterance": "你好", "vector_candidates": []},
+    )
+
+    assert result == {"intent": "greeting", "confidence": 0.9}
+    assert call["url"] == "https://api.groq.com/openai/v1/chat/completions"
+    assert call["body"]["model"] == "qwen/qwen3.8-27b"
+    assert call["body"]["response_format"]["json_schema"]["strict"] is True
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("text", ["住院登记", "入院登记。", " 住院登记！ "])
 async def test_bare_admission_name_starts_the_demo_without_model(text: str, monkeypatch) -> None:
     call = AsyncMock()
