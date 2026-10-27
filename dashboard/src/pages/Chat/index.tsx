@@ -796,7 +796,7 @@ function ChatPageInner() {
     (items: readonly TodoListItem[]) => {
       const normalized = items
         .filter((item) => item.content.trim())
-        .map((item, index) => ({
+        .map((item) => ({
           content: item.content.trim(),
           status: item.status,
         }));
