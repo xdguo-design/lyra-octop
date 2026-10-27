@@ -2311,6 +2311,7 @@
     "todoSync": "Send to Agent",
     "todoSyncBusy": "Agent is working",
     "todoSyncHint": "You can edit now and send the changes after the Agent finishes.",
+    "todoStaleHint": "The task list changed while you were editing. Cancel and reopen it to avoid overwriting newer Agent progress.",
     "todoContentPlaceholder": "Enter a task",
     "todoContentLabel": "Task {{number}}",
     "todoStatusLabel": "Status for task {{number}}",

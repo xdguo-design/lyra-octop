@@ -119,12 +119,28 @@ export function TodoProgressPanel({
   ownerLabel?: string;
 }) {
   const { t } = useTranslation();
+  const itemsSignature = JSON.stringify(items);
   const [editing, setEditing] = useState(false);
   const [draftItems, setDraftItems] = useState<TodoListItem[]>(() => [...items]);
+  const [baseSignature, setBaseSignature] = useState(itemsSignature);
+  const [hasExternalChanges, setHasExternalChanges] = useState(false);
 
   useEffect(() => {
-    if (!editing) setDraftItems([...items]);
-  }, [items, editing]);
+    if (!editing) {
+      setDraftItems([...items]);
+      setBaseSignature(itemsSignature);
+      setHasExternalChanges(false);
+      return;
+    }
+    if (itemsSignature !== baseSignature) setHasExternalChanges(true);
+  }, [items, itemsSignature, editing, baseSignature]);
+
+  const handleStartEditing = () => {
+    setDraftItems([...items]);
+    setBaseSignature(itemsSignature);
+    setHasExternalChanges(false);
+    setEditing(true);
+  };
 
   const updateItem = (id: string, patch: Partial<TodoListItem>) => {
     setDraftItems((current) =>
@@ -156,11 +172,13 @@ export function TodoProgressPanel({
 
   const handleCancel = () => {
     setDraftItems([...items]);
+    setBaseSignature(itemsSignature);
+    setHasExternalChanges(false);
     setEditing(false);
   };
 
   const handleSync = () => {
-    if (!onSyncTodos || isAgentBusy) return;
+    if (!onSyncTodos || isAgentBusy || hasExternalChanges) return;
     const cleaned = draftItems
       .filter((item) => item.content.trim())
       .map((item, index) => ({
@@ -202,7 +220,7 @@ export function TodoProgressPanel({
             })}
           </div>
           {!editing && onSyncTodos ? (
-            <button type="button" className={styles.todoActionButton} onClick={() => setEditing(true)}>
+            <button type="button" className={styles.todoActionButton} onClick={handleStartEditing}>
               <Pencil size={14} aria-hidden="true" />
               {t("chatUsage.todoEdit", "编辑任务")}
             </button>
@@ -286,7 +304,7 @@ export function TodoProgressPanel({
               <button
                 type="button"
                 className={styles.todoSyncButton}
-                disabled={isAgentBusy || !draftItems.some((item) => item.content.trim().length > 0)}
+                disabled={isAgentBusy || hasExternalChanges || !draftItems.some((item) => item.content.trim().length > 0)}
                 onClick={handleSync}
               >
                 <Send size={14} aria-hidden="true" />
@@ -301,7 +319,14 @@ export function TodoProgressPanel({
               </button>
             </div>
           </div>
-          {isAgentBusy ? (
+          {hasExternalChanges ? (
+            <div className={styles.todoSyncHint}>
+              {t(
+                "chatUsage.todoStaleHint",
+                "任务清单在编辑期间已更新。请取消编辑并重新打开，避免覆盖 Agent 的新进度。",
+              )}
+            </div>
+          ) : isAgentBusy ? (
             <div className={styles.todoSyncHint}>
               {t("chatUsage.todoSyncHint", "Agent 执行中仍可编辑；完成后再同步。")}
             </div>

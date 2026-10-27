@@ -75,4 +75,24 @@ describe("TodoProgressPanel editing", () => {
     fireEvent.click(screen.getByRole("button", { name: /Sync to|同步给/ }));
     expect(onSyncTodos).toHaveBeenCalledWith(initialItems, "frontend-agent");
   });
+
+  it("blocks syncing a draft after the Agent updates the task list", () => {
+    const onSyncTodos = vi.fn();
+    const { rerender } = render(
+      <TodoProgressPanel items={initialItems} onSyncTodos={onSyncTodos} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "编辑任务" }));
+    const updatedItems: TodoListItem[] = [
+      { id: "1", content: "检查现有 API 和权限", status: "completed" },
+      { id: "2", content: "补充回归测试", status: "in_progress" },
+    ];
+    rerender(
+      <TodoProgressPanel items={updatedItems} onSyncTodos={onSyncTodos} />,
+    );
+
+    expect(screen.getByText(/任务清单在编辑期间已更新|task list changed while you were editing/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Send to Agent|同步给 Agent/ })).toBeDisabled();
+    expect(onSyncTodos).not.toHaveBeenCalled();
+  });
 });
