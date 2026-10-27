@@ -121,9 +121,7 @@ def resolve_context_budget(
     available_input = max(1, model_window - output_reserve - safety_margin)
     configured_cap = positive_int(configured_input_cap_tokens)
     effective_cap = (
-        min(available_input, configured_cap)
-        if configured_cap is not None
-        else available_input
+        min(available_input, configured_cap) if configured_cap is not None else available_input
     )
 
     return ContextBudget(
