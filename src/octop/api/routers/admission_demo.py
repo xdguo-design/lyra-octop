@@ -141,10 +141,9 @@ async def extract_admission_fields(
     response_model=AdmissionIntentResponse,
     summary="Answer a home-page question within admission demo capabilities",
     description=(
-        "Requires an authenticated Octop user. Uses the admission expert's bound model to judge one fixed "
-        "UI intent for the utterance; the reply is demo-scripted wording except for "
-        "page-capability answers. Only an explicit begin intent can start identity "
-        "verification."
+        "Requires an authenticated Octop user. Routes exact phrases first, then local embedding hints and "
+        "the configured Groq intent model; low-confidence decisions fall back to the admission expert's "
+        "bound model. Only an explicit begin intent can start identity verification."
     ),
     responses={
         429: {"description": "The active AI model provider rate limited the request."},
