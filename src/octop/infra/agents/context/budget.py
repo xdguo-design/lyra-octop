@@ -103,7 +103,11 @@ def resolve_context_budget(
 
     available_input = max(1, model_window - output_reserve - safety_margin)
     configured_cap = positive_int(configured_input_cap_tokens)
-    effective_cap = min(available_input, configured_cap) if configured_cap is not None else available_input
+    effective_cap = (
+        min(available_input, configured_cap)
+        if configured_cap is not None
+        else available_input
+    )
 
     return ContextBudget(
         model_context_window_tokens=model_window,
@@ -158,7 +162,15 @@ def estimate_payload_tokens(value: Any) -> tuple[int, int]:
             return
         if isinstance(item, Mapping):
             item_type = str(item.get("type") or "").lower()
-            if item_type in {"image", "image_url", "input_image", "audio", "input_audio", "video", "file"}:
+            if item_type in {
+                "image",
+                "image_url",
+                "input_image",
+                "audio",
+                "input_audio",
+                "video",
+                "file",
+            }:
                 media_blocks += 1
                 return
             for key, child in item.items():
