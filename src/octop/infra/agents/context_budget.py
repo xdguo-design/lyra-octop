@@ -132,9 +132,11 @@ def validate_context_items(items: Any, *, max_items: int = MAX_CONTEXT_ITEMS) ->
             errors.append(f"{prefix}.trust_level is invalid")
         if item.sensitivity not in allowed_sensitivity:
             errors.append(f"{prefix}.sensitivity is invalid")
-        if isinstance(item.estimated_tokens, bool) or item.estimated_tokens < 0:
-            errors.append(f"{prefix}.estimated_tokens must be a non-negative integer")
-        elif not isinstance(item.estimated_tokens, int):
+        if (
+            isinstance(item.estimated_tokens, bool)
+            or not isinstance(item.estimated_tokens, int)
+            or item.estimated_tokens < 0
+        ):
             errors.append(f"{prefix}.estimated_tokens must be a non-negative integer")
         else:
             estimated_tokens += item.estimated_tokens
