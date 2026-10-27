@@ -185,9 +185,11 @@ The inspector must not expose another Agent's private context or raw secret-bear
 - No runtime behavior change.
 
 ### P1 — Context telemetry and assembler in shadow mode
-- Build a pure, testable context-budget calculator and packet validator.
-- Log source IDs, token estimates, selected/omitted reasons and compaction events without changing model inputs.
-- Compare estimated input usage with provider-reported usage.
+- [x] Add a pure, testable budget calculator that clamps the Agent input cap to the model window after output reserve and safety margin; unknown model windows are explicitly marked as fallback estimates.
+- [x] Add a delegation context-packet validator for scope, trust, sensitivity, bounded excerpts, raw-secret/transcript fields, and aggregate token budget.
+- [x] Add metadata-only model-call middleware. It records estimated text-token usage, bounded source IDs, source roles, model/window metadata and pressure level without changing messages or logging prompt content.
+- [ ] Compare estimates with provider-reported usage on representative models; the current estimate is intentionally heuristic and multimodal payloads are counted separately.
+- [ ] Integrate supported harness lifecycle hooks for actual omission reasons and compaction events. The model-call middleware cannot see content discarded before it receives the request, so it explicitly reports this observability boundary rather than inventing data.
 - Gate: model-specific budget tests and no cross-scope retrieval tests pass.
 
 ### P2 — Structured task context for team Agents

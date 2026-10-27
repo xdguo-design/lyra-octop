@@ -3611,6 +3611,7 @@ class AgentManager:
 
         from octop.infra.agents.middleware.binary_read_guard import BinaryReadGuardMiddleware
         from octop.infra.agents.middleware.browser_profile import BrowserProfileMiddleware
+        from octop.infra.agents.middleware.context_observability import ContextObservabilityMiddleware
         from octop.infra.agents.middleware.connected_tools_hint import (
             ConnectedToolsHintMiddleware,
         )
@@ -3637,6 +3638,7 @@ class AgentManager:
                 usage_repo=self._repos.usage_repo,
             ),
             ReasoningRequestMiddleware(),
+            ContextObservabilityMiddleware(agent_id=row.agent_id),
             ConnectedToolsHintMiddleware(),
             KnowledgeSearchHintMiddleware(),
             BrowserProfileMiddleware(),
