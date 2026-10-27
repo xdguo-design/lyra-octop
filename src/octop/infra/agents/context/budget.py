@@ -16,10 +16,27 @@ DEFAULT_OUTPUT_RESERVE_TOKENS = 8_192
 DEFAULT_SAFETY_MARGIN_TOKENS = 1_024
 
 _CONTEXT_SCOPES = frozenset(
-    {"platform", "user", "project", "conversation", "team", "agent_private", "task", "artifact"}
+    {
+        "platform",
+        "user",
+        "project",
+        "conversation",
+        "team",
+        "agent_private",
+        "task",
+        "artifact",
+    }
 )
 _TRUST_LEVELS = frozenset(
-    {"trusted", "verified", "unverified", "untrusted", "user_provided", "external", "tool_output"}
+    {
+        "trusted",
+        "verified",
+        "unverified",
+        "untrusted",
+        "user_provided",
+        "external",
+        "tool_output",
+    }
 )
 _SENSITIVITY_LEVELS = frozenset({"public", "internal", "confidential", "restricted"})
 _FORBIDDEN_FIELDS = frozenset(
