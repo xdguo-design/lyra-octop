@@ -2302,6 +2302,8 @@
     "mediaOutput": "媒体输出",
     "todoListTitle": "任务进度",
     "todoListSummary": "已完成 {{completed}}/{{total}}",
+    "todoAgentPlanTitle": "{{agent}} · 任务清单",
+    "todoSyncToAgent": "同步给 {{agent}}",
     "todoEdit": "编辑任务",
     "todoAdd": "添加任务",
     "todoRemove": "删除任务",

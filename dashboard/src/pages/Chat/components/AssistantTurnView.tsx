@@ -14,6 +14,7 @@ import { isWriteToolName } from "../constants";
 import { collectChatFilePaths } from "../hooks/useChatFileDetection";
 import { layoutAssistantTurnHitl } from "../utils/layoutAssistantTurnHitl";
 import { useAgent } from "../../../context/AgentContext";
+import { isTeamAgent, isTeamHostSpeaker } from "../../../utils/teamAgent";
 import { TodoProgressPanel } from "../../../components/TodoProgressPanel";
 import {
   collectWriteTodosFromMessages,
@@ -60,7 +61,7 @@ interface AssistantTurnViewProps {
   shellCommandDisabledTitle?: string;
   compactProcess?: boolean;
   isAgentBusy?: boolean;
-  onSyncTodos?: (items: readonly TodoListItem[]) => void;
+  onSyncTodos?: (items: readonly TodoListItem[], ownerAgentId?: string) => void;
 }
 
 function hasProcessContent(
@@ -105,10 +106,33 @@ export default function AssistantTurnView({
   onSyncTodos,
 }: AssistantTurnViewProps) {
   const { t } = useTranslation();
-  const { activeAgentId } = useAgent();
+  const {
+    activeAgentId,
+    activeAgent: currentActiveAgent,
+    agents,
+  } = useAgent();
   const agentId = agentIdProp ?? activeAgentId;
   const speakerAgentId =
     messages.map((item) => messageSpeakerId(item)).find(Boolean) || agentId;
+  const roomAgent =
+    agents.find((item) => item.agent_id === agentId) ?? currentActiveAgent;
+  const isTeamRoom = isTeamAgent(roomAgent);
+  const isHostSpeaker = isTeamHostSpeaker(
+    isTeamRoom,
+    speakerAgentId,
+    agentId,
+  );
+  const todoOwnerAgentId =
+    isTeamRoom &&
+    !isHostSpeaker &&
+    (roomAgent?.member_ids ?? []).includes(speakerAgentId ?? "")
+      ? speakerAgentId ?? undefined
+      : undefined;
+  const todoOwnerLabel = todoOwnerAgentId
+    ? agents.find((item) => item.agent_id === todoOwnerAgentId)?.name ??
+      todoOwnerAgentId
+    : undefined;
+  const canEditTodo = !isTeamRoom || Boolean(todoOwnerAgentId);
 
   const speakerLive = turnHasLiveSpeaker(messages, liveSpeakers);
   const hasStreamingMsg = messages.some((m) => m.status === "streaming");
@@ -201,7 +225,9 @@ export default function AssistantTurnView({
         isStreaming={todoStreaming}
         followingProcessSummary={anyProcessShown}
         isAgentBusy={isAgentBusy || turnStreaming}
-        onSyncTodos={onSyncTodos}
+        onSyncTodos={canEditTodo ? onSyncTodos : undefined}
+        ownerAgentId={todoOwnerAgentId}
+        ownerLabel={todoOwnerLabel}
       />
     ) : null;
   const todoAtTop = todoPanel && !anyProcessShown ? todoPanel : null;

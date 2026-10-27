@@ -2302,6 +2302,8 @@
     "mediaOutput": "Media output",
     "todoListTitle": "Task progress",
     "todoListSummary": "{{completed}}/{{total}} done",
+    "todoAgentPlanTitle": "{{agent}} · task list",
+    "todoSyncToAgent": "Sync to {{agent}}",
     "todoEdit": "Edit tasks",
     "todoAdd": "Add task",
     "todoRemove": "Remove task",

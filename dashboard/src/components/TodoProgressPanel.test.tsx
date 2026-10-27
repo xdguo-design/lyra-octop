@@ -58,4 +58,21 @@ describe("TodoProgressPanel editing", () => {
     expect(screen.getByRole("button", { name: "Agent 执行中" })).toBeDisabled();
     expect(screen.getByText("Agent 执行中仍可编辑；完成后再同步。")).toBeInTheDocument();
   });
+
+  it("keeps the owning Agent when syncing a member task list", () => {
+    const onSyncTodos = vi.fn();
+    render(
+      <TodoProgressPanel
+        items={initialItems}
+        ownerAgentId="frontend-agent"
+        ownerLabel="前端 Agent"
+        onSyncTodos={onSyncTodos}
+      />,
+    );
+
+    expect(screen.getByText(/前端 Agent/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "编辑任务" }));
+    fireEvent.click(screen.getByRole("button", { name: /Sync to|同步给/ }));
+    expect(onSyncTodos).toHaveBeenCalledWith(initialItems, "frontend-agent");
+  });
 });

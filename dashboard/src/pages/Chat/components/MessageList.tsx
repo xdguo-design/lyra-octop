@@ -110,7 +110,7 @@ interface MessageListProps {
   onHitlDecision?: HitlDecisionHandler;
   onOpenBrowser?: () => void;
   onEditFile?: () => void;
-  onSyncTodos?: (items: readonly TodoListItem[]) => void;
+  onSyncTodos?: (items: readonly TodoListItem[], ownerAgentId?: string) => void;
   onRunShellCommand?: (code: string) => void;
   shellCommandDisabled?: boolean;
   shellCommandDisabledTitle?: string;
@@ -137,7 +137,7 @@ interface GroupRenderContext {
   onHitlDecision?: HitlDecisionHandler;
   onOpenBrowser?: () => void;
   onEditFile?: () => void;
-  onSyncTodos?: (items: readonly TodoListItem[]) => void;
+  onSyncTodos?: (items: readonly TodoListItem[], ownerAgentId?: string) => void;
   onRunShellCommand?: (code: string) => void;
   shellCommandDisabled?: boolean;
   shellCommandDisabledTitle?: string;

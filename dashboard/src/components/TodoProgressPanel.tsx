@@ -107,12 +107,16 @@ export function TodoProgressPanel({
   followingProcessSummary = false,
   onSyncTodos,
   isAgentBusy = false,
+  ownerAgentId,
+  ownerLabel,
 }: {
   items: readonly TodoListItem[];
   isStreaming?: boolean;
   followingProcessSummary?: boolean;
-  onSyncTodos?: (items: readonly TodoListItem[]) => void;
+  onSyncTodos?: (items: readonly TodoListItem[], ownerAgentId?: string) => void;
   isAgentBusy?: boolean;
+  ownerAgentId?: string;
+  ownerLabel?: string;
 }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
@@ -165,7 +169,8 @@ export function TodoProgressPanel({
         content: item.content.trim(),
       }));
     if (cleaned.length === 0) return;
-    onSyncTodos(cleaned);
+    if (ownerAgentId) onSyncTodos(cleaned, ownerAgentId);
+    else onSyncTodos(cleaned);
     setEditing(false);
   };
 
@@ -181,7 +186,12 @@ export function TodoProgressPanel({
     <div className={containerClassName}>
       <div className={styles.todoListHeader}>
         <div className={styles.todoListTitle}>
-          {t("chatUsage.todoListTitle", "任务进度")}
+          {ownerLabel
+            ? t("chatUsage.todoAgentPlanTitle", {
+                agent: ownerLabel,
+                defaultValue: "{{agent}} · 任务清单",
+              })
+            : t("chatUsage.todoListTitle", "任务进度")}
         </div>
         <div className={styles.todoHeaderActions}>
           <div className={styles.todoListSummary}>
@@ -282,6 +292,11 @@ export function TodoProgressPanel({
                 <Send size={14} aria-hidden="true" />
                 {isAgentBusy
                   ? t("chatUsage.todoSyncBusy", "Agent 执行中")
+                  : ownerLabel
+                  ? t("chatUsage.todoSyncToAgent", {
+                      agent: ownerLabel,
+                      defaultValue: "同步给 {{agent}}",
+                    })
                   : t("chatUsage.todoSync", "同步给 Agent")}
               </button>
             </div>
