@@ -1,5 +1,7 @@
 # Conversation Todo and Multi-Agent Collaboration
 
+**Context strategy:** see [Octop Context Strategy for Multi-Agent Work](2026-10-27-octop-context-strategy.md). Task packets, context scopes, compaction, memory governance and plugin lifecycle must follow that contract.
+
 ## Goal
 
 Treat the Todo panel as an interaction surface between the user, the current Agent, and (in team rooms) the owning team member. It must not imply that separate Agent-local plans are already one globally shared plan.
