@@ -54,6 +54,8 @@ export interface ChatAttachment {
   fileId?: string;
   revisionId?: string;
   readStatus?:
+    | "stored"
+    | "processing"
     | "ready"
     | "partial"
     | "needs_ocr"

@@ -117,6 +117,7 @@ async def iter_dashboard_hitl_resume_sse(
     channel_type: str,
     locale: str,
     is_disconnected: Callable[[], Awaitable[bool]],
+    run_outcome: dict[str, str] | None = None,
 ) -> AsyncIterator[str]:
     """Stream dashboard HITL resume chunks and persist any nested ``hitl_required``.
 
@@ -156,15 +157,26 @@ async def iter_dashboard_hitl_resume_sse(
         user_id=user_id,
         session_key=session_key,
         channel_type=channel_type,
+        run_id=pending.run_id if pending is not None else None,
+        step_id=pending.step_id if pending is not None else None,
     )
     disconnected = False
     # Clear the in-memory pause before the (possibly long) resume stream so
     # history reload cannot reinject the same card while the turn continues.
     if pending is not None:
-        hitl_coordinator.store.mark_resolved(
+        resolved = hitl_coordinator.mark_resolved(
             pending.pending_id,
             "rejected" if rejected else "approved",
         )
+        if not resolved:
+            from octop.i18n.domains.slash import tr as slash_tr  # noqa: PLC0415
+            from octop.infra.utils.locale import normalize_locale  # noqa: PLC0415
+
+            yield format_sse(
+                "chunk",
+                {"type": "error", "message": slash_tr("hitl.expired", normalize_locale(locale))},
+            )
+            return
     try:
         async for chunk in processor.iter_hitl_resume_chunks(
             agent_id=agent_id,
@@ -175,21 +187,29 @@ async def iter_dashboard_hitl_resume_sse(
             if not disconnected:
                 disconnected = await is_disconnected()
             if isinstance(chunk, dict) and chunk.get("type") == "hitl_required":
+                if run_outcome is not None:
+                    run_outcome["status"] = "waiting_approval"
                 request_payload = chunk.get("request")
                 if isinstance(request_payload, dict):
                     request_payload = normalize_hitl_request(request_payload)
                     record = hitl_coordinator.register_from_request(request_payload, ctx=hitl_ctx)
                     request_payload["pending_id"] = record.pending_id
                     chunk["request"] = request_payload
+            elif isinstance(chunk, dict) and chunk.get("type") == "error":
+                if run_outcome is not None:
+                    run_outcome["status"] = "failed"
             if not disconnected:
                 yield format_sse("chunk", chunk)
         if not disconnected:
+            if run_outcome is not None and "status" not in run_outcome:
+                run_outcome["status"] = "failed" if rejected else "succeeded"
             yield format_sse("chunk", {"type": "done"})
     except Exception as exc:
-        # Resume failed after we cleared the pause for reinject safety — do not
-        # leave the record looking like a successful approve/reject.
+        # A durable decision stays terminal after resume failure; never replay it blindly.
+        if run_outcome is not None:
+            run_outcome["status"] = "failed"
         if pending is not None:
-            hitl_coordinator.store.mark_resolved(pending.pending_id, "expired")
+            hitl_coordinator.mark_resolved(pending.pending_id, "expired")
         yield format_sse(
             "chunk",
             {"type": "error", "message": format_stream_error(exc, locale)},
@@ -212,7 +232,15 @@ def _dashboard_hitl_stream_context(
     return f"{agent_id}:dashboard:{user_id}:dm", "dashboard"
 
 
-@router.post("/agents/{agent_id}/chat/hitl/resume", summary="Resume HITL approval (SSE)")
+@router.post(
+    "/agents/{agent_id}/chat/hitl/resume",
+    summary="Resume HITL approval (SSE)",
+    description=(
+        "Requires the authenticated user to own the thread and an active pending approval. "
+        "Provide pending_id when multiple approvals are pending; missing or ambiguous state "
+        "is rejected before resuming the agent graph."
+    ),
+)
 async def resume_hitl(
     agent_id: str,
     body: HitlResumeBody,
@@ -225,13 +253,28 @@ async def resume_hitl(
     processor = server.app_runtime.gateway.processor
     hitl_coordinator = processor.hitl_coordinator
     requested_id = (body.pending_id or "").strip()
-    pending = hitl_coordinator.store.resolve_pending_for_thread(
-        body.thread_id,
-        agent_id=agent_id,
-        user_id=user.id,
-        pending_id=requested_id or None,
-    )
-    if requested_id and pending is None:
+    thread = server.app_runtime.gateway.thread_registry.get_thread(body.thread_id)
+    pending = None
+    pending_id_required = False
+    if thread is not None and thread.agent_id == agent_id and thread.user_id == user.id:
+        if requested_id:
+            pending = hitl_coordinator.resolve_pending_for_thread(
+                body.thread_id,
+                agent_id=agent_id,
+                user_id=user.id,
+                pending_id=requested_id,
+            )
+        else:
+            candidates = hitl_coordinator.list_pending_for_thread(
+                body.thread_id,
+                agent_id=agent_id,
+                user_id=user.id,
+            )
+            if len(candidates) == 1:
+                pending = candidates[0]
+            else:
+                pending_id_required = len(candidates) > 1
+    if pending is None:
         from octop.i18n.domains.slash import tr as slash_tr  # noqa: PLC0415
         from octop.infra.utils.locale import normalize_locale  # noqa: PLC0415
 
@@ -240,10 +283,64 @@ async def resume_hitl(
         async def missing() -> AsyncIterator[str]:
             yield format_sse(
                 "chunk",
-                {"type": "error", "message": slash_tr("hitl.expired", locale)},
+                {
+                    "type": "error",
+                    "message": slash_tr(
+                        "hitl.pending_id_required" if pending_id_required else "hitl.expired",
+                        locale,
+                    ),
+                },
             )
 
         return StreamingResponse(missing(), media_type="text/event-stream")
+    if pending.run_id:
+        linked_run = server.services.run_repo.get(pending.run_id, owner_user_id=int(user.id))
+        if linked_run is None or linked_run["status"] != "waiting_approval":
+            if linked_run is not None and linked_run["status"] == "cancel_requested":
+                cancelled = server.services.run_repo.transition(
+                    pending.run_id,
+                    owner_user_id=int(user.id),
+                    status="cancelled",
+                    expected_version=int(linked_run["version"]),
+                )
+                if cancelled is not None and pending.step_id:
+                    step = next(
+                        (
+                            item
+                            for item in server.services.run_repo.list_steps(
+                                pending.run_id, owner_user_id=int(user.id)
+                            )
+                            if item["step_id"] == pending.step_id
+                        ),
+                        None,
+                    )
+                    if step is not None and step["status"] in {
+                        "waiting_approval",
+                        "cancel_requested",
+                    }:
+                        server.services.run_repo.transition_step(
+                            pending.step_id,
+                            owner_user_id=int(user.id),
+                            status="cancelled",
+                            expected_version=int(step["version"]),
+                        )
+                hitl_coordinator.mark_resolved(pending.pending_id, "expired")
+
+            async def inactive_run() -> AsyncIterator[str]:
+                from octop.i18n.domains.slash import tr as slash_tr  # noqa: PLC0415
+                from octop.infra.utils.locale import normalize_locale  # noqa: PLC0415
+
+                yield format_sse(
+                    "chunk",
+                    {
+                        "type": "error",
+                        "message": slash_tr(
+                            "hitl.expired", normalize_locale(resolve_request_locale(request))
+                        ),
+                    },
+                )
+
+            return StreamingResponse(inactive_run(), media_type="text/event-stream")
     session_key, channel_type = _dashboard_hitl_stream_context(
         server,
         agent_id=agent_id,
@@ -260,6 +357,7 @@ async def resume_hitl(
         hitl_coordinator.session_policies.set(body.thread_id, body.hitl_policy.model_dump())
 
     async def gen() -> AsyncIterator[str]:
+        run_outcome: dict[str, str] = {}
         async for frame in iter_dashboard_hitl_resume_sse(
             processor=processor,
             hitl_coordinator=hitl_coordinator,
@@ -272,8 +370,56 @@ async def resume_hitl(
             channel_type=channel_type,
             locale=resolve_request_locale(request),
             is_disconnected=request.is_disconnected,
+            run_outcome=run_outcome,
         ):
             yield frame
+        if (
+            pending is not None
+            and pending.run_id
+            and run_outcome.get("status")
+            in {
+                "succeeded",
+                "failed",
+            }
+        ):
+            run = server.services.run_repo.get(pending.run_id, owner_user_id=int(user.id))
+            if run is not None and run["status"] == "waiting_approval":
+                target = run_outcome["status"]
+                server.services.run_repo.transition(
+                    pending.run_id,
+                    owner_user_id=int(user.id),
+                    status=target,
+                    expected_version=int(run["version"]),
+                )
+                if pending.step_id:
+                    step = next(
+                        (
+                            item
+                            for item in server.services.run_repo.list_steps(
+                                pending.run_id, owner_user_id=int(user.id)
+                            )
+                            if item["step_id"] == pending.step_id
+                        ),
+                        None,
+                    )
+                    if step is not None and step["status"] == "waiting_approval":
+                        server.services.run_repo.transition_step(
+                            pending.step_id,
+                            owner_user_id=int(user.id),
+                            status=target,
+                            expected_version=int(step["version"]),
+                            error_code=(
+                                "approval_rejected"
+                                if target == "failed"
+                                and any(
+                                    isinstance(decision, dict) and decision.get("type") == "reject"
+                                    for decision in body.decisions
+                                )
+                                else "execution_failed"
+                                if target == "failed"
+                                else None
+                            ),
+                        )
 
     return StreamingResponse(gen(), media_type="text/event-stream")
 

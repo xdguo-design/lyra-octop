@@ -305,6 +305,7 @@ export default function ExpertsPage() {
         | "chat_visible"
         | "color"
         | "icon_url"
+        | "icon_name"
       >,
     ) => {
       setEditAgent(null);
@@ -320,6 +321,7 @@ export default function ExpertsPage() {
                 chat_visible: updated.chat_visible,
                 color: updated.color,
                 icon_url: updated.icon_url,
+                icon_name: updated.icon_name,
               }
             : a,
         ),

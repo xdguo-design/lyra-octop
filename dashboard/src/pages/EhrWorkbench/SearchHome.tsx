@@ -4,118 +4,181 @@ import {
   Card,
   Empty,
   Input,
-  Segmented,
+  Select,
   Space,
   Spin,
   Tag,
   Typography,
 } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
-import { ehrApi, type SearchResult } from "@/api/modules/ehr";
+import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { ehrApi, publicEhrApi, type SearchResult } from "@/api/modules/ehr";
 import { TYPE_COLORS, TYPE_LABELS } from "./types";
+import { ehrPlatformLoginUrl } from "./ehrPlatformLoginUrl";
+import styles from "./index.module.less";
 
-interface Props {
-  /**  Agent 面板联动：把检索词转发给助手 */
-  onAskAgent?: (question: string) => void;
-}
+type SearchScope = "medical" | "documents" | "code" | "all";
 
-const QUICK_QUESTIONS = [
-  "阿司匹林的禁忌症",
-  "高危药品有哪些",
-  "血常规检查注意事项",
-  "头孢菌素类药品",
+const MEDICAL_TYPES = [
+  "drug",
+  "clinic_item",
+  "diagnosis",
+  "knowledge",
+  "frequency",
+  "usage",
 ];
 
-export default function SearchHome({ onAskAgent }: Props) {
+export default function SearchHome({
+  publicMode = false,
+  onOpenDrugQuery,
+}: {
+  publicMode?: boolean;
+  onOpenDrugQuery?: () => void;
+}) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
-  const [type, setType] = useState<string>("");
+  const [scope, setScope] = useState<SearchScope>("medical");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState("");
 
-  const runSearch = useCallback(async (q: string, t: string) => {
-    const text = q.trim();
-    if (!text) return;
-    setLoading(true);
-    setError("");
-    try {
-      const resp = await ehrApi.search(text, {
-        type: t || undefined,
-        top_k: 12,
-      });
-      setResults(resp.results);
-      setSearched(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setResults([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const runSearch = useCallback(
+    async (q: string, searchScope: SearchScope) => {
+      const text = q.trim();
+      if (!text) return;
+      setLoading(true);
+      setError("");
+      try {
+        const filter =
+          searchScope === "medical"
+            ? { types: MEDICAL_TYPES }
+            : searchScope === "documents"
+            ? { type: "doc" }
+            : searchScope === "code"
+            ? { type: "code" }
+            : {};
+        const resp = publicMode
+          ? await publicEhrApi.search(text, 12)
+          : await ehrApi.search(text, { ...filter, top_k: 12 });
+        setResults(resp.results);
+        setSearched(true);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        setResults([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [publicMode],
+  );
+
+  const scopeOptions = publicMode
+    ? [{ label: t("ehrWorkbenchPage.scopeMedical"), value: "medical" }]
+    : [
+        { label: t("ehrWorkbenchPage.scopeAll"), value: "all" },
+        { label: t("ehrWorkbenchPage.scopeMedical"), value: "medical" },
+        { label: t("ehrWorkbenchPage.scopeDocuments"), value: "documents" },
+        { label: t("ehrWorkbenchPage.scopeCode"), value: "code" },
+      ];
 
   return (
-    <div className="ehr-search-home">
-      <div className="ehr-search-hero">
-        <Typography.Title level={3} style={{ marginBottom: 4 }}>
-          EHR 医疗知识检索
-        </Typography.Title>
-        <Typography.Text type="secondary">
-          药品 · 诊疗项目 · 诊断 · 频次用法 · 项目文档与代码，混合语义 +
-          关键词检索
-        </Typography.Text>
-        <div className="ehr-search-bar">
-          <Input
+    <div className={styles.ehrSearchHome}>
+      {!searched && (
+        <section
+          className={styles.ehrSearchHero}
+          aria-labelledby="ehr-search-title"
+        >
+          <Typography.Text className={styles.ehrEyebrow}>
+            EHR KNOWLEDGE WORKSPACE
+          </Typography.Text>
+          <Typography.Title
+            id="ehr-search-title"
+            className={styles.ehrSearchTitle}
+          >
+            {t("ehrWorkbenchPage.homeTitle")}
+          </Typography.Title>
+          <Typography.Paragraph className={styles.ehrSearchDescription}>
+            {t("ehrWorkbenchPage.searchDescription")}
+          </Typography.Paragraph>
+          <Input.Search
+            className={styles.ehrSearchInput}
             size="large"
             allowClear
-            placeholder="输入药品、检查项目、诊断或问题，回车检索"
+            loading={loading}
+            prefix={<SearchOutlined />}
+            placeholder={t("ehrWorkbenchPage.searchPlaceholder")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onPressEnter={() => runSearch(query, type)}
-            prefix={<SearchOutlined />}
+            onSearch={(value) => void runSearch(value, scope)}
+            enterButton={t("ehrWorkbenchPage.searchButton")}
+            addonBefore={
+              <Select
+                aria-label={t("ehrWorkbenchPage.searchScope")}
+                bordered={false}
+                value={scope}
+                onChange={(value) => {
+                  setScope(value);
+                  if (query.trim()) void runSearch(query, value);
+                }}
+                options={scopeOptions}
+                disabled={publicMode}
+              />
+            }
           />
-          <Segmented
-            value={type || "all"}
-            onChange={(v) => {
-              const t = v === "all" ? "" : String(v);
-              setType(t);
-              if (query.trim()) runSearch(query, t);
-            }}
-            options={[
-              { label: "全部", value: "all" },
-              { label: "药品", value: "drug" },
-              { label: "项目", value: "clinic_item" },
-              { label: "诊断", value: "diagnosis" },
-              { label: "文档", value: "doc" },
-              { label: "代码", value: "code" },
-            ]}
-          />
-          <Button
-            type="primary"
-            size="large"
-            loading={loading}
-            onClick={() => runSearch(query, type)}
-          >
-            检索
-          </Button>
-        </div>
-        <Space wrap style={{ marginTop: 8 }}>
-          <Typography.Text type="secondary">试试：</Typography.Text>
-          {QUICK_QUESTIONS.map((q) => (
-            <Button
-              key={q}
-              size="small"
-              type="link"
-              onClick={() => {
-                setQuery(q);
-                runSearch(q, type);
-              }}
+          {!publicMode && (
+            <nav
+              className={styles.ehrSecondaryLinks}
+              aria-label={t("ehrWorkbenchPage.moreEntries")}
             >
-              {q}
-            </Button>
-          ))}
-        </Space>
-      </div>
+              <Link to="/ehr/prd">{t("ehrWorkbenchPage.docsEntry")}</Link>
+              <a href={ehrPlatformLoginUrl()}>
+                {t("ehrWorkbenchPage.hisLoginEntry")}
+              </a>
+              <a
+                href="https://github.com/xdguo-design/ehr-platform/tree/main"
+                target="_blank"
+                rel="noreferrer"
+              >
+                {t("ehrWorkbenchPage.codeEntry")}
+              </a>
+              <Button type="link" onClick={onOpenDrugQuery}>
+                {t("ehrWorkbenchPage.drugEntry")}
+              </Button>
+            </nav>
+          )}
+        </section>
+      )}
+
+      {searched && (
+        <div className={styles.ehrSearchBar}>
+          <Input.Search
+            size="large"
+            allowClear
+            loading={loading}
+            prefix={<SearchOutlined />}
+            placeholder={t("ehrWorkbenchPage.searchPlaceholder")}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onSearch={(value) => void runSearch(value, scope)}
+            enterButton={t("ehrWorkbenchPage.searchButton")}
+            addonBefore={
+              <Select
+                aria-label={t("ehrWorkbenchPage.searchScope")}
+                bordered={false}
+                value={scope}
+                onChange={(value) => {
+                  setScope(value);
+                  if (query.trim()) void runSearch(query, value);
+                }}
+                options={scopeOptions}
+                disabled={publicMode}
+              />
+            }
+          />
+        </div>
+      )}
 
       {error && <Typography.Text type="danger">{error}</Typography.Text>}
 
@@ -129,12 +192,12 @@ export default function SearchHome({ onAskAgent }: Props) {
         <Empty description="没有找到相关内容，换个问法试试" />
       )}
 
-      <div className="ehr-result-list">
+      <div className={styles.ehrResultList}>
         {results.map((r) => (
           <Card
             key={r.id}
             size="small"
-            className="ehr-result-card"
+            className={styles.ehrResultCard}
             title={
               <Space wrap>
                 <Tag color={TYPE_COLORS[r.type] || "default"}>
@@ -146,17 +209,9 @@ export default function SearchHome({ onAskAgent }: Props) {
             extra={
               <Space>
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  相关度 {(r.score * 100).toFixed(0)}%
+                  {t("ehrWorkbenchPage.resultSource")}{" "}
+                  {String(r.meta.path || r.meta.source || r.type)}
                 </Typography.Text>
-                {onAskAgent && (
-                  <Button
-                    size="small"
-                    type="link"
-                    onClick={() => onAskAgent(`${r.title} 的详细信息`)}
-                  >
-                    问助手
-                  </Button>
-                )}
               </Space>
             }
           >

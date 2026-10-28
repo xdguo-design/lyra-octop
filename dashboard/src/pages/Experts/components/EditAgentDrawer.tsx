@@ -173,6 +173,7 @@ interface EditAgentDrawerProps {
       | "chat_visible"
       | "color"
       | "icon_url"
+      | "icon_name"
     >,
   ) => void;
 }
@@ -253,6 +254,10 @@ function EditAgentDrawerBody({
     () => parseStoredColor(agent.color) ?? DEFAULT_PALETTE,
   );
   const [iconUrl, setIconUrl] = useState<string | null>(agent.icon_url);
+  const [iconName, setIconName] = useState<string | null>(
+    agent.icon_name ?? null,
+  );
+  const [avatarResetToPreset, setAvatarResetToPreset] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [filesLoading, setFilesLoading] = useState(false);
@@ -510,6 +515,7 @@ function EditAgentDrawerBody({
           chat_visible: !(values.hide_from_chat ?? false),
           default_model: defaultModelFromForm(values.default_model),
           color: nextColor,
+          icon_name: iconName,
           config: nextConfig,
           welcome_message: stored.welcome_message ?? "",
           knowledge_base_ids: stored.knowledge_base_ids ?? [],
@@ -517,6 +523,16 @@ function EditAgentDrawerBody({
           ...buildAgentRuntimeRequest(values, { clearMissing: true }),
         }),
       });
+      if (avatarResetToPreset) {
+        try {
+          await octopAgentsApi.deleteAvatar(agent.agent_id);
+        } catch (err) {
+          message.error(
+            apiErrorMessage(err, t("experts.avatarRemoveFailed"), t),
+          );
+          return;
+        }
+      }
 
       if (!remote && !skillPackagesSupported) {
         try {
@@ -544,6 +560,7 @@ function EditAgentDrawerBody({
         chat_visible: !(values.hide_from_chat ?? false),
         color: nextColor,
         icon_url: iconUrl,
+        icon_name: iconName,
       });
       onClose();
     } catch (err) {
@@ -554,11 +571,13 @@ function EditAgentDrawerBody({
   }, [
     agent.agent_id,
     agent.state,
+    avatarResetToPreset,
     agentConfig,
     remote,
     colorPalette,
     form,
     iconUrl,
+    iconName,
     onClose,
     onSaved,
     pathMappings,
@@ -778,13 +797,20 @@ function EditAgentDrawerBody({
               <Form.Item label={t("experts.avatar")}>
                 <ExpertAvatarPicker
                   iconUrl={iconUrl}
-                  iconName={agent.icon_name}
+                  iconName={iconName}
                   color={
                     isCuratedPalette(colorPalette)
                       ? expertPaletteColor(colorPalette)
                       : colorPalette
                   }
                   disabled={avatarBusy}
+                  onSelectIcon={(nextIconName) => {
+                    setIconName(nextIconName);
+                    setAvatarResetToPreset(
+                      (current) => current || Boolean(iconUrl),
+                    );
+                    setIconUrl(null);
+                  }}
                   onPick={(file) => {
                     void (async () => {
                       setAvatarBusy(true);
@@ -794,6 +820,7 @@ function EditAgentDrawerBody({
                           file,
                         );
                         setIconUrl(result.icon_url);
+                        setAvatarResetToPreset(false);
                         await refresh({ silent: true });
                       } catch (err) {
                         message.error(
@@ -815,6 +842,7 @@ function EditAgentDrawerBody({
                       try {
                         await octopAgentsApi.deleteAvatar(agent.agent_id);
                         setIconUrl(null);
+                        setAvatarResetToPreset(false);
                         await refresh({ silent: true });
                       } catch (err) {
                         message.error(

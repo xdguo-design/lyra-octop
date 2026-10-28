@@ -7,7 +7,9 @@ from dataclasses import dataclass
 from octop.config import OctopConfig
 from octop.infra.db.pool import DatabasePool
 from octop.infra.db.repos.admission_sessions import AdmissionSessionRepo
+from octop.infra.db.repos.agent_versions import AgentVersionRepo
 from octop.infra.db.repos.agents import AgentRepo
+from octop.infra.db.repos.app_registry import AppRegistryRepo
 from octop.infra.db.repos.audit import AuditRepo
 from octop.infra.db.repos.backends import BackendRepo
 from octop.infra.db.repos.bridge_connections import BridgeConnectionRepo
@@ -18,11 +20,14 @@ from octop.infra.db.repos.connectors import ConnectorRepo
 from octop.infra.db.repos.creations import CreationRepo
 from octop.infra.db.repos.cron import CronJobRepo
 from octop.infra.db.repos.email_verification import EmailVerificationRepo
+from octop.infra.db.repos.hitl_approvals import HitlApprovalRepo
 from octop.infra.db.repos.invites import InviteRepo
 from octop.infra.db.repos.knowledge import KnowledgeRepo
 from octop.infra.db.repos.proactive_care_config import ProactiveCareConfigRepo
 from octop.infra.db.repos.providers import ProviderRepo
 from octop.infra.db.repos.published_experts import PublishedExpertRepo
+from octop.infra.db.repos.run_effects import RunEffectRepo
+from octop.infra.db.repos.runs import RunRepo
 from octop.infra.db.repos.secrets import SecretRepo
 from octop.infra.db.repos.sessions import SessionRepo
 from octop.infra.db.repos.settings import SettingsRepo
@@ -45,14 +50,18 @@ class RepoBundle:
 
     user_repo: UserRepo
     admission_session_repo: AdmissionSessionRepo
+    app_registry_repo: AppRegistryRepo
     user_policy_repo: UserPolicyRepo
     invite_repo: InviteRepo
     email_verification_repo: EmailVerificationRepo
     agent_repo: AgentRepo
+    agent_version_repo: AgentVersionRepo
     provider_repo: ProviderRepo
     channel_repo: ChannelRepo
     chat_file_repo: ChatFileRepo
     cron_repo: CronJobRepo
+    run_repo: RunRepo
+    run_effect_repo: RunEffectRepo
     session_repo: SessionRepo
     thread_repo: ThreadRepo
     thread_message_repo: ThreadMessageRepo
@@ -68,6 +77,7 @@ class RepoBundle:
     skill_package_repo: SkillPackageRepo
     published_expert_repo: PublishedExpertRepo
     knowledge_repo: KnowledgeRepo
+    hitl_approval_repo: HitlApprovalRepo
     voice_provider_repo: VoiceProviderRepo
     care_push_repo: CarePushRepo
     proactive_care_config_repo: ProactiveCareConfigRepo
@@ -80,14 +90,18 @@ class RepoBundle:
             db=db,
             user_repo=UserRepo(db),
             admission_session_repo=AdmissionSessionRepo(db),
+            app_registry_repo=AppRegistryRepo(db),
             user_policy_repo=UserPolicyRepo(db),
             invite_repo=InviteRepo(db),
             email_verification_repo=EmailVerificationRepo(db),
             agent_repo=AgentRepo(db),
+            agent_version_repo=AgentVersionRepo(db),
             provider_repo=ProviderRepo(db),
             channel_repo=ChannelRepo(db),
             chat_file_repo=ChatFileRepo(db),
             cron_repo=CronJobRepo(db),
+            run_repo=RunRepo(db),
+            run_effect_repo=RunEffectRepo(db),
             session_repo=SessionRepo(db),
             thread_repo=ThreadRepo(db),
             thread_message_repo=ThreadMessageRepo(db),
@@ -103,6 +117,7 @@ class RepoBundle:
             skill_package_repo=SkillPackageRepo(db),
             published_expert_repo=PublishedExpertRepo(db),
             knowledge_repo=KnowledgeRepo(db),
+            hitl_approval_repo=HitlApprovalRepo(db),
             voice_provider_repo=VoiceProviderRepo(db),
             care_push_repo=CarePushRepo(db),
             proactive_care_config_repo=ProactiveCareConfigRepo(db),
@@ -126,8 +141,16 @@ class SharedServices:
         return self.repos.user_repo
 
     @property
+    def agent_version_repo(self) -> AgentVersionRepo:
+        return self.repos.agent_version_repo
+
+    @property
     def admission_session_repo(self) -> AdmissionSessionRepo:
         return self.repos.admission_session_repo
+
+    @property
+    def app_registry_repo(self) -> AppRegistryRepo:
+        return self.repos.app_registry_repo
 
     @property
     def user_policy_repo(self) -> UserPolicyRepo:
@@ -160,6 +183,14 @@ class SharedServices:
     @property
     def cron_repo(self) -> CronJobRepo:
         return self.repos.cron_repo
+
+    @property
+    def run_repo(self) -> RunRepo:
+        return self.repos.run_repo
+
+    @property
+    def run_effect_repo(self) -> RunEffectRepo:
+        return self.repos.run_effect_repo
 
     @property
     def session_repo(self) -> SessionRepo:

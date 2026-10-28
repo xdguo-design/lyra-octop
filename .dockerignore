@@ -1,47 +1,41 @@
-# Git and IDE
-.git
-.gitignore
-.idea
-.vscode
-*.md
+# Only send files referenced by docker/Dockerfile.
+**
+!Dockerfile
+!.dockerignore
 !README.md
-
-# Python dev and cache
-__pycache__
-*.py[cod]
-*$py.class
-.venv
-venv
-.pytest_cache
-.coverage
-htmlcov
-.tox
-.mypy_cache
-.ruff_cache
-dist
-build
-*.egg-info
-
-# Tests (not needed in runtime image)
-tests
-.pre-commit-config.yaml
-
-# Frontend: stage 1 builds dashboard in-image; exclude host dev deps and pre-built output
-dashboard/node_modules
-dashboard/.vite
-dashboard/dist
-src/octop/dashboard
-node_modules
-**/node_modules
-**/.vite
-
-# Example and local config (mount at runtime instead)
-.env
-.env.*
+!LICENSE
+!pyproject.toml
+!uv.lock
 !.env.example
 
-# Misc
-.DS_Store
-*.log
-logs
-agent-transcripts
+!dashboard/package.json
+!dashboard/package-lock.json
+!dashboard/index.html
+!dashboard/vite.config.ts
+!dashboard/tsconfig.json
+!dashboard/tsconfig.app.json
+!dashboard/tsconfig.node.json
+!dashboard/src/
+!dashboard/src/**
+!dashboard/public/
+!dashboard/public/**
+
+!demos/admission-registration/frontend/package.json
+!demos/admission-registration/frontend/package-lock.json
+!demos/admission-registration/frontend/index.html
+!demos/admission-registration/frontend/app.html
+!demos/admission-registration/frontend/env.d.ts
+!demos/admission-registration/frontend/vite.config.js
+!demos/admission-registration/frontend/src/
+!demos/admission-registration/frontend/src/**
+!demos/admission-registration/frontend/public/
+!demos/admission-registration/frontend/public/**
+
+!src/
+!src/**
+src/octop/dashboard/
+src/octop/dashboard/**
+**/__pycache__
+**/*.pyc
+
+!docker/docker-entrypoint.sh

@@ -40,7 +40,9 @@ describe("multi-agent Todo synchronization", () => {
     };
 
     expect(todoSyncTargetAgents(context)).toEqual([]);
-    expect(buildTodoSyncPrompt([], context)).toContain("团队主 Agent 的总体任务计划");
+    expect(buildTodoSyncPrompt([], context)).toContain(
+      "团队主 Agent 的总体任务计划",
+    );
   });
 
   it("preserves the current target selection in a one-to-one chat", () => {

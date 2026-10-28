@@ -69,3 +69,18 @@ def test_apply_agent_runtime_to_stream_request_merges_configurable() -> None:
         "max_tokens": 2048,
     }
     assert req["configurable"][CONFIGURABLE_MAX_INPUT_TOKENS] == 32000
+
+
+def test_request_model_settings_override_agent_defaults() -> None:
+    req = apply_agent_runtime_to_stream_request(
+        {
+            "_octop_allow_model_settings_override": True,
+            "configurable": {"model_settings": {"max_tokens": 64}},
+        },
+        {"max_tokens": 512, "temperature": 0.2},
+    )
+
+    assert req["configurable"][CONFIGURABLE_MODEL_SETTINGS] == {
+        "max_tokens": 64,
+        "temperature": 0.2,
+    }

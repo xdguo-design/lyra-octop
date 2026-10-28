@@ -7,12 +7,13 @@ from pathlib import Path
 from typing import Any, Literal, cast
 from urllib.parse import urlsplit
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from octop.api.common.agent import require_agent_row
 from octop.api.deps import current_user, get_server, require_admin
+from octop.infra.connectors.service import ConnectorService
 from octop.infra.creations import (
     capture_creation_thumbnail,
     capture_trusted_local_thumbnail,
@@ -20,11 +21,17 @@ from octop.infra.creations import (
     remove_creation_thumbnail,
 )
 from octop.infra.errors import ErrorCode, OctopError
+from octop.infra.workbench.project_service import (
+    normalize_repository_branch,
+    normalize_repository_url,
+)
 
 router = APIRouter()
 _BUILT_IN_APPS = {
+    "ppt-studio",
     "speech-recognition",
     "admission-demo",
+    "admission-registration",
     "planet",
     "manus-refund",
     "manus-clinicemr",
@@ -55,6 +62,8 @@ class CardMeta(BaseModel):
     name: str | None
     description: str | None
     category: Literal["platform", "applet", "service", "repository"] | None = None
+    repository_url: str | None = None
+    repository_branch: str | None = None
 
 
 class CreationIndex(BaseModel):
@@ -69,6 +78,15 @@ class ProjectLaunchStatus(BaseModel):
     url: str | None = None
     logs: str | None = None
     thumbnail_url: str | None = None
+
+
+class CreationThumbnailRefreshResult(BaseModel):
+    captured: bool
+    thumbnail_url: str | None = None
+
+
+class ProjectUpdateResult(BaseModel):
+    updated: bool
 
 
 class FolderBody(BaseModel):
@@ -143,6 +161,8 @@ class CardMetaBody(BaseModel):
     category: Literal["platform", "applet", "service", "repository"] | None = Field(
         default=None, description="Optional user-selected category for the built-in card."
     )
+    repository_url: str | None = Field(default=None, max_length=2048)
+    repository_branch: str | None = Field(default=None, max_length=255)
 
     @field_validator("name", "description")
     @classmethod
@@ -151,6 +171,24 @@ class CardMetaBody(BaseModel):
             return None
         value = value.strip()
         return value or None
+
+    @field_validator("repository_url")
+    @classmethod
+    def validate_repository_url(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        normalized = normalize_repository_url(value.strip())
+        if normalized is None:
+            raise ValueError("enter an HTTPS GitHub or CNB repository URL")
+        return normalized
+
+    @field_validator("repository_branch")
+    @classmethod
+    def validate_repository_branch(cls, value: str | None) -> str | None:
+        normalized = normalize_repository_branch(value)
+        if value is not None and value.strip() and normalized is None:
+            raise ValueError("enter a valid Git branch name")
+        return normalized
 
 
 @router.get("/creations", summary="List creation entries and folders", response_model=CreationIndex)
@@ -176,8 +214,12 @@ async def list_creations(
 def _with_thumbnail(item: dict[str, Any], root: Path, owner_user_id: int) -> dict[str, Any]:
     row = dict(item)
     path = creation_thumbnail_path(root, owner_user_id, row["item_id"])
+    try:
+        cache_version = path.stat().st_mtime_ns
+    except OSError:
+        cache_version = row["updated_at"]
     row["thumbnail_url"] = (
-        f"/api/creations/items/{row['item_id']}/thumbnail?v={row['updated_at']}"
+        f"/api/creations/items/{row['item_id']}/thumbnail?v={cache_version}"
         if path.is_file()
         else None
     )
@@ -203,6 +245,24 @@ def _launchable_item(server: Any, user: Any, item_id: str) -> dict[str, Any]:
     ):
         raise OctopError(ErrorCode.NOT_FOUND, "project launch profile not found")
     return cast(dict[str, Any], row)
+
+
+def _cnb_access_token(server: Any, user: Any, repository_url: str) -> str | None:
+    if urlsplit(repository_url).hostname != "cnb.cool":
+        return None
+    service = ConnectorService(
+        repo=server.services.repos.connector_repo,
+        secret_repo=server.services.secret_repo,
+        settings_repo=server.services.settings_repo,
+        config=server.services.config,
+    )
+    token = str(service.active_credentials_for_user_kind(user.id, "cnb").get("token") or "")
+    if not token:
+        raise OctopError(
+            ErrorCode.CONNECTOR_INVALID_CREDENTIALS,
+            "connect a CNB connector before using this repository",
+        )
+    return token
 
 
 async def _stop_item_runtime(server: Any, item: dict[str, Any]) -> None:
@@ -241,8 +301,9 @@ async def start_project_preview(
 ) -> ProjectLaunchStatus:
     row = _launchable_item(server, user, item_id)
     manager = server.project_service_manager
+    access_token = _cnb_access_token(server, user, row["url"])
     try:
-        status = await manager.start(row["url"], item_id)
+        status = await manager.start(row["url"], item_id, access_token=access_token)
     except RuntimeError:
         status = manager.status(row["url"], item_id)
     if status["status"] == "running" and status["url"]:
@@ -276,13 +337,34 @@ async def stop_project_preview(
     )
 
 
-async def _refresh_thumbnail(item: dict[str, Any], root: Path, owner_user_id: int) -> None:
+@router.post(
+    "/creations/items/{item_id}/update",
+    summary="Update a registered GitHub or CNB project checkout",
+    response_model=ProjectUpdateResult,
+)
+async def update_project_code(
+    item_id: str,
+    user: Any = Depends(require_admin()),
+    server: Any = Depends(get_server),
+) -> ProjectUpdateResult:
+    row = _launchable_item(server, user, item_id)
+    try:
+        await server.project_service_manager.update(
+            row["url"], item_id, access_token=_cnb_access_token(server, user, row["url"])
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail="Project code update failed") from exc
+    return ProjectUpdateResult(updated=True)
+
+
+async def _refresh_thumbnail(item: dict[str, Any], root: Path, owner_user_id: int) -> bool:
     path = creation_thumbnail_path(root, owner_user_id, item["item_id"])
     hostname = urlsplit(item["url"]).hostname if item["url"] else None
-    if item["kind"] == "service" and item["url"] and hostname != "github.com":
-        await capture_creation_thumbnail(item["url"], path)
+    if item["kind"] in {"platform", "service"} and item["url"] and hostname != "github.com":
+        return await capture_creation_thumbnail(item["url"], path)
     else:
         await asyncio.to_thread(remove_creation_thumbnail, path)
+        return False
 
 
 @router.post(
@@ -388,7 +470,7 @@ async def update_item(
         raise OctopError(ErrorCode.NOT_FOUND, "creation item or folder not found")
     thumbnail_path = creation_thumbnail_path(server.paths.root, user.id, item_id)
     needs_capture = previous["kind"] != body.kind or previous["url"] != body.url
-    if body.kind == "service" and body.url and not thumbnail_path.is_file():
+    if body.kind in {"platform", "service"} and body.url and not thumbnail_path.is_file():
         needs_capture = True
     if needs_capture:
         await _refresh_thumbnail(
@@ -439,6 +521,54 @@ async def delete_item(
     return Response(status_code=204)
 
 
+@router.post(
+    "/creations/items/{item_id}/thumbnail/refresh",
+    summary="Capture the homepage of a platform or website again",
+    response_model=CreationThumbnailRefreshResult,
+)
+async def refresh_item_thumbnail(
+    item_id: str,
+    user: Any = Depends(current_user),
+    server: Any = Depends(get_server),
+) -> CreationThumbnailRefreshResult:
+    row = next(
+        (
+            item
+            for item in server.services.creation_repo.list_items(user.id)
+            if item["item_id"] == item_id
+        ),
+        None,
+    )
+    if row is None:
+        raise OctopError(ErrorCode.NOT_FOUND, "creation item not found")
+    if row["kind"] not in {"platform", "service"} or not row["url"]:
+        return CreationThumbnailRefreshResult(captured=False)
+
+    captured = await _refresh_thumbnail(row, server.paths.root, user.id)
+    latest = next(
+        (
+            item
+            for item in server.services.creation_repo.list_items(user.id)
+            if item["item_id"] == item_id
+        ),
+        None,
+    )
+    if latest is None or latest["kind"] != row["kind"] or latest["url"] != row["url"]:
+        await asyncio.to_thread(
+            remove_creation_thumbnail,
+            creation_thumbnail_path(server.paths.root, user.id, item_id),
+        )
+        return CreationThumbnailRefreshResult(captured=False)
+    return CreationThumbnailRefreshResult(
+        captured=captured,
+        thumbnail_url=(
+            _with_thumbnail(latest, server.paths.root, user.id)["thumbnail_url"]
+            if captured
+            else None
+        ),
+    )
+
+
 @router.get(
     "/creations/items/{item_id}/thumbnail",
     summary="Read a captured creation website thumbnail",
@@ -453,7 +583,7 @@ async def get_item_thumbnail(
         (
             row
             for row in server.services.creation_repo.list_items(user.id)
-            if row["item_id"] == item_id and row["kind"] == "service"
+            if row["item_id"] == item_id and row["kind"] in {"platform", "service"}
         ),
         None,
     )
@@ -496,7 +626,7 @@ async def set_card_folder(
 
 @router.put(
     "/creations/cards/{card_type}/{card_id}/meta",
-    summary="Update the name, description, or category of a built-in app card",
+    summary="Update built-in app card details and its optional source repository",
 )
 async def set_card_meta(
     card_type: Literal["agent", "app"],
@@ -514,9 +644,47 @@ async def set_card_meta(
         name=body.name,
         description=body.description,
         category=body.category,
+        repository_url=body.repository_url,
+        repository_branch=body.repository_branch,
     )
     return {
         "name": body.name,
         "description": body.description,
         "category": body.category,
+        "repository_url": body.repository_url,
+        "repository_branch": body.repository_branch,
     }
+
+
+@router.post(
+    "/creations/cards/{card_type}/{card_id}/update",
+    summary="Pull the bound repository for a built-in app card",
+    response_model=ProjectUpdateResult,
+)
+async def update_card_code(
+    card_type: Literal["agent", "app"],
+    card_id: str,
+    user: Any = Depends(require_admin()),
+    server: Any = Depends(get_server),
+) -> ProjectUpdateResult:
+    if card_type != "app" or card_id not in _BUILT_IN_APPS:
+        raise OctopError(ErrorCode.NOT_FOUND, "creation app not found")
+    meta = server.services.creation_repo.list_card_meta(user.id).get(f"app:{card_id}")
+    repository_url = str((meta or {}).get("repository_url") or "")
+    repository_branch = (meta or {}).get("repository_branch")
+    if normalize_repository_url(repository_url) is None:
+        raise OctopError(ErrorCode.NOT_FOUND, "creation card has no repository bound")
+    manager = server.project_service_manager
+    if manager is None:
+        raise OctopError(ErrorCode.INTERNAL_ERROR, "project updater is unavailable")
+    try:
+        await manager.update(
+            repository_url,
+            f"app:{user.id}:{card_id}",
+            access_token=_cnb_access_token(server, user, repository_url),
+            source_only=True,
+            repository_branch=repository_branch,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail="Project code update failed") from exc
+    return ProjectUpdateResult(updated=True)

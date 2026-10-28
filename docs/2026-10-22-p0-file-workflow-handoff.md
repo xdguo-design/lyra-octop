@@ -13,14 +13,14 @@ P0 第一阶段（门禁 + 基线）已收官并推送；文件工作流读到�
 
 ## 2. 我已交付的 5 个提交（全部已推送，且已被领主的后续提交覆盖在上层）
 
-| 提交 | 内容 |
-|---|---|
+| 提交        | 内容                                                                          |
+| --------- | --------------------------------------------------------------------------- |
 | `352fdfc` | CI 门禁修复：B009×4、bootLogo 断言、批上传可靠性（Promise.all→逐文件 settle）、过期 region 断言、格式修复 |
-| `59af9d8` | 清理 22 个 dev 固有测试失败（演示 Agent 污染、captcha/i18n 过期期望、schema 水位钉子） |
-| `01de2c1` | 演示 Agent 可见性冲突收口：默认列表不含系统 Agent（user_id=NULL），演示测试改走 scope=all |
-| `1ae32ad` | **T04 文件读侧 API**：线程文件列表 / 文件详情 / 分页片段 / 关键词搜索 + 上传响应补 size/read_status |
-| `a56761d` | **T05 上传状态**：逐文件状态、最多 3 并发、失败重试、在飞移除防复活、切 Agent 清空 |
-| `02510e0` | （10-22）按领主新契约对齐 3 个测试文件：平台共享 Agent 在默认列表可见 |
+| `59af9d8` | 清理 22 个 dev 固有测试失败（演示 Agent 污染、captcha/i18n 过期期望、schema 水位钉子）               |
+| `01de2c1` | 演示 Agent 可见性冲突收口：默认列表不含系统 Agent（user_id=NULL），演示测试改走 scope=all              |
+| `1ae32ad` | **T04 文件读侧 API**：线程文件列表 / 文件详情 / 分页片段 / 关键词搜索 + 上传响应补 size/read_status      |
+| `a56761d` | **T05 上传状态**：逐文件状态、最多 3 并发、失败重试、在飞移除防复活、切 Agent 清空                          |
+| `02510e0` | （10-22）按领主新契约对齐 3 个测试文件：平台共享 Agent 在默认列表可见                                  |
 
 说明：T05 中 `Home/index.tsx` 与 locales 的改动当时因混在领主 WIP 里未单独提交，已随领主 10-22 的 `a25f26a` 等提交进入主干（已核实 `retryUpload`/`uploadItems`/`someFailed` 在 HEAD 中在位）。
 
@@ -65,13 +65,13 @@ P0 第一阶段（门禁 + 基线）已收官并推送；文件工作流读到�
 
 ## 6. P0 进度矩阵
 
-| P0 项 | 状态 | 说明 |
-|---|---|---|
-| ① 第一阶段：门禁 + 基线验证 | ✅ 100% | 5 提交全部推送；静态门禁 + CI 范围全绿 |
+| P0 项                | 状态      | 说明                                                                                                                           |
+| ------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| ① 第一阶段：门禁 + 基线验证    | ✅ 100%  | 5 提交全部推送；静态门禁 + CI 范围全绿                                                                                                      |
 | ② 文件工作流闭环（20–35 人日） | 🟡 ~35% | T01–T04 后端读侧 100%；T05 上传状态/并发/重试已交付；**剩余：T05 读取状态轮询 + Home 历史附件 + 统一预览上下文；T06 模型工具；T07 引用定位；T08–T13 编辑/生成/导出/恢复；T14–T15 验收** |
-| ③ 联网搜索与深度研究 | ❌ 0% | 未开始 |
-| ④ 数据分析 | ❌ 0% | 未开始 |
-| ⑤ 安全与端到端验收 | 🟡 ~10% | 仅修了演示 Agent 越界；文件流程跨 Agent 边界审计、浏览器端到端未做 |
+| ③ 联网搜索与深度研究         | ❌ 0%    | 未开始                                                                                                                          |
+| ④ 数据分析              | ❌ 0%    | 未开始                                                                                                                          |
+| ⑤ 安全与端到端验收          | 🟡 ~10% | 仅修了演示 Agent 越界；文件流程跨 Agent 边界审计、浏览器端到端未做                                                                                     |
 
 ## 7. 下一步行动清单（建议顺序）
 
@@ -85,14 +85,14 @@ P0 第一阶段（门禁 + 基线）已收官并推送；文件工作流读到�
 
 ## 8. 关键文件地图（接手者速查）
 
-| 区域 | 位置 |
-|---|---|
-| 文件工作流后端 | `src/octop/infra/files/{service,parse,worker,context}.py`、`src/octop/infra/db/repos/chat_files.py`、`src/octop/api/routers/files.py` |
-| 文件 Schema | `src/octop/infra/db/migrations/024_chat_files.sql`（+.pg.sql）；水位 `latest_schema_version()` in `migrate.py` |
-| 上传链路 | `src/octop/api/routers/uploads.py`、`dashboard/src/pages/Chat/hooks/useChatAttachments.ts`、`dashboard/src/pages/Chat/components/ChatInputPreviewBar.tsx` |
-| 前端 API 客户端 | `dashboard/src/api/modules/files.ts`（T04 四端点） |
-| 测试 | `tests/unit/files/`（31 个）、`tests/integration/test_chat_files_api.py`（7 个）、`useChatAttachments.test.tsx`（10 个） |
-| 计划/设计文档 | `docs/specs/plans/2026-10-17-chatgpt-file-experience.md`、`docs/specs/2026-10-17-chatgpt-file-experience-design.md`（API 合同 §2.10、预算表 §2.7） |
+| 区域         | 位置                                                                                                                                                      |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 文件工作流后端    | `src/octop/infra/files/{service,parse,worker,context}.py`、`src/octop/infra/db/repos/chat_files.py`、`src/octop/api/routers/files.py`                     |
+| 文件 Schema  | `src/octop/infra/db/migrations/024_chat_files.sql`（+.pg.sql）；水位 `latest_schema_version()` in `migrate.py`                                               |
+| 上传链路       | `src/octop/api/routers/uploads.py`、`dashboard/src/pages/Chat/hooks/useChatAttachments.ts`、`dashboard/src/pages/Chat/components/ChatInputPreviewBar.tsx` |
+| 前端 API 客户端 | `dashboard/src/api/modules/files.ts`（T04 四端点）                                                                                                           |
+| 测试         | `tests/unit/files/`（31 个）、`tests/integration/test_chat_files_api.py`（7 个）、`useChatAttachments.test.tsx`（10 个）                                           |
+| 计划/设计文档    | `docs/specs/plans/2026-10-17-chatgpt-file-experience.md`、`docs/specs/2026-10-17-chatgpt-file-experience-design.md`（API 合同 §2.10、预算表 §2.7）               |
 
 ## 9. 本机约定与坑（必读）
 
@@ -110,3 +110,12 @@ P0 第一阶段（门禁 + 基线）已收官并推送；文件工作流读到�
 ---
 
 *附：复跑取证日志 `/tmp/pytest-targeted2.log`（后端定点回归，含 -rf 失败清单）；前端全量日志 `/tmp/vitest-solo.log`（单独跑）与 `/tmp/vitest-regress.log`（并发跑，数字偏高）。*
+
+## 10. 2026-10-23 复核补记
+
+- 当前分支仍为 `dev`，HEAD 已推进到 `6cb1b7b`；下文提交号、当时工作区状态和日志路径均是 10-22 的历史快照。
+- §5 第 1 项已修：当前 `tests/unit/db/test_db_pool.py` 只有两处 schema 版本断言，改为比较 `latest_schema_version()`。定向验证：`.venv\Scripts\python.exe -m pytest tests/unit/db/test_db_pool.py -q`，`20 passed, 1 skipped`。
+- §4.3 的“50 个全量失败”不再是当前判断：开发计划后来记录 Chat/Home 全集串行与 2-worker 均为 `562/562`。没有足够证据支持调全局 timeout/pool；先保留现状，若复现则记录当前命令和日志。
+- §7 第 1 项的旧日志在当前 Windows 工作区不可用；已在当前 HEAD 重跑 `test_agents_list_scope.py`、`test_boundary_authz.py`、`test_setup_bootstrap.py`、`test_invites_api.py`，结果为 `32 passed`。旧的 4 个失败未复现。
+- 后续文件工作流优先级以 `docs/specs/plans/2026-10-17-chatgpt-file-experience.md` 最新的“下一步执行顺序”为准；该计划仍列有 T02/T03、T04/T06 和 T05/T07 等未完项，不能把本交接中的 T05 第二刀视为完整闭环。
+- 本轮保留工作区其他既有修改；未运行全仓 `make all`，避免其格式化步骤改写无关 WIP。

@@ -181,7 +181,8 @@ class AdmissionSessionRepo:
         now = now_ts()
         with self._db.transaction() as conn:
             session = conn.execute(
-                "SELECT revision, last_turn_id FROM admission_registration_sessions "
+                "SELECT revision, last_turn_id, facts_json, summary_json, pending_proposal_json "
+                "FROM admission_registration_sessions "
                 "WHERE session_id = ? AND owner_user_id = ? AND expires_at > ?",
                 (session_id, owner_user_id, now),
             ).fetchone()
@@ -201,10 +202,16 @@ class AdmissionSessionRepo:
                     "fields_json": fields_json,
                     "status": status,
                 }
+                expected_session = {
+                    "facts_json": facts_json,
+                    "summary_json": summary_json,
+                    "pending_proposal_json": pending_proposal_json,
+                }
                 return (
                     int(session["revision"]) == expected_revision + 1
                     and session["last_turn_id"] == turn_id
                     and all(existing[key] == value for key, value in expected.items())
+                    and all(session[key] == value for key, value in expected_session.items())
                 )
             if (
                 int(session["revision"]) != expected_revision
@@ -260,7 +267,18 @@ class AdmissionSessionRepo:
                 "ORDER BY t.created_at, t.turn_id",
                 (session_id, owner_user_id, now_ts()),
             ).fetchall()
-        return [AdmissionTurnRow.from_row(row) for row in rows]
+        turns = [AdmissionTurnRow.from_row(row) for row in rows]
+        by_previous = {turn.previous_turn_id: turn for turn in turns}
+        ordered: list[AdmissionTurnRow] = []
+        previous_id = None
+        while previous_id in by_previous:
+            turn = by_previous.pop(previous_id)
+            ordered.append(turn)
+            previous_id = turn.turn_id
+        return [
+            *ordered,
+            *sorted(by_previous.values(), key=lambda turn: (turn.created_at, turn.turn_id)),
+        ]
 
     def delete_expired(self, *, now: int | None = None) -> int:
         with self._db.transaction() as conn:

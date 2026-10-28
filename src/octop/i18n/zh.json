@@ -65,6 +65,7 @@
             "card_pending_id": "审批 ID：`{pending_id}`（30 分钟内有效）",
             "none_pending": "当前会话没有待审批的工具操作。",
             "invalid_pending_id": "未找到审批 ID `{pending_id}`。可用 `/pending` 查看列表，或不带 ID 使用 `/approve` 批准最新一项。",
+            "pending_id_required": "当前有多个待审批项，请在审批卡片中选择要处理的那一项。",
             "not_owner": "仅发起本轮对话的用户可以批准或拒绝。",
             "expired": "审批请求已过期，请重新发送消息后再试。",
             "approved_ack": "已批准，继续执行…",
@@ -460,10 +461,12 @@
         "SLASH_BAD_ARGS": "参数无效。",
         "ATTACHMENT_UNSUPPORTED_TYPE": "不支持此文件类型。",
         "ATTACHMENT_TOO_LARGE": "附件超过 {max_mb} MB 大小限制。",
+        "DOCUMENT_CONVERSION_LIMIT": "可编辑文档超过 200,000 字符或 10,000 行的限制。",
         "FILE_READ_BUSY": "文件读取服务繁忙，请稍后重试。",
         "FILE_READ_TOO_LARGE": "文件超过自动读取大小限制。",
         "FILE_INTEGRITY_FAILED": "文件上传后内容已变化，无法按此版本读取。",
         "FILE_READ_FAILED": "无法安全读取此文件。",
+        "FILE_REVISION_CONFLICT": "文件已更新，请重新加载最新版本后再试。",
         "VOICE_BROWSER_ONLY": "语音输入仅在浏览器中可用。",
         "VOICE_KIND_UNSUPPORTED": "不支持的语音提供商。",
         "VOICE_CAPABILITY_MISMATCH": "语音能力不匹配。",
@@ -531,6 +534,16 @@
         "TEAM_MEMBER_BUSY": "该专家有进行中的团队任务，请等结束后再调整成员或删除。",
         "TEAM_NOT_SHAREABLE": "当前版本不支持分享团队。",
         "LOCAL_DOWNLOAD_UNAVAILABLE": "仅在本机打开 Octop 时才能保存到系统「下载」文件夹。",
+        "RUN_IDEMPOTENCY_CONFLICT": "此幂等键已用于不同的任务请求。",
+        "RUN_EVENT_LIMIT_EXCEEDED": "此任务已达到事件记录上限，无法继续变更。",
+        "RUN_INPUT_REQUIRED": "启动任务需要引用已保存的用户消息和会话。",
+        "RUN_STATE_CONFLICT": "任务状态已变化，请刷新后重试。",
+        "WORKBENCH_CONTEXT_CONFLICT": "项目指令已被更新，请重新加载最新内容后再试。",
+        "APP_UNSUPPORTED": "此应用不在模拟集成目录中。",
+        "APP_REGISTRATION_EXISTS": "此账号已注册该应用。",
+        "APP_SCOPE_INVALID": "请求的应用能力范围无效。",
+        "APP_GRANT_EXPIRY_INVALID": "能力授权的到期时间必须晚于当前时间。",
+        "APP_DISPLAY_NAME_INVALID": "应用显示名称不能为空。",
         "SKILL_PACKAGE_COPY_DENIED": "该技能包的创建者已禁止复制其中的技能。",
         "SKILL_PACKAGE_LOCKED": "此技能复制自锁定策略的技能包，无法在工作区编辑。",
         "USER_REJECTED": "账号未通过审核，请联系管理员。"
@@ -984,5 +997,25 @@
             "bind_failed": "目录服务拒绝了绑定 DN 或密码",
             "search_failed": "目录服务拒绝了用户检索"
         }
-    }
+    },
+  "presentations": {
+    "notFound": "演示稿不存在或无权访问。",
+    "conflict": "演示稿已发生变化，请重新加载后再试。",
+    "busy": "当前演示稿已有任务正在执行。",
+    "interrupted": "上次任务已中断，已完成页面已保留，可以重试。",
+    "invalidSvg": "生成的页面包含不受支持或不安全的 SVG 内容。",
+    "invalidOutline": "模型未返回有效的演示稿大纲。",
+    "modelUnavailable": "专家模型不可用，请配置可用的服务商与模型。",
+    "generationFailed": "制作任务失败，已完成页面已保留。",
+    "runtimeMissing": "尚未安装固定版本 PPT Master 导出引擎，请参阅 docs/ppt-studio.md。",
+    "exportFailed": "PPTX 导出失败，现有页面已保留。",
+    "exportNotReady": "请先生成全部页面并导出当前版本，再下载 PPTX。",
+    "invalidDeck": "演示稿数据无效。",
+    "capacity": "制作服务繁忙，请等待当前任务完成后重试。",
+    "chatBusy": "当前演示稿任务还在进行中，等它完成后再继续指挥。",
+    "chatInvalidArgs": "助手无法把这句话解析成有效指令，请换个说法再试。",
+    "chatNoDeck": "当前还没有演示稿，请先让我创建一份。",
+    "chatFallback": "这句话我没太理解，请换个说法再试一次。"
+  }
+
 }

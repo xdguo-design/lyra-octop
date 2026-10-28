@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -131,7 +132,8 @@ def test_extract_output_enforces_page_allowlist_and_value_limits() -> None:
     assert _extract_fields_output(
         json.dumps({"contact_phone": "13800138000", "occupation": "学生"}), page=0
     ) == {"contact_phone": "13800138000", "occupation": "学生"}
-    assert _extract_fields_output("not JSON", page=2) == {}
+    with pytest.raises(ValueError):
+        _extract_fields_output("not JSON", page=2)
 
 
 @pytest.mark.asyncio
@@ -190,10 +192,10 @@ async def test_candidate_confirmation_uses_patient_info_skill(monkeypatch) -> No
 
 
 @pytest.mark.asyncio
-async def test_extraction_uses_patient_info_skill_and_page_scope(monkeypatch) -> None:
+async def test_extraction_uses_compact_model_call_and_page_scope(monkeypatch) -> None:
     server = SimpleNamespace()
     call = AsyncMock(return_value=('{"occupation":"学生","address":"忽略"}', "Qwen Display"))
-    monkeypatch.setattr("octop.infra.admission_demo._call_admission_skill_with_model", call)
+    monkeypatch.setattr("octop.infra.admission_demo._call_admission_extraction_with_model", call)
 
     result, model_name = await extract_active_registration_fields_with_model(
         server, "我在上学", page=2
@@ -203,7 +205,6 @@ async def test_extraction_uses_patient_info_skill_and_page_scope(monkeypatch) ->
     assert model_name == "Qwen Display"
     call.assert_awaited_once_with(
         server,
-        skill="admission-patient-info",
         payload={"mode": "extract", "page": 2, "current_utterance": "我在上学"},
         user_id=None,
     )
@@ -232,13 +233,34 @@ def test_model_display_name_prefers_configured_name_and_falls_back_to_model_id()
 async def test_rejects_oversized_model_input_before_calling_agent(
     monkeypatch, text, context
 ) -> None:
-    call = AsyncMock()
-    monkeypatch.setattr("octop.infra.admission_demo._call_admission_skill_with_model", call)
+    ainvoke = AsyncMock(return_value=AIMessage(content="{}"))
+    model: Any = SimpleNamespace(
+        get_num_tokens_from_messages=lambda _messages: 10**6,
+        ainvoke=ainvoke,
+    )
+    model.bind = Mock(return_value=model)
+    registry = SimpleNamespace(
+        get_row=lambda _id: SimpleNamespace(default_model="bound/model"),
+        get_config=lambda _id: {},
+        harness_manager=SimpleNamespace(
+            shared_factory=SimpleNamespace(get_chat_model=Mock(return_value=model))
+        ),
+        providers=SimpleNamespace(
+            iter_usable_rows=lambda: [],
+            is_model_ref_usable=lambda _ref: True,
+            get_model_reasoning_capability=lambda _ref: None,
+        ),
+    )
+    server = SimpleNamespace(app_runtime=SimpleNamespace(agent_registry=registry))
+    monkeypatch.setattr("octop.infra.admission_demo._ensure_admission_agent", AsyncMock())
+    monkeypatch.setattr(
+        "octop.infra.admission_demo._read_skill_text", AsyncMock(return_value="skill")
+    )
 
     with pytest.raises(AdmissionContextTooLongError):
-        await extract_active_registration_fields(SimpleNamespace(), text, context=context)
+        await extract_active_registration_fields(server, text, context=context)
 
-    call.assert_not_awaited()
+    ainvoke.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -527,7 +549,7 @@ async def test_pins_initial_active_model_without_changing_an_existing_binding(bo
         get_config=lambda _id: {
             "admission_demo_agent": True,
             "max_iters": 32,
-            "max_input_length": 20000,
+            "max_input_length": 2000,
             "temperature": 0.2,
             "max_tokens": 512,
             "model_retry_enabled": False,
@@ -580,10 +602,12 @@ async def test_upgrades_existing_admission_graph_budget_without_changing_model()
     registry.update.assert_awaited_once()
     updates = registry.update.await_args.kwargs
     assert updates["max_iters"] == 32
+    assert updates["max_input_length"] == 2000
     assert "model_retry_enabled" not in updates
     assert json.loads(updates["config_json"]) == {
         **config,
         "max_iters": 32,
+        "max_input_length": 2000,
         "model_retry_enabled": False,
     }
     assert "default_model" not in updates

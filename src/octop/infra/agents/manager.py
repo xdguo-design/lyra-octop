@@ -138,6 +138,8 @@ def _model_retry_on_failure(
 _PROVIDER_RELOAD_CONCURRENCY = 6
 # One hung remote backend must not block ``octop run`` from serving HTTP.
 _AGENT_BOOT_START_TIMEOUT = 60.0
+# How often the idle auto-stop sweep checks for quiescent agents.
+_AGENT_IDLE_STOP_SWEEP_INTERVAL_S = 60.0
 
 # octop-memory builds SQLite table names as ``{namespace}_*``. The namespace
 # must be a valid bare SQL identifier: start with a letter, only [A-Za-z0-9_].
@@ -457,6 +459,7 @@ class AgentManager:
         # Serialize start/reload per agent so parallel provider reloads cannot
         # double-register the same harness id ("already exists in the registry").
         self._agent_lifecycle_locks: dict[str, asyncio.Lock] = {}
+        self._agent_start_events: dict[str, asyncio.Event] = {}
         # Serialize harness execution per thread. Dashboard turns are queued by
         # the channel debounce lock, but POST /chat/hitl/resume (and cron)
         # drive the same checkpoint without it — two concurrent executions on
@@ -470,6 +473,9 @@ class AgentManager:
         self._reclaim_holds: dict[str, asyncio.Event] = {}
         self._reclaim_task: asyncio.Task[None] | None = None
         self._reclaim_wake: asyncio.Event | None = None
+        # Monotonic last-activity stamps feeding the idle auto-stop sweep.
+        self._last_activity: dict[str, float] = {}
+        self._idle_stop_task: asyncio.Task[None] | None = None
         self._reload_dirty: set[str] = set()
         self._reload_worker_running: dict[str, bool] = {}
         self._bootstrap_graph_refresh_pending: set[str] = set()
@@ -609,6 +615,9 @@ class AgentManager:
                     "failed",
                     error=AGENT_START_TIMEOUT,
                 )
+        team_recovery = getattr(self._team_processor, "start_dispatch_recovery", None)
+        if callable(team_recovery) and self._harness_manager is not None:
+            await team_recovery(self._harness_manager.team)
 
     async def shutdown(self) -> None:
         self._reclaim_pending.clear()
@@ -618,6 +627,11 @@ class AgentManager:
             reclaim_task.cancel()
             with suppress(asyncio.CancelledError):
                 await reclaim_task
+        team_shutdown = getattr(
+            getattr(self, "_team_processor", None), "shutdown_dispatch_recovery", None
+        )
+        if callable(team_shutdown):
+            await team_shutdown()
         await self.memory_slim.close()
         async with self._lock:
             if self._harness_manager:
@@ -1076,6 +1090,7 @@ class AgentManager:
             if row is None:
                 raise OctopError(ErrorCode.AGENT_NOT_FOUND, f"agent {agent_id!r} not found")
             await self._start_agent(row, init_workspace=False)
+        self._note_activity(agent_id)
 
     def _lifecycle_lock_for(self, agent_id: str) -> asyncio.Lock:
         lock = self._agent_lifecycle_locks.get(agent_id)
@@ -1114,6 +1129,72 @@ class AgentManager:
                 await asyncio.to_thread(self._quiesce_octop_memory, agent_id)
                 await self._harness_manager.aremove_agent(agent_id)  # type: ignore[union-attr]
                 self._repos.agent_repo.set_state(agent_id, "stopped", error=None)
+        self._last_activity.pop(agent_id, None)
+
+    def start_idle_stop_sweep(self) -> None:
+        """Start the periodic idle auto-stop sweep (no-op when already running)."""
+        if self._idle_stop_task is not None and not self._idle_stop_task.done():
+            return
+        try:
+            self._idle_stop_task = asyncio.get_running_loop().create_task(
+                self._idle_stop_sweep_loop(), name="agent-idle-stop-sweep"
+            )
+        except RuntimeError:
+            return
+
+    async def _idle_stop_sweep_loop(self) -> None:
+        while True:
+            await asyncio.sleep(_AGENT_IDLE_STOP_SWEEP_INTERVAL_S)
+            try:
+                await self._sweep_idle_agents()
+            except Exception:
+                logger.exception("Agent idle-stop sweep failed")
+
+    def _idle_stop_minutes_for(self, row: AgentRow) -> int:
+        """Per-agent ``idle_stop_minutes`` override, else the global default."""
+        raw: Any = self._agent_config_dict(row).get("idle_stop_minutes")
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+            raw = getattr(self._config, "agent_idle_stop_minutes", 0)
+        return max(0, int(raw))
+
+    async def _sweep_idle_agents(self) -> None:
+        """Stop loaded agents that saw no invocation past their idle limit."""
+        if int(getattr(self._config, "agent_idle_stop_minutes", 0) or 0) <= 0:
+            return
+        now = time.monotonic()
+        for row in self._repos.agent_repo.list_all(include_disabled=False):
+            if row.last_state != "running":
+                continue
+            agent_id = row.agent_id
+            if self._octop_harness_or_none(agent_id) is None:
+                continue
+            if (
+                self.is_agent_active(agent_id)
+                or self._invocation_waiters.get(agent_id, 0) > 0
+                or agent_id in self._history_backfills
+                or agent_id in self._reclaim_holds
+            ):
+                continue
+            limit_minutes = self._idle_stop_minutes_for(row)
+            if limit_minutes <= 0:
+                continue
+            last = self._last_activity.get(agent_id)
+            if last is None or (now - last) < limit_minutes * 60:
+                continue
+            logger.info(
+                "Agent %s (%s) idle for over %s min — auto-stopping",
+                agent_id,
+                row.name,
+                limit_minutes,
+            )
+            try:
+                await self.stop(agent_id)
+            except Exception:
+                logger.exception("Idle auto-stop failed for agent %s", agent_id)
+                continue
+            self._repos.audit_repo.write(
+                actor=ACTOR_SYSTEM, action="agent.idle_stop", target=agent_id
+            )
 
     def _quiesce_octop_memory(self, agent_id: str) -> None:
         """Stop memory GC before the harness closes the SQLite backend.
@@ -1613,6 +1694,7 @@ class AgentManager:
             event.set()
 
     async def _begin_invocation(self, agent_id: str) -> None:
+        self._note_activity(agent_id)
         self._invocation_waiters[agent_id] = self._invocation_waiters.get(agent_id, 0) + 1
         try:
             while True:
@@ -1629,6 +1711,7 @@ class AgentManager:
         self._active_invocations[agent_id] = self._active_invocations.get(agent_id, 0) + 1
 
     def _end_invocation(self, agent_id: str) -> None:
+        self._note_activity(agent_id)
         active = self._active_invocations.get(agent_id, 1) - 1
         if active > 0:
             self._active_invocations[agent_id] = active
@@ -1645,10 +1728,32 @@ class AgentManager:
         finally:
             self._end_invocation(agent_id)
 
+    def _note_activity(self, agent_id: str) -> None:
+        """Stamp the idle-auto-stop clock for *agent_id* (monotonic seconds)."""
+        self._last_activity[agent_id] = time.monotonic()
+
+    async def _ensure_running(self, agent_id: str) -> None:
+        """Start a stopped agent on demand so deliveries need no manual start.
+
+        Called at every delivery entry (dashboard turn, cron, IM inbound);
+        a no-op while the harness already has the agent loaded.
+        """
+        if self._octop_harness_or_none(agent_id) is not None:
+            ready = getattr(self, "_agent_start_events", {}).get(agent_id)
+            if ready is not None:
+                await ready.wait()
+            self._note_activity(agent_id)
+            return
+        await self.start(agent_id)
+        if self._octop_harness_or_none(agent_id) is None:
+            raise self._unavailable_error(agent_id)
+        self._note_activity(agent_id)
+
     async def stream(self, agent_id: str, request: dict[str, Any]) -> AsyncIterator[Any]:
         """Stream harness chunks (Langfuse tracing handled inside octop-harness)."""
         if self._harness_manager is None:
             raise self._unavailable_error(agent_id)
+        await self._ensure_running(agent_id)
 
         thread_id = str(request.get("thread_id") or "")
         async with (
@@ -1669,6 +1774,7 @@ class AgentManager:
         """Non-streaming harness invocation (one-shot agent call)."""
         if self._harness_manager is None:
             raise self._unavailable_error(agent_id)
+        await self._ensure_running(agent_id)
         async with self._track_invocation(agent_id):
             self._apply_pending_bootstrap_graph_refresh(agent_id)
             req = self._prepare_stream_request(agent_id, request)
@@ -1692,6 +1798,7 @@ class AgentManager:
         """Resume a paused HITL interrupt for *thread_id*."""
         if self._harness_manager is None:
             raise self._unavailable_error(agent_id)
+        await self._ensure_running(agent_id)
         async with (
             self._thread_execution_lock(agent_id, thread_id),
             self._track_invocation(agent_id),
@@ -2099,7 +2206,7 @@ class AgentManager:
                     continue
                 if tools:
                     try:
-                        agent.append_mcp_tools(tools)
+                        self._append_mcp_tools_with_approval(agent, tools)
                     except Exception:
                         logger.exception(
                             "prepare_chat_mcp agent=%s: append_mcp_tools failed for %s",
@@ -2174,7 +2281,7 @@ class AgentManager:
                         )
 
                         sanitize_plugin_tool_names(extra)
-                        agent.append_mcp_tools(extra)
+                        self._append_mcp_tools_with_approval(agent, extra)
 
             # Full reload drops previously appended custom tools — re-inject from cache.
             if custom_configs and uid is not None:
@@ -2198,7 +2305,7 @@ class AgentManager:
                         )
                         continue
                     if tools:
-                        agent.append_mcp_tools(tools)
+                        self._append_mcp_tools_with_approval(agent, tools)
                         agent.config.mcp_server_configs[name] = dict(spec)
                     tool_set = getattr(agent, "_mcp_tool_name_set", frozenset())
 
@@ -2255,6 +2362,7 @@ class AgentManager:
             user_id=user_id,
             agent_id=agent_id,
             mcp_server_configs=agent.config.mcp_server_configs,
+            prepare_tools=lambda tools: self._prepare_tool_interrupts(agent, tools),
         )
 
     # ------------------------------------------------------------------
@@ -2956,6 +3064,8 @@ class AgentManager:
                     row.name,
                 )
                 return existing
+            ready = asyncio.Event()
+            self._agent_start_events[row.agent_id] = ready
             try:
                 from octop.infra.agents.teams import is_team_agent  # noqa: PLC0415
 
@@ -2990,6 +3100,9 @@ class AgentManager:
                     error=format_agent_start_error(exc),
                 )
                 return None
+            finally:
+                ready.set()
+                self._agent_start_events.pop(row.agent_id, None)
 
     async def _post_start_agent(
         self,
@@ -3012,11 +3125,15 @@ class AgentManager:
                 user_id=uid,
                 agent_id=row.agent_id,
                 mcp_server_configs=cfg.mcp_server_configs,
+                prepare_tools=lambda tools: self._prepare_tool_interrupts(agent, tools),
             )
         if not team_host:
             _sanitize_bound_mcp_tools(agent)
         if team_host:
             self.strip_team_host_runtime_tools(row.agent_id)
+        self._prepare_tool_interrupts(agent, list(getattr(agent, "_mcp_tools", [])))
+        if getattr(agent, "_mcp_tools", None):
+            agent.replace_mcp_tools(list(agent._mcp_tools))
         tool_set: frozenset[str] = getattr(agent, "_mcp_tool_name_set", frozenset())
         logger.info(
             "Agent %s started with mcp_servers=%s mcp_tool_count=%d tools_sample=%s",
@@ -3589,10 +3706,12 @@ class AgentManager:
             extract_original_plugin_label,
             sanitize_plugin_tool_names,
         )
+        from octop.infra.agents.settings.tool_catalog import BUILTIN_TOOL_CATALOG
 
         sanitize_plugin_tool_names(
             plugin_tools,
-            reserved={
+            reserved={entry.name for entry in BUILTIN_TOOL_CATALOG}
+            | {
                 str(getattr(t, "name", ""))
                 for t in [*(cron_tools or []), *knowledge_tools, *mobile_tools]
             },
@@ -3822,7 +3941,27 @@ class AgentManager:
         applied = self._merge_agently_write_interrupts(
             applied, self._connector_uid_for(row) if not team_host else None
         )
-        interrupt_on = apply_session_bypass(applied.interrupt_on, self._hitl_session_store)
+        from octop.infra.agents.security.tool_risk import merge_required_tool_approvals
+        from octop.infra.agents.settings.tool_catalog import BUILTIN_TOOL_CATALOG
+
+        builtin_risk_names = [entry.name for entry in BUILTIN_TOOL_CATALOG]
+        interrupt_on, protected_tools = merge_required_tool_approvals(
+            applied.interrupt_on,
+            [
+                *builtin_risk_names,
+                "bash",
+                "delete",
+            ],
+            policy.hitl.allowed_decisions,
+            force_require=[str(tool.name) for tool in plugin_tools],
+        )
+        bypassed_interrupt_on = apply_session_bypass(
+            interrupt_on,
+            self._hitl_session_store,
+            protected_tools=protected_tools,
+        )
+        if bypassed_interrupt_on is not None:
+            interrupt_on = bypassed_interrupt_on
         if interrupt_on is not applied.interrupt_on:
             applied = replace(applied, interrupt_on=interrupt_on)
         if applied.model_retry_enabled:
@@ -3849,6 +3988,28 @@ class AgentManager:
         return replace(
             applied,
             tool_guard_rules_dir=str(self._tool_guard_rules.rules_dir),
+        )
+
+    def _append_mcp_tools_with_approval(self, agent: HarnessAgent, tools: list[Any]) -> None:
+        """Configure mandatory approval before attaching side-effecting MCP tools."""
+        self._prepare_tool_interrupts(agent, tools)
+        agent.append_mcp_tools(tools)
+
+    def _prepare_tool_interrupts(self, agent: HarnessAgent, tools: list[Any]) -> None:
+        """Merge required approvals before a tool list is compiled into the graph."""
+        from octop.infra.agents.security.tool_risk import merge_required_tool_approvals
+
+        names = [str(name) for tool in tools if (name := getattr(tool, "name", None))]
+        policy = self._security.harness_policy()
+        current = getattr(agent.config, "interrupt_on", None) or {}
+        interrupt_on, protected = merge_required_tool_approvals(
+            current,
+            [*names, *current.keys()],
+            policy.hitl.allowed_decisions,
+            force_require=names,
+        )
+        agent.config.interrupt_on = apply_session_bypass(
+            interrupt_on, self._hitl_session_store, protected_tools=protected
         )
 
     def _install_team_host_dispatch(self) -> None:

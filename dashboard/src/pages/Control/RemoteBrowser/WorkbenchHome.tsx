@@ -75,6 +75,7 @@ interface WorkbenchHomeProps {
   onSubmitTask: (task: string) => void;
   /** Open the planet kids-workbench app panel. */
   onOpenPlanet: () => void;
+  onOpenPresentation?: () => void;
   /** Start a browser session directly. */
   onStartBrowser: () => void;
 }
@@ -121,6 +122,7 @@ export default function WorkbenchHome({
   starting,
   onSubmitTask,
   onOpenPlanet,
+  onOpenPresentation,
   onStartBrowser,
 }: WorkbenchHomeProps) {
   const { t } = useTranslation();
@@ -254,7 +256,11 @@ export default function WorkbenchHome({
         <button
           type="button"
           className={styles.card}
-          onClick={() => setCreationType("presentation")}
+          onClick={() =>
+            onOpenPresentation
+              ? onOpenPresentation()
+              : setCreationType("presentation")
+          }
         >
           <ThumbFrame title={t("workbench.home.cardPresentation", "创建 PPT")}>
             <span className={styles.thumbSoon}>

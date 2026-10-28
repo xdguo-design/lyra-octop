@@ -7,7 +7,7 @@
  * Frames arrive over WebSocket (/browser-stream/ws) instead of screenshot polling.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Alert,
   App,
@@ -291,6 +291,7 @@ export default function RemoteBrowserPage({
   isVisible = true,
 }: RemoteBrowserPageProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { modal, message: antMessage } = App.useApp();
   const isMobile = useIsMobile();
   const currentUser = useCurrentUser();
@@ -1487,6 +1488,7 @@ export default function RemoteBrowserPage({
                   starting={creating}
                   onSubmitTask={handleSubmitTask}
                   onOpenPlanet={() => setPlanetPanelOpen(true)}
+                  onOpenPresentation={() => navigate("/ppt-studio")}
                   onStartBrowser={() =>
                     envReady ? void createSession() : openEnvModal()
                   }

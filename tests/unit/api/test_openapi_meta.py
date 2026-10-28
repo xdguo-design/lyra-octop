@@ -27,5 +27,10 @@ async def test_openapi_has_bearer_security_and_descriptions(tmp_octop_home: Path
         me = spec["paths"]["/api/auth/me"]["get"]
         assert "BearerAuth" in me["security"][0]
         assert "security" not in spec["paths"]["/api/setup/status"]["get"]
+        create_run = spec["paths"]["/api/runs"]["post"]
+        assert create_run["summary"] == "Create a durable run record"
+        assert "BearerAuth" in create_run["security"][0]
+        assert "200" in create_run["responses"]
+        assert "/api/runs/{run_id}/events" in spec["paths"]
     finally:
         await srv.stop()

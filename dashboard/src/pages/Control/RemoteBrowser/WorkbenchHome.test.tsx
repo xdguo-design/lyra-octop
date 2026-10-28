@@ -37,6 +37,15 @@ function setup(overrides: Partial<Parameters<typeof WorkbenchHome>[0]> = {}) {
 }
 
 describe("WorkbenchHome", () => {
+  it("opens the integrated PPT studio when the host provides its entry", async () => {
+    const user = userEvent.setup();
+    const onOpenPresentation = vi.fn();
+    const props = setup({ onOpenPresentation });
+    await user.click(screen.getByRole("button", { name: /创建 PPT/ }));
+    expect(onOpenPresentation).toHaveBeenCalledOnce();
+    expect(props.onSubmitTask).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
   it("renders the hero, ask box and workbench cards", () => {
     setup();
     expect(screen.getByText("AI 工作台")).toBeTruthy();

@@ -8,6 +8,8 @@ export interface UsageStatItem {
   key: string;
   label: string;
   value: string | number;
+  /** Full-precision value for the hover tooltip when ``value`` is compacted. */
+  title?: string;
 }
 
 const STAT_CARD_MIN_PX = 160;
@@ -30,14 +32,16 @@ export function visibleStatCount(width: number, total: number): number {
 function StatBlock({
   label,
   value,
+  title,
 }: {
   label: string;
   value: string | number;
+  title?: string;
 }) {
   return (
-    <div className={styles.statBlock}>
-      <div className={styles.statLabel}>{label}</div>
+    <div className={styles.statBlock} title={title}>
       <div className={styles.statValue}>{value}</div>
+      <div className={styles.statLabel}>{label}</div>
     </div>
   );
 }
@@ -108,7 +112,12 @@ export function UsageStats({
           }
         >
           {shown.map((item) => (
-            <StatBlock key={item.key} label={item.label} value={item.value} />
+            <StatBlock
+              key={item.key}
+              label={item.label}
+              value={item.value}
+              title={item.title}
+            />
           ))}
         </div>
         {overflow.length > 0 ? (

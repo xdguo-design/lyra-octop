@@ -125,6 +125,8 @@ def _ensure_creation_card_category_schema(db: DatabasePool) -> None:
             "category",
             "TEXT CHECK (category IS NULL OR category IN ('platform', 'applet', 'service', 'repository'))",
         )
+        _ensure_column(db, "creation_card_meta", "repository_url", "TEXT")
+        _ensure_column(db, "creation_card_meta", "repository_branch", "TEXT")
 
 
 def _ensure_admission_registration_schema(db: DatabasePool) -> None:
@@ -1733,6 +1735,26 @@ def _ensure_workbench_schema(db: DatabasePool) -> None:
             )
 
 
+def _ensure_project_run_context_schema(db: DatabasePool) -> None:
+    if _table_exists(db, "workbench_projects"):
+        _ensure_column(db, "workbench_projects", "instructions", "TEXT NOT NULL DEFAULT ''")
+        _ensure_column(
+            db, "workbench_projects", "instructions_revision", "INTEGER NOT NULL DEFAULT 1"
+        )
+    if _table_exists(db, "runs"):
+        _ensure_column(db, "runs", "project_context_json", "TEXT")
+        _ensure_column(db, "runs", "source_file_revisions_json", "TEXT NOT NULL DEFAULT '[]'")
+    if _table_exists(db, "run_steps"):
+        _ensure_column(db, "run_steps", "inbox_id", "TEXT")
+        with db.connect() as conn:
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_run_steps_inbox "
+                "ON run_steps(inbox_id) WHERE inbox_id IS NOT NULL"
+            )
+    if _table_exists(db, "chat_file_revisions"):
+        _ensure_column(db, "chat_file_revisions", "parse_lease_until", "INTEGER")
+
+
 def _ensure_bridge_connections_schema(db: DatabasePool) -> None:
     """Fold notes + unique display_name + auto_reconnect into unreleased v19."""
     if not _table_exists(db, "bridge_connections"):
@@ -1822,6 +1844,29 @@ def _repair_legacy_schema(db: DatabasePool) -> None:
 def _max_discovered_version(dialect: str) -> int:
     versions = [version for version, _ in _discover(dialect)]
     return max(versions) if versions else 0
+
+
+def _apply_project_run_context_migration(db: DatabasePool, path: Path) -> None:
+    """Apply folded v31 DDL safely when a local watermark was manually lowered."""
+    sql = path.read_text(encoding="utf-8")
+    for table, column in (
+        ("workbench_projects", "instructions"),
+        ("workbench_projects", "instructions_revision"),
+        ("runs", "source_file_revisions_json"),
+        ("chat_file_revisions", "parse_lease_until"),
+    ):
+        if _table_exists(db, table) and column in _table_columns(db, table):
+            sql = re.sub(
+                rf"(?im)^ALTER TABLE {table} ADD COLUMN {column} [^;]+;\s*$",
+                "",
+                sql,
+            )
+    if db.dialect == "postgresql":
+        with db.connect() as conn, conn.transaction():
+            _apply_postgresql_migration(conn, sql)
+    else:
+        with db.connect() as conn:
+            conn.executescript(sql)
 
 
 def latest_schema_version(dialect: str = "sqlite") -> int:
@@ -2118,6 +2163,21 @@ def _apply_sqlite_migration(db: DatabasePool, version: int, path: Path) -> None:
         with db.connect() as conn:
             conn.execute("UPDATE _schema_version SET version = ?", (version,))
         return
+    if version == 32:
+        _ensure_creation_card_category_schema(db)
+        _ensure_run_execution_schema(db)
+        _ensure_agent_versions_schema(db)
+        _ensure_app_registry_schema(db)
+        _ensure_team_dispatch_payloads_schema(db)
+        if (
+            _table_exists(db, "users")
+            and _table_exists(db, "agents")
+            and _table_exists(db, "threads")
+        ):
+            _ensure_hitl_approvals_schema(db)
+        with db.connect() as conn:
+            conn.execute("UPDATE _schema_version SET version = ?", (version,))
+        return
     sql = path.read_text(encoding="utf-8")
     with db.connect() as conn:
         conn.executescript(sql)
@@ -2205,11 +2265,195 @@ def _grant_default_nav_permissions(db: DatabasePool) -> None:
             )
 
 
+def _ensure_hitl_approvals_schema(db: DatabasePool) -> None:
+    """Repair v32 databases created before the unreleased HITL table was folded in."""
+    blob_type = "BYTEA" if db.dialect == "postgresql" else "BLOB"
+    sql = f"""
+        CREATE TABLE IF NOT EXISTS hitl_approvals (
+            pending_id TEXT PRIMARY KEY,
+            user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            agent_id TEXT NOT NULL REFERENCES agents(agent_id) ON DELETE CASCADE,
+            thread_id TEXT NOT NULL REFERENCES threads(thread_id) ON DELETE CASCADE,
+            session_key TEXT NOT NULL,
+            channel_type TEXT NOT NULL,
+            resume_agent_id TEXT,
+            resume_thread_id TEXT,
+            run_id TEXT REFERENCES runs(run_id) ON DELETE SET NULL,
+            step_id TEXT REFERENCES run_steps(step_id) ON DELETE SET NULL,
+            request_blob {blob_type} NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'expired')),
+            created_at BIGINT NOT NULL,
+            updated_at BIGINT NOT NULL,
+            expires_at BIGINT NOT NULL
+        )
+    """
+    with db.connect() as conn:
+        conn.execute(sql)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_hitl_approvals_thread_pending "
+            "ON hitl_approvals(user_id, agent_id, thread_id, status, expires_at DESC)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_hitl_approvals_session_pending "
+            "ON hitl_approvals(user_id, session_key, agent_id, status, created_at DESC)"
+        )
+    _ensure_column(db, "hitl_approvals", "run_id", "TEXT")
+    _ensure_column(db, "hitl_approvals", "step_id", "TEXT")
+
+
+def _ensure_run_execution_schema(db: DatabasePool) -> None:
+    if not _table_exists(db, "runs"):
+        return
+    integer = "BIGINT" if db.dialect == "postgresql" else "INTEGER"
+    _ensure_column(db, "runs", "lease_owner", "TEXT")
+    _ensure_column(db, "runs", "lease_expires_at", integer)
+    _ensure_column(db, "runs", "max_runtime_seconds", f"{integer} NOT NULL DEFAULT 3600")
+    _ensure_column(db, "runs", "run_attempt", f"{integer} NOT NULL DEFAULT 0")
+    _ensure_column(db, "runs", "agent_version_id", "TEXT")
+    _ensure_column(db, "runs", "capability_scopes_json", "TEXT NOT NULL DEFAULT '[]'")
+    _ensure_column(db, "runs", "thread_id", "TEXT")
+
+
+def _ensure_run_effects_schema(db: DatabasePool) -> None:
+    if not (_table_exists(db, "runs") and _table_exists(db, "app_registrations")):
+        return
+    integer = "BIGINT" if db.dialect == "postgresql" else "INTEGER"
+    with db.connect() as conn:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS run_effects ("
+            "effect_id TEXT PRIMARY KEY, "
+            "run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE, "
+            "step_id TEXT REFERENCES run_steps(step_id) ON DELETE SET NULL, "
+            f"owner_user_id {integer} NOT NULL REFERENCES users(id) ON DELETE CASCADE, "
+            "agent_id TEXT NOT NULL REFERENCES agents(agent_id) ON DELETE CASCADE, "
+            "registration_id TEXT NOT NULL REFERENCES app_registrations(registration_id), "
+            "approval_id TEXT NOT NULL, "
+            f"approved_by_user_id {integer} NOT NULL REFERENCES users(id), "
+            f"approval_expires_at {integer} NOT NULL, scope TEXT NOT NULL, "
+            "resource_hash TEXT NOT NULL, request_hash TEXT NOT NULL, result_hash TEXT, "
+            "idempotency_key TEXT NOT NULL, "
+            "status TEXT NOT NULL CHECK (status IN ('requested', 'succeeded', 'failed', 'unknown')), "
+            f"created_at {integer} NOT NULL, updated_at {integer} NOT NULL, "
+            "UNIQUE(registration_id, idempotency_key))"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_run_effects_run_created "
+            "ON run_effects(run_id, created_at, effect_id)"
+        )
+
+
+def _ensure_run_artifacts_schema(db: DatabasePool) -> None:
+    if not all(_table_exists(db, table) for table in ("runs", "chat_files", "chat_file_revisions")):
+        return
+    integer = "BIGINT" if db.dialect == "postgresql" else "INTEGER"
+    with db.connect() as conn:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS run_artifacts ("
+            "artifact_id TEXT PRIMARY KEY, "
+            "run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE, "
+            "file_id TEXT NOT NULL, revision_id TEXT NOT NULL, "
+            f"created_at {integer} NOT NULL, UNIQUE(run_id, revision_id), "
+            "FOREIGN KEY (file_id, revision_id) REFERENCES "
+            "chat_file_revisions(file_id, revision_id) ON DELETE CASCADE)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_run_artifacts_run_created "
+            "ON run_artifacts(run_id, created_at, artifact_id)"
+        )
+
+
+def _ensure_team_dispatch_payloads_schema(db: DatabasePool) -> None:
+    if not _table_exists(db, "run_steps"):
+        return
+    integer = "BIGINT" if db.dialect == "postgresql" else "INTEGER"
+    blob = "BYTEA" if db.dialect == "postgresql" else "BLOB"
+    with db.connect() as conn:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS team_dispatch_payloads ("
+            "inbox_id TEXT PRIMARY KEY, "
+            "step_id TEXT NOT NULL UNIQUE REFERENCES run_steps(step_id) ON DELETE CASCADE, "
+            f"payload_blob {blob} NOT NULL, created_at {integer} NOT NULL)"
+        )
+
+
+def _ensure_agent_versions_schema(db: DatabasePool) -> None:
+    if not _table_exists(db, "agents"):
+        return
+    integer = "BIGINT" if db.dialect == "postgresql" else "INTEGER"
+    blob = "BYTEA" if db.dialect == "postgresql" else "BLOB"
+    with db.connect() as conn:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS agent_versions ("
+            "version_id TEXT PRIMARY KEY, "
+            "agent_id TEXT NOT NULL REFERENCES agents(agent_id) ON DELETE CASCADE, "
+            f"created_by {integer} REFERENCES users(id) ON DELETE SET NULL, "
+            f"schema_version {integer} NOT NULL CHECK (schema_version > 0), "
+            "content_hash TEXT NOT NULL, "
+            f"snapshot_blob {blob} NOT NULL, "
+            f"created_at {integer} NOT NULL, UNIQUE(agent_id, content_hash))"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS agent_version_aliases ("
+            "agent_id TEXT NOT NULL REFERENCES agents(agent_id) ON DELETE CASCADE, "
+            "alias TEXT NOT NULL, "
+            "version_id TEXT NOT NULL REFERENCES agent_versions(version_id) ON DELETE CASCADE, "
+            f"updated_at {integer} NOT NULL, PRIMARY KEY(agent_id, alias))"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_agent_versions_agent_created "
+            "ON agent_versions(agent_id, created_at DESC, version_id DESC)"
+        )
+
+
+def _ensure_app_registry_schema(db: DatabasePool) -> None:
+    if not (_table_exists(db, "users") and _table_exists(db, "agents")):
+        return
+    integer = "BIGINT" if db.dialect == "postgresql" else "INTEGER"
+    bool_type = "BOOLEAN" if db.dialect == "postgresql" else "INTEGER"
+    truth = "TRUE" if db.dialect == "postgresql" else "1"
+    identity = (
+        "BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY"
+        if db.dialect == "postgresql"
+        else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    )
+    with db.connect() as conn:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS app_registrations ("
+            f"id {identity}, registration_id TEXT NOT NULL UNIQUE, "
+            f"owner_user_id {integer} NOT NULL REFERENCES users(id) ON DELETE CASCADE, "
+            "app_key TEXT NOT NULL, display_name TEXT NOT NULL, "
+            "adapter_kind TEXT NOT NULL CHECK (adapter_kind = 'mock'), "
+            f"enabled {bool_type} NOT NULL DEFAULT {truth}, "
+            f"created_at {integer} NOT NULL, updated_at {integer} NOT NULL, "
+            "UNIQUE(owner_user_id, app_key))"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS capability_grants ("
+            f"id {identity}, grant_id TEXT NOT NULL UNIQUE, "
+            "registration_id TEXT NOT NULL REFERENCES app_registrations(registration_id) ON DELETE CASCADE, "
+            f"owner_user_id {integer} NOT NULL REFERENCES users(id) ON DELETE CASCADE, "
+            "agent_id TEXT NOT NULL REFERENCES agents(agent_id) ON DELETE CASCADE, "
+            "read_scopes_json TEXT NOT NULL DEFAULT '[]', "
+            "write_scopes_json TEXT NOT NULL DEFAULT '[]', expires_at "
+            f"{integer}, revoked_at {integer}, created_at {integer} NOT NULL, "
+            f"updated_at {integer} NOT NULL, UNIQUE(registration_id, owner_user_id, agent_id))"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_capability_grants_owner_agent "
+            "ON capability_grants(owner_user_id, agent_id, registration_id)"
+        )
+
+
 def run_migrations(db: DatabasePool) -> None:
     if db.dialect == "sqlite":
         _repair_legacy_schema(db)
+    if _table_exists(db, "users") and _table_exists(db, "agents") and _table_exists(db, "threads"):
+        _ensure_hitl_approvals_schema(db)
     for version, path in _discover(db.dialect):
         if version <= _current_version(db):
+            continue
+        if version == 31:
+            _apply_project_run_context_migration(db, path)
             continue
         # v18 touches optional ``user_invites``; use the idempotent helper for both
         # dialects so restores from pre-invite physical schemas do not fail.
@@ -2260,6 +2504,13 @@ def run_migrations(db: DatabasePool) -> None:
     _ensure_user_registration_schema(db)
     _ensure_email_verification_schema(db)
     _ensure_workbench_schema(db)
+    _ensure_project_run_context_schema(db)
     _ensure_creation_card_category_schema(db)
     _ensure_admission_registration_schema(db)
+    _ensure_run_execution_schema(db)
+    _ensure_run_effects_schema(db)
+    _ensure_run_artifacts_schema(db)
+    _ensure_agent_versions_schema(db)
+    _ensure_app_registry_schema(db)
+    _ensure_team_dispatch_payloads_schema(db)
     _grant_default_nav_permissions(db)

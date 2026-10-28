@@ -7,6 +7,7 @@ import {
   MessageSquarePlus,
   Paperclip,
   FileUp,
+  FilePlus,
   FolderUp,
   Zap,
   Link2,
@@ -181,6 +182,7 @@ interface ChatInputActionsRowProps {
   slashMenuItems: SlashMenuItem[];
   onSlashShortcutSelect: (command: string) => void;
   onFileSelect: () => void;
+  onTextArtifactOpen?: () => void;
   onFolderSelect: () => void;
   onNewChat: () => void;
   onPolish: () => void;
@@ -240,6 +242,7 @@ export default function ChatInputActionsRow({
   slashMenuItems,
   onSlashShortcutSelect,
   onFileSelect,
+  onTextArtifactOpen,
   onFolderSelect,
   onNewChat,
   onPolish,
@@ -1165,6 +1168,22 @@ export default function ChatInputActionsRow({
                   <span>{t("upload.files", "Files")}</span>
                 </span>
               </button>
+              {agentId && threadId && onTextArtifactOpen && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={styles.mobileOverflowItem}
+                  onClick={() => {
+                    setUploadOpen(false);
+                    onTextArtifactOpen();
+                  }}
+                >
+                  <span className={styles.mobileOverflowItemMain}>
+                    <FilePlus size={16} />
+                    <span>{t("chat.textArtifacts.open", "Text file")}</span>
+                  </span>
+                </button>
+              )}
               <button
                 type="button"
                 role="menuitem"

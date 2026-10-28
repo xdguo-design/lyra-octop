@@ -9,7 +9,7 @@ import {
   Tooltip,
   Alert,
 } from "antd";
-import { LayoutGrid, List, RefreshCw } from "lucide-react";
+import { History, LayoutGrid, List, RefreshCw } from "lucide-react";
 import type { CronJobSpecOutput } from "../../../api/types";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -254,6 +254,14 @@ function CronJobsPage() {
       <PageShell
         title={t("pageShell.tasks.title")}
         subtitle={t("pageShell.tasks.subtitle")}
+        actions={
+          <Button
+            icon={<History size={14} />}
+            onClick={() => navigate("/runs")}
+          >
+            {t("cronJobs.allAgentRuns")}
+          </Button>
+        }
         agentScoped
       >
         <Card>
@@ -275,6 +283,11 @@ function CronJobsPage() {
     <PageShell
       title={t("pageShell.tasks.title")}
       subtitle={t("pageShell.tasks.subtitle")}
+      actions={
+        <Button icon={<History size={14} />} onClick={() => navigate("/runs")}>
+          {t("cronJobs.allAgentRuns")}
+        </Button>
+      }
       agentScoped
     >
       {activeAgent?.bridge ? (

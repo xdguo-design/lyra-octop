@@ -65,6 +65,7 @@
             "card_pending_id": "Approval ID: `{pending_id}` (valid for 30 minutes)",
             "none_pending": "No pending tool approval for this conversation.",
             "invalid_pending_id": "No pending approval with ID `{pending_id}`. Use `/pending` to list or `/approve` without an ID for the latest.",
+            "pending_id_required": "Several approvals are pending. Choose the approval card you want to resolve.",
             "not_owner": "Only the user who started this turn can approve or reject.",
             "expired": "This approval request has expired. Send a new message to retry.",
             "approved_ack": "Approved. Continuing…",
@@ -460,10 +461,12 @@
         "SLASH_BAD_ARGS": "Invalid arguments.",
         "ATTACHMENT_UNSUPPORTED_TYPE": "This file type is not supported.",
         "ATTACHMENT_TOO_LARGE": "This attachment exceeds the {max_mb} MB size limit.",
+        "DOCUMENT_CONVERSION_LIMIT": "This editable document exceeds the 200,000-character or 10,000-line limit.",
         "FILE_READ_BUSY": "The file reader is busy. Retry in a moment.",
         "FILE_READ_TOO_LARGE": "This file exceeds the automatic read size limit.",
         "FILE_INTEGRITY_FAILED": "The stored file changed after upload and cannot be read as this revision.",
         "FILE_READ_FAILED": "The file could not be read safely.",
+        "FILE_REVISION_CONFLICT": "This file was updated. Reload the latest revision and try again.",
         "VOICE_BROWSER_ONLY": "Voice input is only available in the browser.",
         "VOICE_KIND_UNSUPPORTED": "Unsupported voice provider.",
         "VOICE_CAPABILITY_MISMATCH": "Voice capability does not match.",
@@ -531,6 +534,16 @@
         "TEAM_MEMBER_BUSY": "This expert has an in-flight team job. Wait until it finishes.",
         "TEAM_NOT_SHAREABLE": "Teams cannot be shared in this version.",
         "LOCAL_DOWNLOAD_UNAVAILABLE": "Saving to the host Downloads folder is only available when Octop is opened on this computer.",
+        "RUN_IDEMPOTENCY_CONFLICT": "This idempotency key was already used for a different run request.",
+        "RUN_EVENT_LIMIT_EXCEEDED": "This run reached its event limit and cannot be changed further.",
+        "RUN_INPUT_REQUIRED": "A saved user message and thread are required to start this run.",
+        "RUN_STATE_CONFLICT": "The run state changed. Reload it before trying again.",
+        "WORKBENCH_CONTEXT_CONFLICT": "Project instructions changed. Reload the latest context and try again.",
+        "APP_UNSUPPORTED": "This application is not available in the mock integration catalog.",
+        "APP_REGISTRATION_EXISTS": "This application is already registered for this account.",
+        "APP_SCOPE_INVALID": "The requested application capability scopes are invalid.",
+        "APP_GRANT_EXPIRY_INVALID": "The capability grant expiry must be in the future.",
+        "APP_DISPLAY_NAME_INVALID": "The application display name cannot be blank.",
         "SKILL_PACKAGE_COPY_DENIED": "The creator of this skill package has disabled copying its skills.",
         "SKILL_PACKAGE_LOCKED": "This skill was copied from a locked skill package and cannot be edited in the workspace.",
         "USER_REJECTED": "This account was not approved. Contact an administrator."
@@ -984,5 +997,25 @@
             "bind_failed": "The directory rejected the bind DN or password",
             "search_failed": "The directory refused the user search"
         }
-    }
+    },
+  "presentations": {
+    "notFound": "Presentation not found.",
+    "conflict": "This presentation changed. Reload before retrying.",
+    "busy": "A presentation task is already running.",
+    "interrupted": "The previous task was interrupted. Completed slides were kept; you can retry.",
+    "invalidSvg": "The generated slide contains unsupported or unsafe SVG.",
+    "invalidOutline": "The model did not return a valid presentation outline.",
+    "modelUnavailable": "The expert model is not available. Configure a usable provider and model.",
+    "generationFailed": "The presentation task failed. Completed slides were kept.",
+    "runtimeMissing": "The pinned PPT Master export engine is not installed. See docs/ppt-studio.md.",
+    "exportFailed": "PPTX export failed. The existing slides were kept.",
+    "exportNotReady": "Generate all slides and export the current version before downloading.",
+    "invalidDeck": "The presentation data is invalid.",
+    "capacity": "The presentation service is busy. Please retry after the current tasks finish.",
+    "chatBusy": "A presentation task is still running. Tell me what to change once it finishes.",
+    "chatInvalidArgs": "The assistant could not turn that into a valid instruction. Try rephrasing it.",
+    "chatNoDeck": "There is no presentation yet. Ask me to create one first.",
+    "chatFallback": "I did not quite catch that. Could you rephrase your request?"
+  }
+
 }

@@ -106,22 +106,14 @@ export default function AssistantTurnView({
   onSyncTodos,
 }: AssistantTurnViewProps) {
   const { t } = useTranslation();
-  const {
-    activeAgentId,
-    activeAgent: currentActiveAgent,
-    agents,
-  } = useAgent();
+  const { activeAgentId, activeAgent: currentActiveAgent, agents } = useAgent();
   const agentId = agentIdProp ?? activeAgentId;
   const speakerAgentId =
     messages.map((item) => messageSpeakerId(item)).find(Boolean) || agentId;
   const roomAgent =
     agents.find((item) => item.agent_id === agentId) ?? currentActiveAgent;
   const isTeamRoom = isTeamAgent(roomAgent);
-  const isHostSpeaker = isTeamHostSpeaker(
-    isTeamRoom,
-    speakerAgentId,
-    agentId,
-  );
+  const isHostSpeaker = isTeamHostSpeaker(isTeamRoom, speakerAgentId, agentId);
   const todoOwnerAgentId =
     isTeamRoom &&
     !isHostSpeaker &&

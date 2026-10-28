@@ -23,6 +23,8 @@ export interface CreationCardMeta {
   name: string | null;
   description: string | null;
   category: "platform" | "applet" | "service" | "repository" | null;
+  repository_url: string | null;
+  repository_branch: string | null;
 }
 
 export interface CreationsIndex {
@@ -47,6 +49,15 @@ export interface ProjectLaunchStatus {
   thumbnail_url: string | null;
 }
 
+export interface CreationThumbnailRefreshResult {
+  captured: boolean;
+  thumbnail_url: string | null;
+}
+
+export interface ProjectUpdateResult {
+  updated: boolean;
+}
+
 export const creationsApi = {
   list: () => request<CreationsIndex>("/creations"),
   launchStatus: (itemId: string) =>
@@ -62,6 +73,16 @@ export const creationsApi = {
     request<ProjectLaunchStatus>(
       `/creations/items/${encodeURIComponent(itemId)}/launch`,
       { method: "DELETE" },
+    ),
+  updateProject: (itemId: string) =>
+    request<ProjectUpdateResult>(
+      `/creations/items/${encodeURIComponent(itemId)}/update`,
+      { method: "POST" },
+    ),
+  updateCardCode: (cardType: "app", cardId: string) =>
+    request<ProjectUpdateResult>(
+      `/creations/cards/${cardType}/${encodeURIComponent(cardId)}/update`,
+      { method: "POST" },
     ),
   createFolder: (name: string) =>
     request<CreationFolder>("/creations/folders", {
@@ -90,6 +111,11 @@ export const creationsApi = {
       method: "PUT",
       body: JSON.stringify(body),
     }),
+  refreshThumbnail: (itemId: string) =>
+    request<CreationThumbnailRefreshResult>(
+      `/creations/items/${encodeURIComponent(itemId)}/thumbnail/refresh`,
+      { method: "POST" },
+    ),
   deleteItem: (itemId: string) =>
     request<void>(`/creations/items/${encodeURIComponent(itemId)}`, {
       method: "DELETE",
@@ -110,6 +136,8 @@ export const creationsApi = {
       name: string | null;
       description: string | null;
       category: "platform" | "applet" | "service" | "repository" | null;
+      repository_url: string | null;
+      repository_branch: string | null;
     },
   ) =>
     request<CreationCardMeta>(

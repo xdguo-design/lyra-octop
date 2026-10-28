@@ -26,17 +26,19 @@ def _acp_config(registry: Any, user_id: int) -> ACPConfig:
     return ACPConfig.from_dict({"runners": runners})
 
 
-async def list_model_options(*, registry: Any, user_id: int, agent_id: str) -> list[dict[str, str]]:
-    """Read model choices from the runner's ACP session config options."""
+async def list_model_options(
+    *, registry: Any, user_id: int, agent_id: str, runner_name: str
+) -> list[dict[str, str]]:
+    """Read model choices from a runner's ACP session config options."""
     from acp import PROTOCOL_VERSION, spawn_agent_process
     from acp.schema import ClientCapabilities, Implementation
 
     cwd = _workspace_dir(registry, agent_id)
     config = _acp_config(registry, user_id)
-    runner = config.runners.get("opencode")
+    runner = config.runners.get(runner_name)
     if runner is None or not runner.enabled:
-        raise ACPConfigurationError("OpenCode is not enabled")
-    client = ACPHostedClient(runner_name="opencode", runner_config=runner, cwd=str(cwd))
+        raise ACPConfigurationError(f"ACP runner {runner_name!r} is not enabled")
+    client = ACPHostedClient(runner_name=runner_name, runner_config=runner, cwd=str(cwd))
     env = overlay_env(os.environ, load_dotenv_path(os.path.join(cwd, ".env")), protect=True)
     env = overlay_env(env, runner.env, protect=False)
     async with AsyncExitStack() as stack:
@@ -56,7 +58,7 @@ async def list_model_options(*, registry: Any, user_id: int, agent_id: str) -> l
             client_info=Implementation(name="octop-direct-acp", version="1"),
         )
         if initialized.protocol_version != PROTOCOL_VERSION:
-            raise ACPConfigurationError("OpenCode ACP protocol version mismatch")
+            raise ACPConfigurationError(f"ACP runner {runner_name!r} protocol version mismatch")
         session = await conn.new_session(cwd=str(cwd))
         options = getattr(session, "config_options", None) or []
         model_option = next(
@@ -81,23 +83,27 @@ async def run_direct_turn(
     user_id: int,
     agent_id: str,
     thread_id: str,
+    runner_name: str,
     model: str | None,
     prompt: str,
     on_message: Any,
 ) -> dict[str, Any]:
-    """Run a prompt in the OpenCode ACP session bound to this thread."""
+    """Run a prompt in an ACP runner session bound to this thread."""
     cwd = _workspace_dir(registry, agent_id)
     config = _acp_config(registry, user_id)
-    runner = config.runners.get("opencode")
+    runner = config.runners.get(runner_name)
     if runner is None or not runner.enabled:
-        raise ACPConfigurationError("OpenCode is not enabled")
-    service_key = f"direct:{user_id}:{agent_id}"
+        raise ACPConfigurationError(f"ACP runner {runner_name!r} is not enabled")
+    runner_defaults = registry.acp_settings.load_runners(user_id)
+    default_model = runner_defaults.get(runner_name, {}).get("default_model")
+    model = model or (default_model if isinstance(default_model, str) else None)
+    service_key = f"direct:{user_id}:{agent_id}:{runner_name}"
     service = get_acp_service(service_key)
     if service is None:
         service = init_acp_service(service_key, config)
     session = await service._get_or_create_session(  # noqa: SLF001
         thread_id=thread_id,
-        runner="opencode",
+        runner=runner_name,
         cwd=str(cwd),
         require_existing=False,
     )
@@ -109,7 +115,7 @@ async def run_direct_turn(
         )
     result = await service.run_turn(
         thread_id=thread_id,
-        runner="opencode",
+        runner=runner_name,
         prompt_blocks=[{"type": "text", "text": prompt}],
         cwd=str(cwd),
         on_message=on_message,
@@ -120,14 +126,18 @@ async def run_direct_turn(
     return result
 
 
-async def cancel_direct_turn(*, user_id: int, agent_id: str, thread_id: str) -> bool:
-    service = get_acp_service(f"direct:{user_id}:{agent_id}")
+async def cancel_direct_turn(
+    *, user_id: int, agent_id: str, thread_id: str, runner_name: str
+) -> bool:
+    service = get_acp_service(f"direct:{user_id}:{agent_id}:{runner_name}")
     if service is None:
         return False
-    return await service.cancel_turn(thread_id=thread_id, runner="opencode")
+    return await service.cancel_turn(thread_id=thread_id, runner=runner_name)
 
 
-async def close_direct_thread(*, user_id: int, agent_id: str, thread_id: str) -> None:
-    service = get_acp_service(f"direct:{user_id}:{agent_id}")
+async def close_direct_thread(
+    *, user_id: int, agent_id: str, thread_id: str, runner_name: str
+) -> None:
+    service = get_acp_service(f"direct:{user_id}:{agent_id}:{runner_name}")
     if service is not None:
-        await service.close_thread_session(thread_id=thread_id, runner="opencode")
+        await service.close_thread_session(thread_id=thread_id, runner=runner_name)

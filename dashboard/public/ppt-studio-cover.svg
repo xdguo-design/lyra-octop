@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
+<rect width="640" height="360" fill="#edf0e9"/>
+<rect x="63" y="58" width="435" height="248" rx="3" fill="#d6dfcd" transform="rotate(-5 280 180)"/>
+<rect x="96" y="47" width="451" height="255" rx="3" fill="#faf9f2" stroke="#d8dfce"/>
+<text x="132" y="90" fill="#8b9a7d" font-family="sans-serif" font-size="9" letter-spacing="3">PRESENTATION STUDIO</text>
+<text x="130" y="170" fill="#30523d" font-family="Georgia,serif" font-size="56">From idea.</text>
+<text x="130" y="230" fill="#30523d" font-family="Georgia,serif" font-size="56">To impact.</text>
+<path d="M137 263h97m9 0h38" stroke="#a1b38c" stroke-width="2"/>
+<rect x="452" y="244" width="62" height="31" rx="4" fill="#31523e"/>
+<text x="465" y="264" fill="#faf9f2" font-family="sans-serif" font-size="12">PPTX</text>
+</svg>

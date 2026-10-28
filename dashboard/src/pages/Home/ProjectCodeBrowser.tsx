@@ -3,6 +3,7 @@ import { Button, Drawer, Empty, Spin } from "antd";
 import { ChevronLeft, FileCode2, Folder, RotateCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { workbenchApi, type CodeEntry } from "../../api/modules/workbench";
+import "./home-workbench.css";
 
 interface ProjectCodeBrowserProps {
   projectId: string;
@@ -68,7 +69,7 @@ export default function ProjectCodeBrowser({
       title={t("workbench.home.projects.codeTitle")}
       open={open}
       onClose={onClose}
-      width={900}
+      width="min(900px, 100vw)"
       destroyOnClose
       extra={
         <Button

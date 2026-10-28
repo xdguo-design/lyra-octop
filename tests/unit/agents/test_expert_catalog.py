@@ -43,6 +43,25 @@ def test_expert_discovers_seed_paths(tmp_path: Path) -> None:
     assert expert.prompt_files == []
 
 
+def test_ehr_platform_developer_template_includes_evidence_workflow() -> None:
+    from octop.infra.agents.experts.catalog import ExpertCatalog, default_library_root
+
+    catalog = ExpertCatalog(default_library_root())
+    catalog.refresh()
+    expert = catalog.get("ehr-platform-developer")
+
+    assert expert is not None
+    assert "SOUL.md" in expert.files
+    assert "skills/ehr-evidence-driven-slice/SKILL.md" in expert.files
+    assert expert.summary.label_zh == "HIS 证据驱动研发工程师"
+    assert len(expert.summary.quick_prompts) == 2
+    skill = catalog.read_file_contents(
+        "ehr-platform-developer", paths=["skills/ehr-evidence-driven-slice/SKILL.md"]
+    )
+    assert "020" in skill[0]["content"]
+    assert "UNKNOWN" in skill[0]["content"]
+
+
 def test_resolve_expert_icon_url_uses_scene_for_skillhub() -> None:
     from octop.infra.agents.experts.catalog import resolve_expert_icon_url
 

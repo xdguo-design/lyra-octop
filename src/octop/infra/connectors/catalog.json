@@ -700,6 +700,27 @@
         }
       ],
       "remote_transport": "streamable_http"
+    },
+    {
+      "kind": "cnb",
+      "name": { "en": "CNB Code Repositories", "zh": "CNB 代码仓库" },
+      "description": {
+        "en": "Connect a CNB account to clone and update its repositories",
+        "zh": "连接 CNB 账号，以便克隆和更新仓库"
+      },
+      "auth_kind": "personal_token",
+      "doc_url": "https://docs.cnb.cool/en/guide/access-token.html",
+      "icon": "cnb",
+      "color": "#1677ff",
+      "phase": "available",
+      "mcp_mode": "gateway",
+      "category": "self_hosted",
+      "manual_url": "https://docs.cnb.cool/en/guide/access-token.html",
+      "auth_hint": {
+        "en": "Create a CNB Access Token with repository read permission. Octop uses it only for Git clone and pull; the token is checked when you start or update a project.",
+        "zh": "创建具有仓库读取权限的 CNB Access Token。Octop 仅使用它执行 Git 克隆和拉取，并在启动或更新项目时验证令牌。"
+      },
+      "allowed_tools": []
     }
   ]
 }

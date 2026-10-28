@@ -10,13 +10,42 @@ import threading
 from dataclasses import asdict
 from functools import partial
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
+from octop.infra.db.repos._base import now_ts
 from octop.infra.db.repos.chat_files import ChatFileRepo
-from octop.infra.files.parse import DEFAULT_PARSE_LIMITS
+from octop.infra.files.parse import (
+    DEFAULT_PARSE_LIMITS,
+    PARSER_VERSION,
+    UnsupportedFileTypeError,
+)
 from octop.infra.files.worker import parse_file_in_worker
 
 _READ_SLOTS = threading.BoundedSemaphore(2)
+_PARSE_LEASE_SECONDS = 60
+
+
+def _source_spans(revision: Any, segments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    result = []
+    for segment in segments:
+        try:
+            locator = json.loads(str(segment.get("locator_json") or "{}"))
+        except json.JSONDecodeError:
+            locator = {}
+        result.append(
+            {
+                **segment,
+                "source_span": {
+                    "file_id": revision.file_id,
+                    "revision_id": revision.revision_id,
+                    "parser_version": revision.parse_version,
+                    "content_hash": revision.sha256,
+                    "ordinal": int(segment["ordinal"]),
+                    "locator": locator,
+                },
+            }
+        )
+    return result
 
 
 class FileReadBusy(RuntimeError):
@@ -34,6 +63,68 @@ class FileTooLargeError(ValueError):
 class FileService:
     def __init__(self, repo: ChatFileRepo) -> None:
         self._repo = repo
+
+    async def read_owned_revision_bytes(
+        self,
+        *,
+        workspace: Any,
+        file_id: str,
+        revision_id: str,
+        user_id: int,
+        agent_id: str,
+        thread_id: str | None = None,
+    ) -> tuple[Any, Any, bytes]:
+        if thread_id is None:
+            file_row = self._repo.get_owned_file(file_id, user_id=user_id, agent_id=agent_id)
+            revision = self._repo.get_revision(revision_id)
+            owned = (
+                (file_row, revision)
+                if file_row is not None and revision is not None and revision.file_id == file_id
+                else None
+            )
+        else:
+            owned = self._repo.get_owned_revision(
+                file_id=file_id,
+                revision_id=revision_id,
+                user_id=user_id,
+                agent_id=agent_id,
+                thread_id=thread_id,
+            )
+        if owned is None:
+            raise PermissionError("file revision is not available")
+        file_row, revision = owned
+        return file_row, revision, await self._read_revision_bytes(workspace, revision)
+
+    async def read_registered_path_bytes(
+        self, *, workspace: Any, agent_id: str, user_id: int, workspace_path: str
+    ) -> tuple[bytes, str] | None:
+        rows = self._repo.list_workspace_path_revisions(
+            agent_id=agent_id, workspace_path=workspace_path
+        )
+        if not rows:
+            return None
+        if len(rows) != 1 or rows[0]["deleted_at"] is not None:
+            raise PermissionError("registered file path is not available")
+        row = rows[0]
+        if int(row["user_id"]) != user_id:
+            raise PermissionError("registered file path is not available")
+        revision = self._repo.get_revision(str(row["revision_id"]))
+        if revision is None or revision.file_id != str(row["file_id"]):
+            raise PermissionError("registered file revision is not available")
+        return await self._read_revision_bytes(workspace, revision), revision.media_type
+
+    @staticmethod
+    async def _read_revision_bytes(workspace: Any, revision: Any) -> bytes:
+        data = cast(bytes | None, await workspace.adownload_bytes(revision.workspace_path))
+        if data is None:
+            raise FileNotFoundError("stored file content is unavailable")
+        FileService._verify_revision_bytes(revision, data)
+        return data
+
+    @staticmethod
+    def _verify_revision_bytes(revision: Any, data: bytes) -> None:
+        if len(data) != revision.byte_size or hashlib.sha256(data).hexdigest() != revision.sha256:
+            raise FileIntegrityError("file integrity check failed")
 
     async def read(
         self,
@@ -86,18 +177,49 @@ class FileService:
         data = workspace.download_bytes(revision.workspace_path)
         if data is None:
             raise FileNotFoundError("stored file content is unavailable")
-        if len(data) != revision.byte_size or hashlib.sha256(data).hexdigest() != revision.sha256:
-            raise FileIntegrityError("file integrity check failed")
-        if revision.parse_version is not None:
+        try:
+            self._verify_revision_bytes(revision, data)
+        except FileIntegrityError:
+            self._repo.invalidate_parse_result(
+                revision_id, expected_parse_version=revision.parse_version
+            )
+            raise
+        if revision.parse_version is not None and revision.parse_version >= PARSER_VERSION:
             return self._stored_result(revision_id)
         if len(data) > DEFAULT_PARSE_LIMITS.max_input_bytes:
+            self._repo.set_parse_status(
+                revision_id,
+                status="failed",
+                expected_parse_version=revision.parse_version,
+            )
             raise FileTooLargeError("file exceeds the automatic read size limit")
 
         suffix = Path(file_row.display_name).suffix.lower()
+        self._repo.set_parse_status(
+            revision_id,
+            status="processing",
+            expected_parse_version=revision.parse_version,
+            lease_until=now_ts() + _PARSE_LEASE_SECONDS,
+        )
         with tempfile.TemporaryDirectory(prefix="octop-file-read-") as directory:
             path = Path(directory) / ("input" + suffix)
             path.write_bytes(data)
-            result = parse_file_in_worker(path)
+            try:
+                result = parse_file_in_worker(path)
+            except UnsupportedFileTypeError:
+                self._repo.set_parse_status(
+                    revision_id,
+                    status="unsupported",
+                    expected_parse_version=revision.parse_version,
+                )
+                raise
+            except Exception:
+                self._repo.set_parse_status(
+                    revision_id,
+                    status="failed",
+                    expected_parse_version=revision.parse_version,
+                )
+                raise
 
         coverage = asdict(result.coverage)
         status = (
@@ -120,7 +242,8 @@ class FileService:
             parse_version=result.coverage.parser_version,
             read_status=status,
             coverage_json=json.dumps(coverage, separators=(",", ":")),
-            only_if_unparsed=True,
+            only_if_unparsed=revision.parse_version is None,
+            expected_parse_version=revision.parse_version,
         )
         if saved is None:
             return self._stored_result(revision_id)
@@ -129,7 +252,10 @@ class FileService:
             "revision_id": revision_id,
             "read_status": status,
             "coverage": coverage,
-            "segments": self._repo.list_segments(revision_id, limit=2_000),
+            "segments": _source_spans(
+                self._repo.get_revision(revision_id),
+                self._repo.list_segments(revision_id, limit=2_000),
+            ),
         }
 
     def _stored_result(self, revision_id: str) -> dict[str, Any]:
@@ -139,10 +265,20 @@ class FileService:
         return {
             "file_id": revision.file_id,
             "revision_id": revision_id,
-            "read_status": revision.read_status,
+            "read_status": self._read_status(revision),
             "coverage": json.loads(revision.coverage_json),
-            "segments": self._repo.list_segments(revision_id, limit=2_000),
+            "segments": _source_spans(revision, self._repo.list_segments(revision_id, limit=2_000)),
         }
+
+    @staticmethod
+    def _read_status(revision: Any) -> str:
+        if (
+            revision.read_status == "processing"
+            and revision.parse_lease_until is not None
+            and revision.parse_lease_until <= now_ts()
+        ):
+            return "stored"
+        return str(revision.read_status)
 
     # ---- Read-side queries (DB only; no workspace or worker needed) ----
 
@@ -152,8 +288,9 @@ class FileService:
             "display_name": file_row.display_name,
             "media_type": revision.media_type if revision else "",
             "byte_size": revision.byte_size if revision else 0,
-            "read_status": revision.read_status if revision else "stored",
+            "read_status": self._read_status(revision) if revision else "stored",
             "current_revision_id": file_row.current_revision_id,
+            "origin_kind": revision.origin_kind if revision else None,
             "created_at": file_row.created_at,
             "updated_at": file_row.updated_at,
         }
@@ -201,7 +338,7 @@ class FileService:
                 "revision_id": item.revision_id,
                 "parent_revision_id": item.parent_revision_id,
                 "origin_kind": item.origin_kind,
-                "read_status": item.read_status,
+                "read_status": self._read_status(item),
                 "byte_size": item.byte_size,
                 "created_at": item.created_at,
             }
@@ -231,8 +368,8 @@ class FileService:
         return {
             "file_id": file_id,
             "revision_id": revision.revision_id,
-            "read_status": revision.read_status,
-            "segments": fetched[:limit],
+            "read_status": self._read_status(revision),
+            "segments": _source_spans(revision, fetched[:limit]),
             "next_offset": offset + limit if has_more else None,
         }
 
@@ -253,5 +390,5 @@ class FileService:
             "file_id": file_id,
             "revision_id": revision.revision_id,
             "query": query.strip()[:500],
-            "matches": matches,
+            "matches": _source_spans(revision, matches),
         }

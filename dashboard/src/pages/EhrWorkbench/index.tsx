@@ -1,13 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { Badge, Button, Input, Layout, Space, Tooltip, Typography } from "antd";
-import {
-  ApiOutlined,
-  BugOutlined,
-  ExperimentOutlined,
-  MedicineBoxOutlined,
-  SearchOutlined,
-} from "@ant-design/icons";
-import { ehrApi } from "@/api/modules/ehr";
+import { Badge, Button, Input, Layout, Space, Tag, Typography } from "antd";
+import { useTranslation } from "react-i18next";
+import { SettingOutlined } from "@ant-design/icons";
+import { ehrApi, publicEhrApi } from "@/api/modules/ehr";
 import AgentPanel from "./AgentPanel";
 import DrugQueryView from "./DrugQueryView";
 import GraphView from "./GraphView";
@@ -16,18 +11,16 @@ import SkillsView from "./SkillsView";
 import { EHR_NAV, type EhrViewKey } from "./types";
 import styles from "./index.module.less";
 
-const { Sider, Content } = Layout;
+const { Content } = Layout;
 
-const VIEW_ICONS: Record<EhrViewKey, React.ReactNode> = {
-  search: <SearchOutlined />,
-  graph: <ApiOutlined />,
-  drug: <MedicineBoxOutlined />,
-  skills: <BugOutlined />,
-};
-
-export default function EhrWorkbenchPage() {
+export default function EhrWorkbenchPage({
+  publicMode = false,
+}: {
+  publicMode?: boolean;
+}) {
+  const { t } = useTranslation();
   const [view, setView] = useState<EhrViewKey>("search");
-  const [agentOpen, setAgentOpen] = useState(true);
+  const [agentOpen, setAgentOpen] = useState(false);
   const [ragUrl, setRagUrl] = useState("");
   const [ragDraft, setRagDraft] = useState("");
   const [urlEditing, setUrlEditing] = useState(false);
@@ -38,19 +31,24 @@ export default function EhrWorkbenchPage() {
 
   const refreshHealth = useCallback(async () => {
     try {
-      const resp = await ehrApi.health();
-      setHealth({ ok: resp.ok, docs: resp.docs });
+      if (publicMode) {
+        const resp = await publicEhrApi.health();
+        setHealth({ ok: resp.ok, docs: 0 });
+      } else {
+        const resp = await ehrApi.health();
+        setHealth({ ok: resp.ok, docs: resp.docs });
+      }
       setHealthError("");
     } catch (err) {
       setHealth(null);
       setHealthError(err instanceof Error ? err.message : String(err));
     }
-  }, []);
+  }, [publicMode]);
 
   useEffect(() => {
-    setRagUrl(ehrApiResolveUrl());
+    setRagUrl(publicMode ? "" : ehrApiResolveUrl());
     void refreshHealth();
-  }, [refreshHealth]);
+  }, [publicMode, refreshHealth]);
 
   // 直接内联避免循环依赖的小工具
   function ehrApiResolveUrl(): string {
@@ -58,7 +56,7 @@ export default function EhrWorkbenchPage() {
     if (stored) return stored;
     const fromEnv = import.meta.env.VITE_EHR_RAG_URL as string | undefined;
     if (fromEnv) return fromEnv;
-    return `http://${window.location.hostname || "127.0.0.1"}:8600`;
+    return "/ehr-rag";
   }
 
   const saveUrl = () => {
@@ -71,115 +69,108 @@ export default function EhrWorkbenchPage() {
     void refreshHealth();
   };
 
-  const askAgent = useCallback((question: string) => {
-    setAgentOpen(true);
-    // 通过自定义事件通知 AgentPanel 发起提问
-    window.dispatchEvent(
-      new CustomEvent("ehr:ask-agent", { detail: question }),
-    );
-  }, []);
-
   return (
     <Layout className={styles.ehrWorkbench}>
-      <Sider width={168} className={styles.ehrSider} theme="light">
-        <div className={styles.ehrBrand}>
-          <ExperimentOutlined style={{ fontSize: 20, color: "#1677ff" }} />
-          <Typography.Text strong style={{ marginLeft: 8 }}>
-            EHR 工作台
-          </Typography.Text>
-        </div>
-        <nav className={styles.ehrNav} aria-label="EHR 导航">
-          {EHR_NAV.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              className={
-                view === item.key ? styles.ehrNavItemActive : styles.ehrNavItem
-              }
-              onClick={() => setView(item.key)}
-            >
-              {VIEW_ICONS[item.key]}
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </nav>
-        <div className={styles.ehrSiderFooter}>
-          <Badge
-            status={health?.ok ? "success" : "error"}
-            text={
-              health
-                ? `已索引 ${health.docs} 条`
-                : healthError
-                ? "服务不可达"
-                : "连接中…"
-            }
-          />
-        </div>
-      </Sider>
-
       <Content className={styles.ehrContent}>
         <div className={styles.ehrTopbar}>
-          <Space wrap>
-            <Typography.Text strong>
-              {EHR_NAV.find((n) => n.key === view)?.label}
-            </Typography.Text>
-            <Tooltip title={ragUrl}>
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                服务：{ragUrl}
-              </Typography.Text>
-            </Tooltip>
-            <Button
-              size="small"
-              type="link"
-              onClick={() => {
-                setRagDraft(ragUrl);
-                setUrlEditing(true);
-              }}
-            >
-              修改
-            </Button>
-            <Button size="small" type="link" onClick={refreshHealth}>
-              刷新状态
-            </Button>
+          <Space size={12}>
+            {view !== "search" && (
+              <>
+                <Button
+                  type="text"
+                  size="small"
+                  onClick={() => setView("search")}
+                >
+                  ← {t("ehrWorkbenchPage.backToSearch")}
+                </Button>
+                <Typography.Text strong>
+                  {EHR_NAV.find((item) => item.key === view)?.label}
+                </Typography.Text>
+              </>
+            )}
+            <Badge
+              status={
+                health?.ok ? "success" : healthError ? "error" : "processing"
+              }
+              text={
+                health
+                  ? publicMode
+                    ? t("ehrWorkbenchPage.publicAvailable")
+                    : t("ehrWorkbenchPage.indexedCount", { count: health.docs })
+                  : healthError
+                  ? t("ehrWorkbenchPage.serviceUnavailable")
+                  : t("ehrWorkbenchPage.serviceConnecting")
+              }
+            />
           </Space>
-          <Space>
-            <Button size="small" onClick={() => setAgentOpen((v) => !v)}>
-              {agentOpen ? "收起助手" : "展开助手"}
+          <Space size={4}>
+            {publicMode && <Tag>{t("ehrWorkbenchPage.publicReadOnly")}</Tag>}
+            <Button
+              type="text"
+              size="small"
+              onClick={() => setAgentOpen((v) => !v)}
+            >
+              {agentOpen
+                ? t("ehrWorkbenchPage.closeDelivery")
+                : t("ehrWorkbenchPage.openDelivery")}
             </Button>
+            {!publicMode && (
+              <Button
+                type="text"
+                size="small"
+                icon={<SettingOutlined />}
+                aria-label={t("ehrWorkbenchPage.retrievalSettings")}
+                title={t("ehrWorkbenchPage.retrievalSettings")}
+                onClick={() => {
+                  setRagDraft(ragUrl);
+                  setUrlEditing(true);
+                }}
+              />
+            )}
           </Space>
         </div>
 
         {healthError && (
           <Typography.Text
             type="danger"
-            style={{ padding: "8px 16px", display: "block" }}
+            style={{ padding: "8px 24px", display: "block" }}
           >
-            无法连接 EHR RAG 服务（{ragUrl}）：{healthError}
+            {publicMode
+              ? t("ehrWorkbenchPage.publicUnavailable")
+              : `无法连接 EHR RAG 服务（${ragUrl}）：${healthError}`}
           </Typography.Text>
         )}
 
         <div className={styles.ehrBody}>
           <div className={styles.ehrMain}>
-            {view === "search" && <SearchHome onAskAgent={askAgent} />}
-            {view === "graph" && <GraphView onAskAgent={askAgent} />}
+            {view === "search" && (
+              <SearchHome
+                publicMode={publicMode}
+                onOpenDrugQuery={() => setView("drug")}
+              />
+            )}
+            {view === "graph" && <GraphView />}
             {view === "drug" && <DrugQueryView />}
             {view === "skills" && <SkillsView />}
           </div>
           {agentOpen && (
             <div className={styles.ehrAgent}>
-              <AgentPanel />
+              <AgentPanel
+                publicMode={publicMode}
+                onClose={() => setAgentOpen(false)}
+              />
             </div>
           )}
         </div>
       </Content>
 
-      {urlEditing && (
+      {!publicMode && urlEditing && (
         <div className={styles.ehrUrlModal}>
           <Typography.Text strong>EHR RAG 服务地址</Typography.Text>
           <Input
             value={ragDraft}
             onChange={(e) => setRagDraft(e.target.value)}
-            placeholder="http://119.3.216.103:8600"
+            placeholder="/ehr-rag"
             onPressEnter={saveUrl}
           />
           <Space>

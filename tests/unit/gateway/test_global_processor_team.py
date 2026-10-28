@@ -1863,6 +1863,254 @@ async def test_on_reply_failed_releases_job(processor_env: dict) -> None:
     assert not jobs.is_busy("host", "child")
 
 
+@pytest.mark.asyncio
+async def test_team_dispatch_persists_before_enqueue_with_harness_inbox_id() -> None:
+    from octop.infra.agents.teams.team_manager import wire_host_dispatch
+
+    order: list[tuple[str, str]] = []
+
+    def resolve_peer(source: str, target: str, user_id: str | int) -> None:
+        assert (source, target, user_id) == ("host", "member", 7)
+        order.append(("authorized", ""))
+
+    async def persist_dispatch(**kwargs: object) -> None:
+        inbox_id = str(kwargs["inbox_id"])
+        assert kwargs["from_agent_id"] == "host"
+        assert kwargs["message"] == "private task content"
+        assert kwargs["session_key"] == "session-7"
+        order.append(("persisted", inbox_id))
+
+    def enqueue(**kwargs: object) -> SimpleNamespace:
+        inbox_id = str(kwargs["job_id"])
+        order.append(("enqueued", inbox_id))
+        return SimpleNamespace(job_id=inbox_id, status="queued")
+
+    harness_team = SimpleNamespace(
+        enabled=True,
+        _resolve_peer_entry=resolve_peer,
+        submit_peer=enqueue,
+    )
+    wire_host_dispatch(
+        harness_team,
+        is_team=lambda agent_id: agent_id == "host",
+        on_dispatch=persist_dispatch,
+    )
+
+    result = await harness_team.call_peer(
+        from_agent_id="host",
+        to_agent_id="member",
+        message="private task content",
+        user_id=7,
+        source_thread_id="thread-7",
+        session_key="session-7",
+    )
+
+    assert result.status == "queued"
+    assert order[0] == ("authorized", "")
+    assert order[1][0] == "persisted"
+    assert order[2] == ("enqueued", order[1][1])
+
+
+@pytest.mark.asyncio
+async def test_team_dispatch_links_to_current_run_only_for_the_same_owner() -> None:
+    from octop.infra.agents.teams.team_manager import TeamManager
+    from octop.infra.run_context import RunContext, current_run_context
+
+    secrets: dict[str, bytes] = {}
+    manager = TeamManager(
+        agent_manager=MagicMock(),
+        thread_registry=MagicMock(),
+        user_repo=MagicMock(),
+        run_repo=MagicMock(),
+        secret_repo=SimpleNamespace(
+            get_or_create=lambda key, factory: secrets.setdefault(key, factory())
+        ),
+    )
+    token = current_run_context.set(RunContext("parent-run", 7))
+    try:
+        await manager._create_team_dispatch(
+            inbox_id="inbox-child",
+            from_agent_id="host",
+            to_agent_id="member",
+            user_id=7,
+            source_thread_id=None,
+            message="private task content",
+            session_key="session-key",
+        )
+        with pytest.raises(PermissionError, match="owner does not match"):
+            await manager._create_team_dispatch(
+                inbox_id="inbox-other-owner",
+                from_agent_id="host",
+                to_agent_id="member",
+                user_id=8,
+                source_thread_id=None,
+            )
+    finally:
+        current_run_context.reset(token)
+        if manager._dispatch_lease_task is not None:
+            manager._dispatch_lease_task.cancel()
+            await asyncio.gather(manager._dispatch_lease_task, return_exceptions=True)
+
+    kwargs = manager._run_repo.create_team_dispatch.call_args.kwargs
+    assert kwargs["parent_run_id"] == "parent-run"
+    assert kwargs["owner_user_id"] == 7
+    assert kwargs["lease_owner"] == manager._dispatch_instance_id
+    from octop.infra.agents.teams.dispatch_crypto import decrypt_dispatch
+
+    assert decrypt_dispatch(manager._secret_repo, kwargs["encrypted_payload"])["message"] == (
+        "private task content"
+    )
+    assert manager._run_repo.create_team_dispatch.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_team_dispatch_heartbeat_cancels_local_job_after_lease_loss(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from octop.infra.agents.teams.team_manager import TeamManager
+
+    repo = MagicMock()
+    repo.heartbeat_team_dispatch.return_value = False
+    agent_manager = MagicMock()
+    inbox = agent_manager._harness_manager.team.inbox
+    manager = TeamManager(
+        agent_manager=agent_manager,
+        thread_registry=MagicMock(),
+        user_repo=MagicMock(),
+        run_repo=repo,
+    )
+    manager._dispatch_lease_owners["job-1"] = 7
+
+    async def no_wait(_seconds: float) -> None:
+        return None
+
+    monkeypatch.setattr(asyncio, "sleep", no_wait)
+    await manager._heartbeat_team_dispatches()
+
+    repo.heartbeat_team_dispatch.assert_called_once_with(
+        "job-1",
+        owner_user_id=7,
+        executor_id=manager._dispatch_instance_id,
+    )
+    inbox.cancel.assert_called_once_with("job-1")
+    assert manager._dispatch_lease_owners == {}
+
+
+@pytest.mark.asyncio
+async def test_recovered_team_dispatch_reuses_inbox_id_and_encrypted_task() -> None:
+    from octop.infra.agents.teams.dispatch_crypto import encrypt_dispatch
+    from octop.infra.agents.teams.team_manager import TeamManager
+
+    keys: dict[str, bytes] = {}
+    secret_repo = SimpleNamespace(
+        get_or_create=lambda key, factory: keys.setdefault(key, factory())
+    )
+    payload = {
+        "user_id": 7,
+        "source_agent_id": "host",
+        "target_agent_id": "member",
+        "message": "resume this private task",
+        "source_thread_id": None,
+        "session_key": "session-key",
+        "original_user_prompt": None,
+    }
+    encrypted = encrypt_dispatch(secret_repo, payload)
+    assert b"resume this private task" not in encrypted
+
+    harness_team = SimpleNamespace(submit_peer=MagicMock())
+    repo = MagicMock()
+    manager = TeamManager(
+        agent_manager=MagicMock(),
+        thread_registry=MagicMock(),
+        user_repo=MagicMock(),
+        run_repo=repo,
+        secret_repo=secret_repo,
+    )
+    manager._dispatch_recovery_team = harness_team
+    row = {
+        "inbox_id": "recovered-inbox",
+        "owner_user_id": 7,
+        "payload_blob": encrypted,
+    }
+
+    await manager._restore_team_dispatch(row)
+    assert manager._dispatch_lease_owners == {"recovered-inbox": 7}
+    await manager.shutdown_dispatch_recovery()
+
+    harness_team.submit_peer.assert_called_once_with(
+        from_agent_id="host",
+        to_agent_id="member",
+        message="resume this private task",
+        user_id=7,
+        source_thread_id=None,
+        original_user_prompt=None,
+        job_id="recovered-inbox",
+        metadata={"session_key": "session-key"},
+    )
+
+
+@pytest.mark.asyncio
+async def test_parent_cancellation_waits_until_persisted_dispatch_is_enqueued() -> None:
+    from octop.infra.agents.teams.team_manager import TeamManager, wire_host_dispatch
+
+    persisted = asyncio.Event()
+    release = asyncio.Event()
+    order: list[str] = []
+    repo = MagicMock()
+    repo.list_children.return_value = [{"run_id": "child-run"}]
+    repo.list_steps.side_effect = lambda run_id, **_kwargs: (
+        [{"kind": "team_dispatch", "inbox_id": "job-1"}] if run_id == "child-run" else []
+    )
+    agent_manager = MagicMock()
+    inbox = agent_manager._harness_manager.team.inbox
+    inbox.get.return_value = SimpleNamespace(status="running")
+    inbox.cancel.side_effect = lambda _inbox_id: order.append("cancelled") or True
+    manager = TeamManager(
+        agent_manager=agent_manager,
+        thread_registry=MagicMock(),
+        user_repo=MagicMock(),
+        run_repo=repo,
+    )
+
+    async def persist_dispatch(**_kwargs: object) -> None:
+        order.append("persisted")
+        persisted.set()
+        await release.wait()
+
+    def enqueue(**kwargs: object) -> SimpleNamespace:
+        order.append("enqueued")
+        return SimpleNamespace(job_id=kwargs["job_id"], status="queued")
+
+    harness_team = SimpleNamespace(
+        enabled=True,
+        _resolve_peer_entry=lambda *_args: None,
+        submit_peer=enqueue,
+    )
+    wire_host_dispatch(
+        harness_team,
+        is_team=lambda _agent_id: True,
+        on_dispatch=persist_dispatch,
+        dispatch_lock=manager._dispatch_lock,
+    )
+    dispatch = asyncio.create_task(
+        harness_team.call_peer(
+            from_agent_id="host",
+            to_agent_id="member",
+            message="task",
+            user_id=7,
+            job_id="job-1",
+        )
+    )
+    await persisted.wait()
+    cancelling = asyncio.create_task(manager.cancel_run_dispatches("parent-run", owner_user_id=7))
+    await asyncio.sleep(0)
+    assert not cancelling.done()
+    release.set()
+    await asyncio.gather(dispatch, cancelling)
+
+    assert order == ["persisted", "enqueued", "cancelled"]
+
+
 def test_resolve_harness_model_auto_expert_omits_model() -> None:
     processor = GlobalProcessor(
         agent_manager=MagicMock(),

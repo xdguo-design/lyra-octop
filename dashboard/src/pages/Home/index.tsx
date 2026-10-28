@@ -34,7 +34,6 @@ import dayjs from "dayjs";
 import {
   ArrowLeft,
   ArrowRight,
-  Brain,
   Bot,
   Check,
   Cpu,
@@ -96,7 +95,7 @@ import {
 import { preferencesApi } from "../../api/modules/preferences";
 import { providerApi } from "../../api/modules/provider";
 import { acpApi } from "../../api/modules/acp";
-import type { ACPModelOption } from "../../api/types/acp";
+import type { ACPRunnerConfig } from "../../api/types/acp";
 import {
   knowledgeBasesApi,
   type KnowledgeBase,
@@ -114,6 +113,7 @@ import {
 } from "../Admin/Users/ProfileAvatar";
 import type { ResolvedModel } from "../../api/types";
 import { applyGuestLocale, applyUserLocale } from "../../utils/locale";
+import { isRunningInFrame } from "../../utils/framed";
 import { useTheme } from "../../context/ThemeContext";
 import { useChat } from "../Chat/hooks/useChat";
 import {
@@ -132,6 +132,8 @@ import AssistantTurnView from "../Chat/components/AssistantTurnView";
 import { groupConsecutiveAssistantMessages } from "../Chat/utils/messageGrouping";
 import EmojiPicker from "../../components/EmojiPicker";
 import ProjectCodeBrowser from "./ProjectCodeBrowser";
+import ProjectContextDialog from "./ProjectContextDialog";
+import ProjectRunsDialog from "./ProjectRunsDialog";
 import ProjectShareDialog from "./ProjectShareDialog";
 import { BUILT_IN_CREATIONS } from "../Creations/builtInCreations";
 import { isSttAvailable, useVoiceInput } from "../../hooks/useVoiceInput";
@@ -189,6 +191,7 @@ const NAV_ITEMS = [
   { path: "/tasks", label: "自动化", Icon: Timer },
 ];
 const MORE_ITEMS = [
+  { path: "/apps", label: "应用目录" },
   { path: "/admin/models", label: "模型与算力" },
   { path: "/acp", label: "ACP 协作" },
   { path: "/admin/plugins", label: "插件" },
@@ -503,6 +506,10 @@ export default function HomePage() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [user, setUser] = useState<MeUser | null>(null);
+  const moreItems =
+    user?.role === "admin"
+      ? [{ path: "/admin/overview", label: "系统管理总览" }, ...MORE_ITEMS]
+      : MORE_ITEMS;
   const [nameDraft, setNameDraft] = useState("");
   const [nameSaving, setNameSaving] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
@@ -604,6 +611,10 @@ export default function HomePage() {
   >(null);
   const [shareDialogProject, setShareDialogProject] =
     useState<WorkbenchProject | null>(null);
+  const [contextDialogProject, setContextDialogProject] =
+    useState<WorkbenchProject | null>(null);
+  const [runsDialogProject, setRunsDialogProject] =
+    useState<WorkbenchProject | null>(null);
   const [knowledgeProject, setKnowledgeProject] =
     useState<WorkbenchProject | null>(null);
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
@@ -616,18 +627,21 @@ export default function HomePage() {
   const [input, setInput] = useState("");
   const [availableModels, setAvailableModels] = useState<ResolvedModel[]>([]);
   const [modelsReady, setModelsReady] = useState(false);
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const [modelProviderMenuOpen, setModelProviderMenuOpen] = useState(false);
+  const [modelPickerProviderId, setModelPickerProviderId] = useState<
+    number | null
+  >(null);
   const [preferredModel, setPreferredModel] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [reasoningMode, setReasoningMode] = useState<
     "auto" | "enabled" | "disabled"
   >("auto");
   const [reasoningEffort, setReasoningEffort] = useState<string | null>(null);
-  const [directOpenCode, setDirectOpenCode] = useState(false);
-  const [openCodeEnabled, setOpenCodeEnabled] = useState(false);
-  const [openCodeDefaultModel, setOpenCodeDefaultModel] = useState<
-    string | null
-  >(null);
-  const [openCodeModels, setOpenCodeModels] = useState<ACPModelOption[]>([]);
+  const [directAcpRunner, setDirectAcpRunner] = useState<string | null>(null);
+  const [acpRunners, setAcpRunners] = useState<Record<string, ACPRunnerConfig>>(
+    {},
+  );
   const [threadModelSelections, setThreadModelSelections] = useState<
     Record<string, string | null>
   >({});
@@ -986,8 +1000,12 @@ export default function HomePage() {
   };
 
   const runProjectMenu = (key: string, project: WorkbenchProject) => {
-    if (key === "task") newTaskInProject(project.project_id);
+    if (key === "details")
+      navigate(`/projects/${encodeURIComponent(project.project_id)}`);
+    else if (key === "task") newTaskInProject(project.project_id);
     else if (key === "share") setShareDialogProject(project);
+    else if (key === "context") setContextDialogProject(project);
+    else if (key === "run-history") setRunsDialogProject(project);
     else if (key === "folder") {
       setFolderNameDraft("");
       setFolderModal({ projectId: project.project_id });
@@ -1062,6 +1080,7 @@ export default function HomePage() {
 
   const projectMenu = (project: WorkbenchProject) => ({
     items: [
+      { key: "details", label: t("projectDetailsPage.title") },
       { key: "task", label: t("workbench.home.projects.newTask") },
       { key: "folder", label: t("workbench.home.projects.newFolder") },
       ...(project.code_enabled
@@ -1081,6 +1100,14 @@ export default function HomePage() {
       {
         key: "knowledge",
         label: t("workbench.home.projects.manageKnowledge"),
+      },
+      {
+        key: "context",
+        label: t("workbench.home.projects.editContext"),
+      },
+      {
+        key: "run-history",
+        label: t("workbench.home.projects.runHistory"),
       },
       { key: "rename", label: t("workbench.home.projects.editProject") },
       { key: "icon", label: t("workbench.home.projects.editProjectIcon") },
@@ -1402,12 +1429,19 @@ export default function HomePage() {
   const activeThreadRow = threads.find(
     (thread) => thread.thread_id === activeThread,
   );
-  const usingOpenCode = activeThread
-    ? activeThreadRow?.acp_runner === "opencode"
-    : directOpenCode;
-  const canUseOpenCode = Boolean(
+  const activeAcpRunner = activeThread
+    ? activeThreadRow?.acp_runner || null
+    : directAcpRunner;
+  const usingAcpRunner = Boolean(activeAcpRunner);
+  const activeAcpRunnerLabel = activeAcpRunner
+    ? t(`acp.runner_${activeAcpRunner}`, activeAcpRunner)
+    : null;
+  const canUseAcpRunner = Boolean(
     primary && !blocksAcpOutboundFromConfig(primary.config ?? null),
   );
+  const activeAcpDefaultModel = activeAcpRunner
+    ? acpRunners[activeAcpRunner]?.default_model || null
+    : null;
   const activeThreadModel =
     threads.find((thread) => thread.thread_id === activeThread)?.model_ref ??
     null;
@@ -1460,13 +1494,11 @@ export default function HomePage() {
       .getConfig(agentId)
       .then((config) => {
         if (cancelled) return;
-        setOpenCodeEnabled(Boolean(config.runners?.opencode?.enabled));
-        setOpenCodeDefaultModel(config.default_model || null);
+        setAcpRunners(config.runners || {});
       })
       .catch(() => {
         if (!cancelled) {
-          setOpenCodeEnabled(false);
-          setOpenCodeDefaultModel(null);
+          setAcpRunners({});
         }
       });
     return () => {
@@ -1474,47 +1506,25 @@ export default function HomePage() {
     };
   }, [agentId]);
   useEffect(() => {
-    if (!usingOpenCode || !agentId) return;
-    let cancelled = false;
-    setModelsReady(false);
-    void acpApi
-      .getOpenCodeModels(agentId)
-      .then(({ models }) => {
-        if (!cancelled) {
-          setOpenCodeModels(models);
-          setModelsReady(true);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setOpenCodeModels([]);
-          setModelsReady(true);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [agentId, usingOpenCode]);
-  useEffect(() => {
     modelSelectionTouched.current = false;
   }, [agentId, activeThread]);
   useEffect(() => {
     if (!activeThread && modelSelectionTouched.current) return;
-    const requestedModel = usingOpenCode
-      ? activeThreadRow?.acp_model || openCodeDefaultModel
-      : activeThread &&
-        Object.prototype.hasOwnProperty.call(
-          threadModelSelections,
-          activeThread,
-        )
-      ? threadModelSelections[activeThread]
-      : activeThreadModel || preferredModel;
+    if (usingAcpRunner) {
+      setSelectedModel(null);
+      return;
+    }
+    const requestedModel =
+      activeThread &&
+      Object.prototype.hasOwnProperty.call(threadModelSelections, activeThread)
+        ? threadModelSelections[activeThread]
+        : activeThreadModel || preferredModel;
     const isAvailable = (
       candidate: string | null | undefined,
     ): candidate is string =>
       Boolean(
         candidate &&
-          (usingOpenCode ? openCodeModels : availableModels).some(
+          availableModels.some(
             (model) =>
               ("value" in model ? model.value : modelOptionValue(model)) ===
               candidate,
@@ -1523,36 +1533,28 @@ export default function HomePage() {
     setSelectedModel(
       isAvailable(requestedModel)
         ? requestedModel
-        : !usingOpenCode && isAvailable(preferredModel)
+        : isAvailable(preferredModel)
         ? preferredModel
         : null,
     );
   }, [
     agentId,
-    usingOpenCode,
-    activeThreadRow?.acp_model,
-    openCodeDefaultModel,
+    usingAcpRunner,
     activeThread,
     activeThreadModel,
     preferredModel,
     availableModels,
-    openCodeModels,
     threadModelSelections,
   ]);
-  const selectedModelOption = usingOpenCode
-    ? openCodeModels.find((model) => model.value === selectedModel)
-    : availableModels.find(
-        (model) => modelOptionValue(model) === selectedModel,
-      );
+  const selectedModelOption = availableModels.find(
+    (model) => modelOptionValue(model) === selectedModel,
+  );
   const selectedModelLabel = selectedModelOption
-    ? "value" in selectedModelOption
-      ? selectedModelOption.label
-      : modelOptionLabel(selectedModelOption)
+    ? modelOptionLabel(selectedModelOption)
     : null;
-  const selectedReasoningCapability = usingOpenCode
-    ? null
-    : availableModels.find((model) => modelOptionValue(model) === selectedModel)
-        ?.reasoning_config;
+  const selectedReasoningCapability = availableModels.find(
+    (model) => modelOptionValue(model) === selectedModel,
+  )?.reasoning_config;
   const effectiveReasoningMode = activeThread
     ? activeThreadRow?.reasoning_mode ??
       selectedReasoningCapability?.default_mode ??
@@ -1571,30 +1573,80 @@ export default function HomePage() {
     effectiveReasoningMode === "enabled" ||
     (effectiveReasoningMode === "auto" &&
       selectedReasoningCapability?.default_mode === "enabled");
-  const currentModelOptions = usingOpenCode ? openCodeModels : availableModels;
+  const reasoningEfforts = selectedReasoningCapability?.efforts ?? [];
+  const showReasoningControls =
+    showReasoningToggle || reasoningEfforts.length > 0;
+  const selectedReasoningEffort =
+    [
+      effectiveReasoningEffort,
+      selectedReasoningCapability?.default_effort,
+    ].find((effort) => effort && reasoningEfforts.includes(effort)) ??
+    reasoningEfforts[0] ??
+    null;
+  const reasoningEffortIndex = Math.max(
+    0,
+    reasoningEfforts.indexOf(selectedReasoningEffort ?? ""),
+  );
+  const reasoningSliderValue =
+    reasoningEfforts.length > 0
+      ? reasoningEffortIndex
+      : reasoningToggleActive
+      ? 1
+      : 0;
+  const reasoningSliderLabel =
+    reasoningEfforts.length === 0
+      ? t(
+          reasoningToggleActive
+            ? "chat.reasoningEnabled"
+            : "chat.reasoningDisabled",
+          reasoningToggleActive ? "开启" : "关闭",
+        )
+      : selectedReasoningCapability?.effort_type === "token_budget"
+      ? t("chat.reasoningTokenBudget", {
+          value: Number(selectedReasoningEffort).toLocaleString(),
+        })
+      : t(
+          `chat.reasoningEffortValues.${selectedReasoningEffort}`,
+          selectedReasoningEffort ?? "",
+        );
+  const modelProviderGroups = Array.from(
+    availableModels.reduce((groups, model) => {
+      const group = groups.get(model.provider_id) ?? {
+        id: model.provider_id,
+        name: model.provider_name,
+        models: [],
+      };
+      group.models.push(model);
+      groups.set(model.provider_id, group);
+      return groups;
+    }, new Map<number, { id: number; name: string; models: ResolvedModel[] }>()),
+  ).map(([, group]) => group);
+  const selectedModelProviderId = availableModels.find(
+    (model) => modelOptionValue(model) === selectedModel,
+  )?.provider_id;
+  const selectedProviderGroup =
+    modelProviderGroups.find((group) => group.id === modelPickerProviderId) ??
+    modelProviderGroups.find((group) => group.id === selectedModelProviderId) ??
+    modelProviderGroups[0];
+  const visibleModelOptions = selectedProviderGroup?.models ?? [];
   const modelMenuItems = [
-    ...(!usingOpenCode
-      ? [{ key: "auto", label: t("chat.modelAuto", "自动") }]
-      : []),
-    ...currentModelOptions.map((model) => ({
-      key: "value" in model ? model.value : modelOptionValue(model),
-      label: "value" in model ? model.label : modelOptionLabel(model),
+    { key: "auto", label: t("chat.modelAuto", "自动") },
+    ...visibleModelOptions.map((model) => ({
+      key: modelOptionValue(model),
+      label: modelOptionLabel(model),
     })),
-    ...(!modelsReady || currentModelOptions.length > 0
+    ...(!modelsReady || visibleModelOptions.length > 0
       ? []
       : [
           {
             key: "empty",
-            label: usingOpenCode
-              ? t("acp.directChatModelEmpty")
-              : t("chat.noModelsAvailable", "当前 Agent 暂无可用模型"),
+            label: t("chat.noModelsAvailable", "当前 Agent 暂无可用模型"),
             disabled: true,
           },
         ]),
   ];
   const handleModelMenu: (info: { key: string }) => void = ({ key }) => {
     if (!modelsReady || key === "empty") return;
-    if (key === "empty") return;
     const model = key === "auto" ? null : key;
     const capability = availableModels.find(
       (item) => modelOptionValue(item) === model,
@@ -1605,6 +1657,12 @@ export default function HomePage() {
     setReasoningEffort(nextReasoningEffort);
     modelSelectionTouched.current = true;
     setSelectedModel(model);
+    if (model) {
+      const providerId = availableModels.find(
+        (item) => modelOptionValue(item) === model,
+      )?.provider_id;
+      if (providerId !== undefined) setModelPickerProviderId(providerId);
+    }
     if (activeThread && agentId) {
       setThreadModelSelections((previous) => ({
         ...previous,
@@ -1613,31 +1671,23 @@ export default function HomePage() {
       setThreads((previous) =>
         previous.map((thread) =>
           thread.thread_id === activeThread
-            ? usingOpenCode
-              ? { ...thread, acp_model: model }
-              : {
-                  ...thread,
-                  model_ref: model,
-                  reasoning_mode: nextReasoningMode,
-                  reasoning_effort: nextReasoningEffort,
-                }
+            ? {
+                ...thread,
+                model_ref: model,
+                reasoning_mode: nextReasoningMode,
+                reasoning_effort: nextReasoningEffort,
+              }
             : thread,
         ),
       );
       const version = ++modelPatchVersion.current;
       modelPatchQueue.current = modelPatchQueue.current
         .then(() =>
-          octopThreadsApi.patch(
-            agentId,
-            activeThread,
-            usingOpenCode
-              ? { acp_model: model }
-              : {
-                  model_ref: model,
-                  reasoning_mode: nextReasoningMode,
-                  reasoning_effort: nextReasoningEffort,
-                },
-          ),
+          octopThreadsApi.patch(agentId, activeThread, {
+            model_ref: model,
+            reasoning_mode: nextReasoningMode,
+            reasoning_effort: nextReasoningEffort,
+          }),
         )
         .then(() => undefined)
         .catch(() => {
@@ -1647,8 +1697,8 @@ export default function HomePage() {
         });
     }
   };
-  const handleReasoningToggle = () => {
-    const nextMode = reasoningToggleActive ? "disabled" : "enabled";
+  const handleReasoningToggle = (enabled?: boolean) => {
+    const nextMode = enabled ?? !reasoningToggleActive ? "enabled" : "disabled";
     setReasoningMode(nextMode);
     if (activeThread && agentId) {
       setThreads((previous) =>
@@ -1663,6 +1713,33 @@ export default function HomePage() {
         .then(() =>
           octopThreadsApi.patch(agentId, activeThread, {
             reasoning_mode: nextMode,
+          }),
+        )
+        .then(() => undefined)
+        .catch(() => {
+          if (version === modelPatchVersion.current) {
+            setError(t("chat.reasoningSaveFailed", "思考设置保存失败"));
+          }
+        });
+    }
+  };
+  const handleReasoningEffortChange = (effort: string) => {
+    setReasoningMode("enabled");
+    setReasoningEffort(effort);
+    if (activeThread && agentId) {
+      setThreads((previous) =>
+        previous.map((thread) =>
+          thread.thread_id === activeThread
+            ? { ...thread, reasoning_mode: "enabled", reasoning_effort: effort }
+            : thread,
+        ),
+      );
+      const version = ++modelPatchVersion.current;
+      modelPatchQueue.current = modelPatchQueue.current
+        .then(() =>
+          octopThreadsApi.patch(agentId, activeThread, {
+            reasoning_mode: "enabled",
+            reasoning_effort: effort,
           }),
         )
         .then(() => undefined)
@@ -2222,41 +2299,48 @@ export default function HomePage() {
           ),
         }))
       : [{ key: "agent-empty", label: "没有运行中的 Agent", disabled: true }]),
-    ...(openCodeEnabled && canUseOpenCode
-      ? [{ key: "opencode", label: "OpenCode" }]
+    ...(canUseAcpRunner
+      ? Object.entries(acpRunners)
+          .filter(([, runner]) => runner.enabled)
+          .map(([runnerName]) => ({
+            key: `acp:${runnerName}`,
+            label: t(`acp.runner_${runnerName}`, runnerName),
+          }))
       : []),
   ];
   const handleAgentMenu: (info: { key: string }) => void = ({ key }) => {
-    if (key === "opencode") {
-      setDirectOpenCode(true);
+    if (key.startsWith("acp:")) {
+      const runnerName = key.slice(4);
+      const defaultModel = acpRunners[runnerName]?.default_model || null;
+      setDirectAcpRunner(runnerName);
       if (activeThread && agentId) {
         setThreads((items) =>
           items.map((thread) =>
             thread.thread_id === activeThread
               ? {
                   ...thread,
-                  acp_runner: "opencode",
-                  acp_model: openCodeDefaultModel,
+                  acp_runner: runnerName,
+                  acp_model: defaultModel,
                 }
               : thread,
           ),
         );
         void octopThreadsApi
           .patch(agentId, activeThread, {
-            acp_runner: "opencode",
-            acp_model: openCodeDefaultModel,
+            acp_runner: runnerName,
+            acp_model: defaultModel,
           })
           .catch(() => setError(t("acp.directChatSaveFailed")));
-        setSelectedModel(openCodeDefaultModel);
+        setSelectedModel(null);
       }
       return;
     }
     if (
       key &&
       key !== "agent-empty" &&
-      (usingOpenCode || key !== primary?.agent_id)
+      (usingAcpRunner || key !== primary?.agent_id)
     ) {
-      setDirectOpenCode(false);
+      setDirectAcpRunner(null);
       if (activeThread && agentId) {
         setThreads((items) =>
           items.map((thread) =>
@@ -2295,12 +2379,13 @@ export default function HomePage() {
       let threadId = activeThread;
       let sessionKey = threadId || "";
       if (!threadId) {
-        const created = usingOpenCode
-          ? await octopThreadsApi.create(agentId, {
-              acp_runner: "opencode",
-              acp_model: selectedModel || openCodeDefaultModel,
-            })
-          : await octopThreadsApi.create(agentId);
+        const created =
+          usingAcpRunner && activeAcpRunner
+            ? await octopThreadsApi.create(agentId, {
+                acp_runner: activeAcpRunner,
+                acp_model: activeAcpDefaultModel,
+              })
+            : await octopThreadsApi.create(agentId);
         if (epoch !== taskEpoch.current) return;
         threadId = created.thread_id;
         sessionKey = created.session_key;
@@ -2313,19 +2398,17 @@ export default function HomePage() {
             title: firstQuestionTitle,
             last_active: now,
             created_at: now,
-            model_ref: usingOpenCode ? null : selectedModel,
-            acp_runner: usingOpenCode ? "opencode" : null,
-            acp_model: usingOpenCode
-              ? selectedModel || openCodeDefaultModel
-              : null,
-            reasoning_mode: usingOpenCode ? null : effectiveReasoningMode,
-            reasoning_effort: usingOpenCode ? null : effectiveReasoningEffort,
+            model_ref: usingAcpRunner ? null : selectedModel,
+            acp_runner: usingAcpRunner ? activeAcpRunner : null,
+            acp_model: usingAcpRunner ? activeAcpDefaultModel : null,
+            reasoning_mode: usingAcpRunner ? null : effectiveReasoningMode,
+            reasoning_effort: usingAcpRunner ? null : effectiveReasoningEffort,
           },
           ...prev,
         ]);
         setThreadModelSelections((previous) => ({
           ...previous,
-          [created.thread_id]: selectedModel,
+          [created.thread_id]: usingAcpRunner ? null : selectedModel,
         }));
         setActiveThread(threadId);
         if (pendingAssignment?.projectId) {
@@ -2339,7 +2422,7 @@ export default function HomePage() {
       if (!threadId || epoch !== taskEpoch.current) return;
       // The existing Octop WebSocket store handles streaming and reconnection.
       // Do not dispatch worker messages directly from this surface.
-      if (usingOpenCode) {
+      if (usingAcpRunner && activeAcpRunner) {
         sendMessage(
           text,
           sessionKey,
@@ -2355,7 +2438,7 @@ export default function HomePage() {
           undefined,
           undefined,
           undefined,
-          "opencode",
+          activeAcpRunner,
         );
       } else {
         const args = [
@@ -2659,6 +2742,9 @@ export default function HomePage() {
     : "/chat";
   const hasChat = activeThread !== null;
   const platformVisible = isHomeRoute && platformOpen;
+  // 平台 iframe（内置平台/创作预览）里的页面不渲染工作台菜单：
+  // 外壳已提供返回与应用栏，保留菜单会诱导用户在 iframe 里再开内置平台（无限嵌套）。
+  const framedView = isRunningInFrame();
   const currentSection = featureTitle(location.pathname);
   const activeAssignment = activeThread
     ? assignmentByThread.get(activeThread)
@@ -2680,7 +2766,7 @@ export default function HomePage() {
     <div
       className={
         "wb-root" +
-        (platformVisible ? " wb-root-platform" : "") +
+        (platformVisible || framedView ? " wb-root-platform" : "") +
         (mobileNavOpen ? " is-mobile-nav-open" : "") +
         (sideCollapsed ? " wb-side-collapsed" : "")
       }
@@ -2694,7 +2780,7 @@ export default function HomePage() {
           onClick={() => setMobileNavOpen(false)}
         />
       )}
-      {!platformVisible && (
+      {!platformVisible && !framedView && (
         <aside className={"wb-side" + (mobileNavOpen ? " is-open" : "")}>
           <button
             className="wb-brand"
@@ -2756,7 +2842,7 @@ export default function HomePage() {
               arrow={false}
               content={
                 <div className="wb-menu-popup">
-                  {MORE_ITEMS.map((item) => (
+                  {moreItems.map((item) => (
                     <button
                       type="button"
                       key={item.path}
@@ -3378,23 +3464,26 @@ export default function HomePage() {
               <span>LYRA SPACE</span>
               <ChevronRight size={13} />
               <strong>工作台</strong>
-              <div
-                className="wb-mode-tabs"
-                role="group"
-                aria-label="工作区模式"
-              >
-                <button
-                  type="button"
-                  className="is-selected"
-                  aria-current="page"
-                  onClick={() => setPlatformOpen(false)}
+              {/* 平台 iframe 里再开「内置平台」会无限嵌套，入口只在顶层保留。 */}
+              {!framedView && (
+                <div
+                  className="wb-mode-tabs"
+                  role="group"
+                  aria-label="工作区模式"
                 >
-                  <MessageCircle size={14} /> 主 Agent 对话
-                </button>
-                <button type="button" onClick={openPlatform}>
-                  <Layers3 size={14} /> 内置平台
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    className="is-selected"
+                    aria-current="page"
+                    onClick={() => setPlatformOpen(false)}
+                  >
+                    <MessageCircle size={14} /> 主 Agent 对话
+                  </button>
+                  <button type="button" onClick={openPlatform}>
+                    <Layers3 size={14} /> 内置平台
+                  </button>
+                </div>
+              )}
             </div>
             <div className="wb-topbar-right">
               <span className="wb-status">
@@ -3626,14 +3715,22 @@ export default function HomePage() {
                       trigger={["click"]}
                       placement="topLeft"
                       overlayClassName="wb-theme-popup"
+                      onOpenChange={(open) => {
+                        if (!open || !agentId) return;
+                        void acpApi
+                          .getConfig(agentId)
+                          .then((config) => setAcpRunners(config.runners || {}))
+                          .catch(() => {});
+                      }}
                       menu={{
                         items: agentMenuItems,
                         onClick: handleAgentMenu,
-                        selectedKeys: usingOpenCode
-                          ? ["opencode"]
-                          : primary?.agent_id
-                          ? [primary.agent_id]
-                          : [],
+                        selectedKeys:
+                          usingAcpRunner && activeAcpRunner
+                            ? [`acp:${activeAcpRunner}`]
+                            : primary?.agent_id
+                            ? [primary.agent_id]
+                            : [],
                       }}
                     >
                       <button
@@ -3642,7 +3739,7 @@ export default function HomePage() {
                         aria-label="选择对话 Agent"
                         title="选择由哪个 Agent 处理消息"
                       >
-                        {usingOpenCode ? (
+                        {usingAcpRunner ? (
                           <Bot size={15} />
                         ) : primary ? (
                           <ExpertAgentAvatar
@@ -3654,16 +3751,147 @@ export default function HomePage() {
                         ) : (
                           <Bot size={15} />
                         )}
-                        {usingOpenCode
-                          ? "OpenCode"
+                        {usingAcpRunner
+                          ? activeAcpRunnerLabel
                           : primary?.name || "选择 Agent"}{" "}
                         <ChevronDown size={13} />
                       </button>
                     </Dropdown>
                     <Dropdown
                       trigger={["click"]}
-                      placement="topLeft"
+                      placement="topRight"
+                      align={{
+                        offset: [window.innerWidth <= 740 ? -150 : 0, 0],
+                      }}
                       overlayClassName="wb-theme-popup"
+                      open={!usingAcpRunner && modelPickerOpen}
+                      onOpenChange={(open) => {
+                        setModelPickerOpen(open);
+                        if (!open) setModelProviderMenuOpen(false);
+                      }}
+                      dropdownRender={(menu) => (
+                        <div className="wb-model-picker">
+                          {!usingAcpRunner && selectedProviderGroup && (
+                            <>
+                              <button
+                                type="button"
+                                className="wb-model-picker-heading"
+                                aria-label={t(
+                                  "chat.selectModelProvider",
+                                  "切换模型提供商",
+                                )}
+                                aria-expanded={modelProviderMenuOpen}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  const open = !modelProviderMenuOpen;
+                                  setModelProviderMenuOpen(open);
+                                }}
+                              >
+                                <span className="wb-model-provider-logo">
+                                  <Cpu size={15} />
+                                </span>
+                                <span className="wb-model-provider-name">
+                                  {selectedProviderGroup.name}
+                                </span>
+                                <ChevronRight size={15} />
+                              </button>
+                              {modelProviderMenuOpen && (
+                                <div
+                                  className="wb-model-provider-menu"
+                                  role="menu"
+                                  aria-label={t(
+                                    "chat.selectModelProvider",
+                                    "切换模型提供商",
+                                  )}
+                                >
+                                  {modelProviderGroups.map((group) => (
+                                    <button
+                                      key={group.id}
+                                      type="button"
+                                      role="menuitem"
+                                      className="wb-model-provider-option"
+                                      aria-current={
+                                        group.id === selectedProviderGroup.id
+                                          ? "true"
+                                          : undefined
+                                      }
+                                      onClick={() => {
+                                        setModelPickerProviderId(group.id);
+                                        setModelProviderMenuOpen(false);
+                                      }}
+                                    >
+                                      <span>{group.name}</span>
+                                      {group.id ===
+                                        selectedProviderGroup.id && (
+                                        <Check size={14} />
+                                      )}
+                                    </button>
+                                  ))}
+                                  <div className="wb-model-provider-divider" />
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="wb-model-provider-manage"
+                                    onClick={() => {
+                                      setModelPickerOpen(false);
+                                      setModelProviderMenuOpen(false);
+                                      navigate("/admin/models");
+                                    }}
+                                  >
+                                    {t("chat.modelPickerManage")}
+                                  </button>
+                                </div>
+                              )}
+                            </>
+                          )}
+                          {menu}
+                          {showReasoningControls && (
+                            <div className="wb-reasoning-panel">
+                              <div className="wb-reasoning-effort">
+                                <label htmlFor="wb-reasoning-effort">
+                                  {t("chat.reasoningEffort", "思考强度")}
+                                </label>
+                                <span>{reasoningSliderLabel}</span>
+                                <kbd aria-hidden="true">Ctrl+T</kbd>
+                                <input
+                                  id="wb-reasoning-effort"
+                                  type="range"
+                                  min={0}
+                                  max={Math.max(reasoningEfforts.length - 1, 1)}
+                                  step={1}
+                                  value={reasoningSliderValue}
+                                  style={
+                                    {
+                                      "--reasoning-progress": `${
+                                        (reasoningSliderValue /
+                                          Math.max(
+                                            reasoningEfforts.length - 1,
+                                            1,
+                                          )) *
+                                        100
+                                      }%`,
+                                    } as CSSProperties
+                                  }
+                                  aria-label={t(
+                                    "chat.reasoningEffort",
+                                    "思考强度",
+                                  )}
+                                  aria-valuetext={reasoningSliderLabel}
+                                  onChange={(event) => {
+                                    const index = Number(event.target.value);
+                                    const effort = reasoningEfforts[index];
+                                    if (effort) {
+                                      handleReasoningEffortChange(effort);
+                                    } else {
+                                      handleReasoningToggle(index === 1);
+                                    }
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       menu={{
                         items: modelMenuItems,
                         onClick: handleModelMenu,
@@ -3673,6 +3901,7 @@ export default function HomePage() {
                       <button
                         type="button"
                         className="wb-composer-model-trigger"
+                        style={{ display: usingAcpRunner ? "none" : undefined }}
                         aria-label={t("chat.selectModel", "选择模型")}
                         title={t("chat.selectModel", "选择模型")}
                         disabled={!modelsReady}
@@ -3686,27 +3915,6 @@ export default function HomePage() {
                         <ChevronDown size={13} />
                       </button>
                     </Dropdown>
-                    {showReasoningToggle && (
-                      <button
-                        type="button"
-                        className={
-                          "wb-composer-reasoning" +
-                          (reasoningToggleActive ? " is-active" : "")
-                        }
-                        aria-label={t("chat.deepThinking", "深度思考")}
-                        aria-pressed={reasoningToggleActive}
-                        title={`${t("chat.deepThinking", "深度思考")}：${t(
-                          reasoningToggleActive
-                            ? "chat.reasoningEnabled"
-                            : "chat.reasoningDisabled",
-                          reasoningToggleActive ? "开启" : "关闭",
-                        )}`}
-                        onClick={handleReasoningToggle}
-                      >
-                        <Brain size={14} />
-                        <span>{t("chat.deepThinking", "深度思考")}</span>
-                      </button>
-                    )}
                     <Dropdown
                       trigger={["click"]}
                       placement="topLeft"
@@ -4245,6 +4453,18 @@ export default function HomePage() {
         <ProjectShareDialog
           project={shareDialogProject}
           onClose={() => setShareDialogProject(null)}
+        />
+      )}
+      {contextDialogProject && (
+        <ProjectContextDialog
+          project={contextDialogProject}
+          onClose={() => setContextDialogProject(null)}
+        />
+      )}
+      {runsDialogProject && (
+        <ProjectRunsDialog
+          project={runsDialogProject}
+          onClose={() => setRunsDialogProject(null)}
         />
       )}
     </div>

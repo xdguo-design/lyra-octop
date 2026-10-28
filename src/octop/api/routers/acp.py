@@ -46,6 +46,7 @@ class ACPRunnerBody(BaseModel):
     trusted: bool = False
     tool_parse_mode: str = "update_detail"
     stdio_buffer_limit_bytes: int = _DEFAULT_STDIO_BUFFER
+    default_model: str | None = None
 
 
 class ACPRunnersBody(BaseModel):
@@ -59,7 +60,7 @@ class ACPConfigBody(BaseModel):
     )
     default_model: str | None = Field(
         default=None,
-        description="Default OpenCode model for direct workbench chats",
+        description="Legacy default OpenCode model for direct workbench chats",
     )
     runners: dict[str, ACPRunnerBody] | None = Field(
         default=None,
@@ -94,7 +95,10 @@ def _runners_payload(body: ACPRunnersBody) -> dict[str, dict[str, Any]]:
         if not key:
             raise OctopError(ErrorCode.SLASH_BAD_ARGS, "runner name cannot be empty")
         _validate_runner(key, runner)
-        runners[key] = runner.model_dump()
+        config = runner.model_dump()
+        if "default_model" not in runner.model_fields_set:
+            config.pop("default_model", None)
+        runners[key] = config
     return runners
 
 
@@ -108,10 +112,18 @@ def _read_agent_tool_enabled(cfg: dict[str, Any]) -> bool:
 def _combined_acp_view(*, registry: Any, user_id: int, agent_cfg: dict[str, Any]) -> dict[str, Any]:
     acp = agent_cfg.get("acp")
     default_model = acp.get("default_model") if isinstance(acp, dict) else None
+    runners = registry.acp_settings.load_runners(user_id)
+    opencode = runners.get("opencode")
+    if (
+        isinstance(default_model, str)
+        and isinstance(opencode, dict)
+        and "default_model" not in opencode
+    ):
+        runners["opencode"] = {**opencode, "default_model": default_model}
     return {
         "tool_enabled": _read_agent_tool_enabled(agent_cfg),
         "default_model": default_model if isinstance(default_model, str) else None,
-        "runners": registry.acp_settings.load_runners(user_id),
+        "runners": runners,
     }
 
 
@@ -302,6 +314,7 @@ async def put_acp_config(
                 registry=registry,
                 user_id=user.id,
                 agent_id=agent_id,
+                runner_name="opencode",
             )
             if model not in {item["value"] for item in options}:
                 raise OctopError(ErrorCode.SLASH_BAD_ARGS, "Unknown OpenCode model")
@@ -323,12 +336,13 @@ async def put_acp_config(
 
 
 @router.get(
-    "/agents/{agent_id}/acp/opencode/models",
-    summary="List OpenCode models",
-    description="Read model choices from the enabled OpenCode ACP runner.",
+    "/agents/{agent_id}/acp/{runner_name}/models",
+    summary="List ACP runner models",
+    description="Read model choices exposed by an ACP runner session.",
 )
-async def get_opencode_models(
+async def get_runner_models(
     agent_id: str,
+    runner_name: str,
     user: Any = Depends(current_user),
     server: Any = Depends(get_server),
 ) -> dict[str, Any]:
@@ -339,6 +353,7 @@ async def get_opencode_models(
         registry=_registry(server),
         user_id=user.id,
         agent_id=agent_id,
+        runner_name=runner_name,
     )
     return {"models": options}
 

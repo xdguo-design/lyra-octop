@@ -98,10 +98,10 @@ def model_input(text: str, session: dict[str, Any]) -> str:
         prompt = f"{prompt_label}{prefix}\n本轮患者回答：{text}"
         if len(prompt.encode("utf-8")) <= _MODEL_INPUT_BYTE_LIMIT:
             return prompt
-        if recent_context:
-            recent_context.pop(0)
-        elif compressed["earlier_turns"]:
+        if compressed["earlier_turns"]:
             compressed["earlier_turns"].pop(0)
+        elif recent_context:
+            recent_context.pop(0)
         else:
             return prompt
 
@@ -139,11 +139,9 @@ def candidate_result(
             for key in uncertain_fields
             if key in _UNCERTAIN_FIELD_TARGETS
         }
-        phones = _PHONE.findall(text)
-        if len(phones) == 1:
-            phone_start = text.find(phones[0])
-            if "联系人" not in text[max(0, phone_start - 8) : phone_start]:
-                uncertain_targets.discard("phone")
+        phones = list(_PHONE.finditer(text))
+        if len(phones) == 1 and not _is_contact_phone(text, phones[0].start()):
+            uncertain_targets.discard("phone")
         values = {key: value for key, value in values.items() if key not in uncertain_targets}
     accepted: dict[str, Any] = {}
     errors = enum_errors
@@ -167,18 +165,23 @@ def _page1_values(
 ) -> dict[str, Any]:
     values: dict[str, Any] = {}
     phone = _substring(extracted.get("contact_phone"), text)
-    if phone:
+    if phone and not _is_contact_phone(text, text.find(phone)):
         values["phone"] = phone
     elif len(_PHONE.findall(text)) == 1:
         match = next(_PHONE.finditer(text))
-        # 模型可能按 PII 惯例把手机号打码（如 ****8813）导致子串校验失败；
-        # 原话恰好只有一个 11 位号码时无需模型指认，联系人口径的号码除外。
-        if "联系人" not in text[max(0, match.start() - 8) : match.start()]:
+        # 模型可能按 PII 惯例把手机号打码；联系人号码不能回填为患者电话。
+        if not _is_contact_phone(text, match.start()):
             values["phone"] = match.group(0)
     elif (phone := _labeled_phone(text)) is not None:
         values["phone"] = phone
-    native_text = _substring(extracted.get("native_region"), text)
+    native_candidate = extracted.get("native_region")
+    native_text = _substring(native_candidate, text)
     native_codes = _region_codes(native_text, regions)
+    if not native_codes and isinstance(native_candidate, str):
+        candidate_codes = _region_codes(native_candidate, regions)
+        candidate_label = _region_label_for_codes(candidate_codes, regions)
+        if candidate_label and candidate_label in text:
+            native_codes = candidate_codes
     if not native_codes:
         native_match = _labeled_region(text, _NATIVE_REGION_LABELS, regions)
         if native_match:
@@ -261,6 +264,10 @@ def _labeled_region(
             if match:
                 length, codes = match
                 return segment[offset : offset + length], codes
+        codes = _region_codes(segment, regions)
+        label = _region_label_for_codes(codes, regions)
+        if codes and label:
+            return label, codes
     return None
 
 
@@ -338,7 +345,43 @@ def _region_codes(text: str | None, regions: list[dict[str, Any]]) -> list[str] 
     if not text:
         return None
     match = _region_prefix(text, regions)
-    return match[1] if match else None
+    if match:
+        return match[1]
+    # The resolver may return a canonical province/city/district path while the
+    # patient only named the district. Accept that suffix only when it is unique.
+    matches: list[list[str]] = []
+    pending = [(node, [node["code"]]) for node in regions]
+    while pending:
+        node, codes = pending.pop()
+        label = node.get("label")
+        if isinstance(label, str) and label in text:
+            matches.append(codes)
+        pending.extend((child, [*codes, child["code"]]) for child in node.get("children", []))
+    return matches[0] if len(matches) == 1 else None
+
+
+def _region_label_for_codes(codes: list[str] | None, regions: list[dict[str, Any]]) -> str | None:
+    if not codes:
+        return None
+    nodes = regions
+    label = None
+    for code in codes:
+        node = next((item for item in nodes if item.get("code") == code), None)
+        if node is None:
+            return None
+        label = node.get("label")
+        nodes = node.get("children", [])
+    return label if isinstance(label, str) else None
+
+
+def _is_contact_phone(text: str, phone_start: int) -> bool:
+    prefix = text[max(0, phone_start - 80) : phone_start]
+    return bool(
+        re.search(
+            r"联系人.{0,40}(?:电话|手机|号码)|(?:她|他|其|女儿|儿子|配偶)的(?:电话|手机|号码)",
+            prefix,
+        )
+    )
 
 
 def _split_region_prefix(text: str, regions: list[dict[str, Any]]) -> tuple[int, list[str]] | None:

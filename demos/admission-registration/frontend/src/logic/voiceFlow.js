@@ -62,6 +62,7 @@ function explicitlyLabeledValue(text, key, value) {
       emergencyContact: ["紧急联系人", "联系人姓名"],
       relationship: ["与患者关系", "关系"],
     }[key] || [];
+  if (Array.isArray(value)) return labels.some((label) => text.includes(label));
   return labels.some((label) => {
     const labelIndex = text.indexOf(label);
     const valueIndex = text.indexOf(value, labelIndex + label.length);
@@ -475,7 +476,7 @@ export default {
       const initialInformationRequest = this.initialPatientInfoRequest;
       this.aiRequest?.abort();
       const requestVersion = ++this.candidateRequestVersion;
-      this.aiRequest = abortAfter(35000);
+      this.aiRequest = abortAfter(48000);
       this.aiThinking = true;
       this.aiNotice = "";
       this.fallbackChoiceKey = "";
@@ -579,6 +580,7 @@ export default {
         let inferredDetail = false;
         const recognizedKeys = new Set();
         const persistedFields = {};
+        const previousFields = {};
         const mapping = {
           phone: "phone",
           addressDetail: "addressDetail",
@@ -602,7 +604,7 @@ export default {
             !initialInformationRequest &&
             pendingField &&
             key !== pendingField.key &&
-            !explicitlyLabeledValue(text, key, value)
+            !explicitlyLabeledValue(extractionText, key, value)
           )
             continue;
           if (validateFields({ ...this.fields, [key]: value }, [key])[key])
@@ -630,6 +632,10 @@ export default {
           }
           this.$delete(this.pendingCandidates, key);
           if (changed) {
+            previousFields[key] = {
+              value: this.fields[key],
+              source: this.sources[key],
+            };
             this.fields[key] = value;
             this.sources[key] = "ai";
             persistedFields[key] = value;
@@ -744,9 +750,20 @@ export default {
           saved === false &&
           generation === this.generation &&
           requestVersion === this.candidateRequestVersion
-        )
+        ) {
+          for (const [key, previous] of Object.entries(previousFields)) {
+            if (
+              this.sources[key] === "ai" &&
+              JSON.stringify(this.fields[key]) ===
+                JSON.stringify(persistedFields[key])
+            ) {
+              this.fields[key] = previous.value;
+              this.sources[key] = previous.source;
+            }
+          }
           this.aiNotice =
-            "候选信息已回填，但本轮对话未能保存；转写已保留，请稍后重试。";
+            "本轮对话未能保存，候选信息已撤回；转写已保留，请稍后重试。";
+        }
       } catch (error) {
         if (
           generation === this.generation &&

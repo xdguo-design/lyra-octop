@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from octop.infra.auth.sso.service import SsoService
     from octop.infra.db.services import SharedServices
     from octop.infra.history.trajectory.service import TrajectoryService
+    from octop.infra.presentations.service import PresentationService
 
 logger = logging.getLogger(__name__)
 
@@ -251,6 +252,7 @@ class OctopServer:
         self.paths = PathLayout(self._home)
         self.config: OctopConfig | None = None
         self.services: SharedServices | None = None
+        self.presentation_service: PresentationService | None = None
         self.app_runtime: AppRuntime | None = None
         self.expert_catalog: ExpertCatalog | None = None
         self.subagent_catalog: SubagentCatalog | None = None
@@ -263,6 +265,7 @@ class OctopServer:
         self._ldap_service: LdapAuthService | None = None
         self._ldap_bind_throttle: LdapBindThrottle | None = None
         self._ldap_bind_throttle_services: SharedServices | None = None
+        self._run_executor: Any | None = None
 
     # Backward compat: expose user_manager directly
     @property
@@ -375,6 +378,8 @@ class OctopServer:
         self._ensure_jwt_secret()
         await self._boot_runtime(config)
         self._started = True
+        if self._run_executor is not None:
+            self._run_executor.start()
         assert self.user_manager is not None
         self._emit_wizard_password(user_count=self.user_manager.count())
 
@@ -401,6 +406,8 @@ class OctopServer:
         boot_from_services(self.services.settings_repo, self.services.secret_repo)
         self._ensure_jwt_secret()
         await self._boot_runtime(config)
+        if self._run_executor is not None:
+            self._run_executor.start()
         logger.info(
             "control-plane database bound driver=%s",
             config.database.driver,
@@ -537,6 +544,7 @@ class OctopServer:
 
         await registry.boot()
         registry.schedule_idle_reclaim_sweep()
+        registry.start_idle_stop_sweep()
         await gateway.refresh_media_backends()
 
         user_mgr = UserManager(self.services)
@@ -598,6 +606,10 @@ class OctopServer:
                 await bridge_mgr.resume_auto_connections()
 
         asyncio.create_task(_resume_bridges(), name="bridge-auto-resume")
+        from octop.infra.run_executor import RunExecutor  # noqa: PLC0415
+
+        self._run_executor = RunExecutor(self.services, gateway.processor, registry)
+        self._run_executor.start()
 
     def _emit_wizard_password(self, *, user_count: int) -> None:
         config = self.config
@@ -636,6 +648,12 @@ class OctopServer:
         if not self._started:
             return
         try:
+            if self._run_executor is not None:
+                await self._run_executor.close()
+                self._run_executor = None
+            if self.presentation_service is not None:
+                await self.presentation_service.close()
+                self.presentation_service = None
             if self.project_service_manager is not None:
                 await self.project_service_manager.close()
                 self.project_service_manager = None

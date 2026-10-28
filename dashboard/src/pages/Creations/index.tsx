@@ -4,12 +4,14 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
+  Camera,
   ExternalLink,
   Folder,
   FolderPlus,
   Github,
   Pencil,
   Plus,
+  RefreshCw,
   Smartphone,
   Star,
   Trash2,
@@ -30,6 +32,7 @@ import {
   type BuiltInAppCreation,
 } from "./builtInCreations";
 import { message } from "../../utils/antdMessage";
+import { copyText } from "../../utils/copyText";
 import "./creations.css";
 
 type CreationCategory = "platform" | "service" | "repository" | "applet";
@@ -47,6 +50,7 @@ interface AppCreation extends BaseCreation {
   thumb?: string;
   url: string;
   route?: string;
+  repositoryUrl?: string | null;
 }
 
 interface ExternalCreation extends BaseCreation {
@@ -65,15 +69,24 @@ interface UserCreation extends BaseCreation {
 type Creation = AppCreation | ExternalCreation | UserCreation;
 type Dialog = "folder" | "entry" | "card" | null;
 
-function isGithubRepositoryUrl(value: string | null): boolean {
+function isManagedRepositoryUrl(value: string | null): boolean {
   if (!value) return false;
   try {
     const url = new URL(value);
+    const parts = url.pathname.replace(/\/$/, "").split("/").filter(Boolean);
+    if (parts[parts.length - 1]?.endsWith(".git")) {
+      parts[parts.length - 1] = parts[parts.length - 1].slice(0, -4);
+    }
     return (
       url.protocol === "https:" &&
-      url.hostname === "github.com" &&
+      ["github.com", "cnb.cool"].includes(url.hostname) &&
       !url.port &&
-      /^\/[^/]+\/[^/]+(?:\.git)?\/?$/.test(url.pathname) &&
+      parts.length >= 2 &&
+      (url.hostname !== "github.com" || parts.length === 2) &&
+      parts.every(
+        (part) =>
+          /^[A-Za-z0-9_.-]+$/.test(part) && part !== "." && part !== "..",
+      ) &&
       !url.search &&
       !url.hash &&
       !url.username &&
@@ -85,11 +98,11 @@ function isGithubRepositoryUrl(value: string | null): boolean {
 }
 
 function isLaunchableProjectUrl(value: string | null): boolean {
-  return isGithubRepositoryUrl(value);
+  return isManagedRepositoryUrl(value);
 }
 
 function creationCategory(item: CreationItem): CreationCategory {
-  return item.kind === "service" && isGithubRepositoryUrl(item.url)
+  return item.kind === "service" && isManagedRepositoryUrl(item.url)
     ? "repository"
     : item.kind;
 }
@@ -120,7 +133,10 @@ function creationThumbnail(creation: Creation): string | null {
   if (creation.type === "app" || creation.type === "external") {
     return creation.thumb || null;
   }
-  if (creation.type === "service" && creation.thumbnailUrl) {
+  if (
+    (creation.type === "platform" || creation.type === "service") &&
+    creation.thumbnailUrl
+  ) {
     return creation.thumbnailUrl;
   }
   if (creation.type === "service" && isLaunchableProjectUrl(creation.url)) {
@@ -168,6 +184,12 @@ export default function CreationsPage() {
     url: string;
   } | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [refreshingThumbnailId, setRefreshingThumbnailId] = useState<
+    string | null
+  >(null);
+  const [updatingProjectId, setUpdatingProjectId] = useState<string | null>(
+    null,
+  );
   const [dialog, setDialog] = useState<Dialog>(null);
   const [entryKind, setEntryKind] = useState<CreationItem["kind"]>("platform");
   const [isGithubProjectForm, setIsGithubProjectForm] = useState(false);
@@ -179,6 +201,7 @@ export default function CreationsPage() {
   const [formDescription, setFormDescription] = useState("");
   const [formCategory, setFormCategory] = useState<CreationCategory>("applet");
   const [formUrl, setFormUrl] = useState("");
+  const [formBranch, setFormBranch] = useState("");
   const [formFolder, setFormFolder] = useState("");
   const [formSaving, setFormSaving] = useState(false);
   const [githubRefDraft, setGithubRefDraft] = useState("");
@@ -264,6 +287,7 @@ export default function CreationsPage() {
           desc: meta?.description?.trim() || t(app.descriptionKey),
           category: meta?.category ?? app.category,
           folderId: cardFolders[`app:${app.id}`] ?? null,
+          repositoryUrl: meta?.repository_url ?? null,
         };
       },
     );
@@ -334,6 +358,7 @@ export default function CreationsPage() {
     setFormName("");
     setFormDescription("");
     setFormUrl("");
+    setFormBranch("");
     setFormFolder("");
     setGithubRefDraft("");
   };
@@ -342,6 +367,17 @@ export default function CreationsPage() {
     const ref = githubRefDraft.trim();
     if (!ref) {
       message.error(t("creationsPage.messages.githubRefInvalid"));
+      return;
+    }
+    if (ref.startsWith("https://cnb.cool/")) {
+      if (!isManagedRepositoryUrl(ref)) {
+        message.error(t("creationsPage.messages.githubRefInvalid"));
+        return;
+      }
+      const parts = new URL(ref).pathname.split("/").filter(Boolean);
+      const repoName = parts[parts.length - 1];
+      setFormName((repoName || "").replace(/\.git$/i, ""));
+      setFormUrl(ref);
       return;
     }
     const match = ref
@@ -401,6 +437,7 @@ export default function CreationsPage() {
     setFormName("");
     setFormDescription("");
     setFormUrl("");
+    setFormBranch("");
     setFormFolder(
       selectedFolder === "all" || selectedFolder === "unfiled"
         ? ""
@@ -418,6 +455,7 @@ export default function CreationsPage() {
     setFormName(entry.name);
     setFormDescription(entry.description);
     setFormUrl(entry.url ?? "");
+    setFormBranch("");
     setFormFolder(entry.folder_id ?? "");
     setDialog("entry");
   };
@@ -434,7 +472,8 @@ export default function CreationsPage() {
     setFormName(meta?.name || t(source.titleKey));
     setFormDescription(meta?.description || t(source.descriptionKey));
     setFormCategory(meta?.category ?? source.category);
-    setFormUrl("");
+    setFormUrl(meta?.repository_url ?? "");
+    setFormBranch(meta?.repository_branch ?? "");
     setFormFolder("");
     setDialog("card");
   };
@@ -444,9 +483,17 @@ export default function CreationsPage() {
     if (
       dialog === "entry" &&
       isGithubProjectForm &&
-      !isGithubRepositoryUrl(formUrl)
+      !isManagedRepositoryUrl(formUrl)
     ) {
-      message.error(t("creationsPage.messages.invalidGithubUrl"));
+      message.error(t("creationsPage.messages.invalidRepositoryUrl"));
+      return;
+    }
+    if (
+      dialog === "card" &&
+      formUrl.trim() &&
+      !isManagedRepositoryUrl(formUrl.trim())
+    ) {
+      message.error(t("creationsPage.messages.invalidRepositoryUrl"));
       return;
     }
     if (
@@ -473,6 +520,8 @@ export default function CreationsPage() {
           name: formName.trim() || null,
           description: formDescription.trim() || null,
           category: source ? formCategory : null,
+          repository_url: formUrl.trim() || null,
+          repository_branch: formBranch.trim() || null,
         });
         setCardMeta((previous) => ({ ...previous, [editingCardId]: saved }));
       } else if (dialog === "entry") {
@@ -517,13 +566,12 @@ export default function CreationsPage() {
     creation: AppCreation | ExternalCreation | UserCreation,
   ) => {
     if (!creation.url) return;
-    try {
-      await navigator.clipboard.writeText(creation.url);
-    } catch {
-      /* clipboard may be blocked; still show feedback */
+    if (await copyText(new URL(creation.url, window.location.origin).href)) {
+      setCopiedId(creation.id);
+      window.setTimeout(() => setCopiedId(null), 1500);
+    } else {
+      message.error(t("common.copyFailed"));
     }
-    setCopiedId(creation.id);
-    window.setTimeout(() => setCopiedId(null), 1500);
   };
 
   const openCreation = (creation: Creation) => {
@@ -595,6 +643,29 @@ export default function CreationsPage() {
     }
   };
 
+  const refreshThumbnail = async (creation: UserCreation) => {
+    setRefreshingThumbnailId(creation.itemId);
+    try {
+      const result = await creationsApi.refreshThumbnail(creation.itemId);
+      if (!result.captured || !result.thumbnail_url) {
+        message.error(t("creationsPage.messages.captureCoverFailed"));
+        return;
+      }
+      setItems((previous) =>
+        previous.map((item) =>
+          item.item_id === creation.itemId
+            ? { ...item, thumbnail_url: result.thumbnail_url }
+            : item,
+        ),
+      );
+      message.success(t("creationsPage.messages.captureCoverSuccess"));
+    } catch {
+      message.error(t("creationsPage.messages.captureCoverFailed"));
+    } finally {
+      setRefreshingThumbnailId(null);
+    }
+  };
+
   const openProjectPreview = async (creation: UserCreation) => {
     const current = launchStatuses[creation.itemId];
     if (current?.status === "starting") return;
@@ -605,6 +676,40 @@ export default function CreationsPage() {
     if (status?.status === "running" && status.url) {
       setOpenId(null);
       setProjectPreview({ title: creation.title, url: status.url });
+    }
+  };
+
+  const updateProject = async (creation: UserCreation) => {
+    setUpdatingProjectId(creation.itemId);
+    try {
+      await creationsApi.updateProject(creation.itemId);
+      setLaunchStatuses((previous) => ({
+        ...previous,
+        [creation.itemId]: {
+          status: "stopped",
+          url: null,
+          logs: null,
+          thumbnail_url: null,
+        },
+      }));
+      message.success(t("creationsPage.messages.projectUpdated"));
+    } catch {
+      message.error(t("creationsPage.messages.projectUpdateFailed"));
+    } finally {
+      setUpdatingProjectId(null);
+    }
+  };
+
+  const updateCardRepository = async (creation: AppCreation) => {
+    const key = `app:${creation.id}`;
+    setUpdatingProjectId(key);
+    try {
+      await creationsApi.updateCardCode("app", creation.id);
+      message.success(t("creationsPage.messages.projectSourcePulled"));
+    } catch {
+      message.error(t("creationsPage.messages.projectUpdateFailed"));
+    } finally {
+      setUpdatingProjectId(null);
     }
   };
 
@@ -865,7 +970,9 @@ export default function CreationsPage() {
                     : t("creationsPage.actions.open", { name: creation.title })
                 }
               >
-                {creation.type === "service" && creation.thumbnailUrl ? (
+                {(creation.type === "platform" ||
+                  creation.type === "service") &&
+                creation.thumbnailUrl ? (
                   <AuthImage
                     url={creation.thumbnailUrl}
                     className="cr-auth-thumb"
@@ -939,9 +1046,35 @@ export default function CreationsPage() {
               </div>
               <div className="cr-actions">
                 {isAdmin &&
+                  creation.type === "app" &&
+                  isManagedRepositoryUrl(creation.repositoryUrl ?? null) && (
+                    <button
+                      type="button"
+                      className="cr-act"
+                      disabled={updatingProjectId === `app:${creation.id}`}
+                      onClick={() => void updateCardRepository(creation)}
+                    >
+                      <RefreshCw size={13} />
+                      {updatingProjectId === `app:${creation.id}`
+                        ? t("creationsPage.actions.updatingCode")
+                        : t("creationsPage.actions.updateCode")}
+                    </button>
+                  )}
+                {isAdmin &&
                   creation.type === "service" &&
                   isLaunchableProjectUrl(creation.url) && (
                     <>
+                      <button
+                        type="button"
+                        className="cr-act"
+                        disabled={updatingProjectId === creation.itemId}
+                        onClick={() => void updateProject(creation)}
+                      >
+                        <RefreshCw size={13} />
+                        {updatingProjectId === creation.itemId
+                          ? t("creationsPage.actions.updatingCode")
+                          : t("creationsPage.actions.updateCode")}
+                      </button>
                       {launchStatuses[creation.itemId]?.status === "running" ? (
                         <>
                           <button
@@ -1047,6 +1180,25 @@ export default function CreationsPage() {
                   creation.type === "service" ||
                   creation.type === "applet") && (
                   <>
+                    {(creation.type === "platform" ||
+                      creation.type === "service") &&
+                      creation.url &&
+                      !isManagedRepositoryUrl(creation.url) && (
+                        <button
+                          type="button"
+                          className="cr-icon-action"
+                          aria-label={t("creationsPage.actions.captureCover", {
+                            name: creation.title,
+                          })}
+                          title={t("creationsPage.actions.captureCover", {
+                            name: creation.title,
+                          })}
+                          disabled={refreshingThumbnailId === creation.itemId}
+                          onClick={() => void refreshThumbnail(creation)}
+                        >
+                          <Camera size={14} />
+                        </button>
+                      )}
                     <button
                       type="button"
                       className="cr-icon-action"
@@ -1203,6 +1355,38 @@ export default function CreationsPage() {
                         </option>
                       </select>
                     </label>
+                  )}
+                {dialog === "card" &&
+                  BUILT_IN_CREATIONS.some(
+                    (item) => `app:${item.id}` === editingCardId,
+                  ) && (
+                    <>
+                      <label>
+                        {t("creationsPage.dialog.repositoryUrl")}
+                        <input
+                          type="url"
+                          placeholder="https://cnb.cool/group/repository"
+                          value={formUrl}
+                          onChange={(event) => setFormUrl(event.target.value)}
+                        />
+                      </label>
+                      <label>
+                        {t("creationsPage.dialog.repositoryBranch")}
+                        <input
+                          maxLength={255}
+                          placeholder={t(
+                            "creationsPage.dialog.repositoryBranchPlaceholder",
+                          )}
+                          value={formBranch}
+                          onChange={(event) =>
+                            setFormBranch(event.target.value)
+                          }
+                        />
+                      </label>
+                      <small className="cr-dialog-note">
+                        {t("creationsPage.dialog.repositoryHint")}
+                      </small>
+                    </>
                   )}
                 {dialog === "entry" &&
                   (entryKind === "service" || entryKind === "applet") && (

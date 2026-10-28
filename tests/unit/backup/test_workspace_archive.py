@@ -43,6 +43,36 @@ async def test_export_and_merge_import(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_replace_import_preserves_registered_paths_and_clears_siblings(
+    tmp_path: Path,
+) -> None:
+    inbound = tmp_path / "inbound"
+    inbound.mkdir()
+    (inbound / "private.txt").write_bytes(b"immutable")
+    (inbound / "discard.txt").write_bytes(b"old")
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr("inbound/private.txt", b"overwrite")
+        bundle.writestr("new.txt", b"new")
+    backend = LocalShellBackend(root_dir=str(tmp_path), virtual_mode=False)
+    workspace = BackendWorkspace(backend, tmp_path)
+
+    result = await import_workspace_zip(
+        workspace,
+        archive.getvalue(),
+        mode="replace",
+        local_workspace_dir=tmp_path,
+        protected_paths={"inbound/private.txt"},
+    )
+
+    assert result["imported"] == 1
+    assert any("preserved 1 registered ChatFile" in warning for warning in result["warnings"])
+    assert (inbound / "private.txt").read_bytes() == b"immutable"
+    assert not (inbound / "discard.txt").exists()
+    assert (tmp_path / "new.txt").read_bytes() == b"new"
+
+
+@pytest.mark.asyncio
 async def test_export_includes_hidden_and_runtime_dirs(tmp_path: Path) -> None:
     """Workspace zip must pack the full tree, including ``.octop`` and ``outbound``.
 

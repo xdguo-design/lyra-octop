@@ -127,7 +127,7 @@ def test_sidebar_nav_roundtrip_preserves_other_keys() -> None:
     assert '"foo": 1' in merged or '"foo":1' in merged
 
 
-@pytest.mark.parametrize("key", ["admission-demo", "ehr"])
+@pytest.mark.parametrize("key", ["admission-demo", "ehr", "runs"])
 def test_sidebar_nav_accepts_builtin_entries(key: str) -> None:
     _, items = validate_sidebar_nav({"groups": [], "items": [{"key": key}]})
     assert items[0].key == key

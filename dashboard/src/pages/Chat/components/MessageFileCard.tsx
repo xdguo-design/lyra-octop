@@ -39,6 +39,8 @@ export function MessageFileCard({
   agentId?: string | null;
   workspacePath?: string;
   readStatus?:
+    | "stored"
+    | "processing"
     | "ready"
     | "partial"
     | "needs_ocr"
@@ -56,6 +58,8 @@ export function MessageFileCard({
   const readStatusLabel = readStatus
     ? t(`chat.fileReadStatus.${readStatus}`, {
         defaultValue: {
+          stored: "Not read yet",
+          processing: "Reading",
           ready: "Read",
           partial: "Partially read",
           needs_ocr: "Scanned pages need OCR",

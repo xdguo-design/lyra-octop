@@ -26,6 +26,7 @@ import RequirePermission from "../../components/RequirePermission";
 import { routeNeedsPermission } from "../../utils/permissions";
 import { useLayoutMode } from "../../context/LayoutModeContext";
 import { useDashboardPushToast } from "../../hooks/useDashboardPushToast";
+import { isRunningInFrame } from "../../utils/framed";
 
 const Chat = lazy(() => import("../../pages/Chat"));
 const WorkbenchPage = lazy(() => import("../../pages/Control/Workbench"));
@@ -58,6 +59,9 @@ export default function MainLayout({
 }: {
   embedded?: boolean;
 }) {
+  // Pages loaded inside the 内置平台/创作预览 iframe render chrome-less, so the
+  // embedded app cannot navigate back to /home and re-open the shell (nesting).
+  const isEmbedded = embedded || isRunningInFrame();
   const location = useLocation();
   const currentPath = location.pathname;
   const selectedKey = resolveSelectedKey(currentPath);
@@ -201,7 +205,7 @@ export default function MainLayout({
           }}
         >
           {/* Mobile overlay backdrop */}
-          {!embedded && isMobile && !collapsed && (
+          {!isEmbedded && isMobile && !collapsed && (
             <div
               onClick={toggleCollapsed}
               style={{
@@ -213,7 +217,7 @@ export default function MainLayout({
             />
           )}
 
-          {!embedded && (
+          {!isEmbedded && (
             <div
               style={{
                 position: "relative",
@@ -264,7 +268,7 @@ export default function MainLayout({
               overflow: "hidden",
             }}
           >
-            {!embedded &&
+            {!isEmbedded &&
               isMobile &&
               !(
                 SELF_HEADER_PATHS.has(currentPath) ||

@@ -244,13 +244,16 @@ class HitlSessionPolicyStore:
 def apply_session_bypass(
     interrupt_on: dict[str, Any] | None,
     store: HitlSessionPolicyStore | None,
+    *,
+    protected_tools: Iterable[str] = (),
 ) -> dict[str, Any] | None:
-    """Wrap HITL ``when`` predicates so a thread bypass can skip the interrupt."""
+    """Wrap HITL predicates; mandatory tool approvals cannot be bypassed by a thread."""
     if not interrupt_on or store is None:
         return interrupt_on
+    protected = set(protected_tools)
     out: dict[str, Any] = {}
     for name, cfg in interrupt_on.items():
-        if name == _ASK_USER_TOOL_NAME:
+        if name == _ASK_USER_TOOL_NAME or name in protected:
             out[name] = cfg
             continue
         entry = dict(cfg) if isinstance(cfg, dict) else {}

@@ -11,6 +11,8 @@ from octop.infra.workbench.project_service import (
     ProjectServiceManager,
     ProjectServiceProfile,
     _child_environment,
+    _DockerRuntime,
+    normalize_repository_branch,
     normalize_repository_url,
     parse_profiles,
     resolve_project_root,
@@ -52,9 +54,23 @@ def test_parse_profiles_matches_only_normalized_repository_url() -> None:
         == "https://github.com/xdguo-design/data-upload-product"
     )
     assert (
+        normalize_repository_url("https://cnb.cool/xdguo/octop.git")
+        == "https://cnb.cool/xdguo/octop"
+    )
+    assert (
+        normalize_repository_url("https://cnb.cool/group/subgroup/octop")
+        == "https://cnb.cool/group/subgroup/octop"
+    )
+    assert normalize_repository_url("https://evil.example/xdguo/octop") is None
+    assert (
         normalize_repository_url("https://github.com:8443/xdguo-design/data-upload-product") is None
     )
     assert normalize_repository_url("https://github.com/../escape") is None
+    assert normalize_repository_branch(None) is None
+    assert normalize_repository_branch(" dev ") == "dev"
+    assert normalize_repository_branch("feature/admission-ui") == "feature/admission-ui"
+    assert normalize_repository_branch("--upload-pack=evil") is None
+    assert normalize_repository_branch("../outside") is None
 
 
 def test_parse_profiles_rejects_shell_commands_and_invalid_relative_paths() -> None:
@@ -215,7 +231,7 @@ async def test_github_project_without_dockerfile_fails_closed(
     url = "https://github.com/example/no-image"
     manager = ProjectServiceManager(None, {}, tmp_path / "projects")
 
-    async def fake_clone(_url: str, checkout: Path) -> None:
+    async def fake_clone(_url: str, checkout: Path, _access_token: str | None = None) -> None:
         checkout.mkdir(parents=True)
 
     async def fake_command(*_args: str, **_kwargs: object) -> str:
@@ -227,3 +243,158 @@ async def test_github_project_without_dockerfile_fails_closed(
         await manager.start(url, "project-1")
     assert manager.status(url, "project-1")["status"] == "failed"
     assert manager.thumbnail_origins(url, "project-1") == ()
+
+
+@pytest.mark.asyncio
+async def test_project_update_pulls_fast_forward_and_invalidates_old_preview(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    url = "https://cnb.cool/example/project"
+    project_id = "project-1"
+    manager = ProjectServiceManager(None, {}, tmp_path / "projects")
+    checkout, container, image = manager._docker_names(url, project_id)
+    assert manager._docker_names(f"{url}.git", project_id) == (checkout, container, image)
+    checkout.mkdir(parents=True)
+    calls: list[tuple[tuple[str, ...], Path | None]] = []
+
+    async def fake_command(*args: str, cwd: Path | None = None, **_kwargs: object) -> str:
+        calls.append((args, cwd))
+        if args[:4] == ("git", "remote", "get-url", "origin"):
+            return url
+        return ""
+
+    monkeypatch.setattr(manager, "_docker_command", fake_command)
+    runtime = manager._docker_runtimes.setdefault(
+        (url, project_id), _DockerRuntime(url, project_id)
+    )
+    runtime.status = "running"
+    runtime.url = "https://preview.example.com"
+
+    await manager.update(url, project_id)
+
+    assert ("git", "pull", "--ff-only") in [args for args, _cwd in calls]
+    assert any(args == ("docker", "rm", "--force", container) for args, _cwd in calls)
+    assert any(args == ("docker", "image", "rm", image) for args, _cwd in calls)
+    assert manager.status(url, project_id)["status"] == "stopped"
+
+
+@pytest.mark.asyncio
+async def test_project_update_keeps_preview_when_checkout_has_local_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    url = "https://github.com/example/project"
+    manager = ProjectServiceManager(None, {}, tmp_path / "projects")
+    checkout, _container, _image = manager._docker_names(url, "project-1")
+    checkout.mkdir(parents=True)
+    calls: list[tuple[str, ...]] = []
+
+    async def fake_command(*args: str, **_kwargs: object) -> str:
+        calls.append(args)
+        if args[:4] == ("git", "remote", "get-url", "origin"):
+            return url
+        if args[:3] == ("git", "status", "--porcelain"):
+            return " M source.py"
+        return ""
+
+    monkeypatch.setattr(manager, "_docker_command", fake_command)
+    with pytest.raises(RuntimeError, match="local changes"):
+        await manager.update(url, "project-1")
+
+    assert not any(args[:2] == ("docker", "rm") for args in calls)
+    assert not any(args[:2] == ("git", "pull") for args in calls)
+
+
+@pytest.mark.asyncio
+async def test_project_update_clones_repository_on_first_use(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    url = "https://cnb.cool/group/subgroup/project"
+    manager = ProjectServiceManager(None, {}, tmp_path / "projects")
+    checkout, _container, _image = manager._docker_names(url, "project-1")
+    calls: list[tuple[str, ...]] = []
+
+    async def fake_command(*args: str, **_kwargs: object) -> str:
+        calls.append(args)
+        if args[:2] == ("git", "clone"):
+            Path(args[-1]).mkdir()
+        if args[:4] == ("git", "remote", "get-url", "origin"):
+            return url
+        if args[:3] == ("git", "ls-remote", "--symref"):
+            return "ref: refs/heads/main\tHEAD\nabc123\tHEAD\n"
+        if args[:3] == ("git", "branch", "--show-current"):
+            return "main"
+        return ""
+
+    monkeypatch.setattr(manager, "_docker_command", fake_command)
+    await manager.update(url, "project-1", source_only=True)
+
+    assert any(args[:2] == ("git", "clone") for args in calls)
+    assert checkout.is_dir()
+    assert ("git", "pull", "--ff-only", "origin", "main") in calls
+    assert all(args[0] == "git" for args in calls)
+
+
+@pytest.mark.asyncio
+async def test_source_only_update_switches_to_selected_remote_branch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    url = "https://github.com/example/project"
+    manager = ProjectServiceManager(None, {}, tmp_path / "projects")
+    checkout, _container, _image = manager._docker_names(url, "app:1:admission-registration")
+    checkout.mkdir(parents=True)
+    calls: list[tuple[str, ...]] = []
+
+    async def fake_command(*args: str, **_kwargs: object) -> str:
+        calls.append(args)
+        if args[:4] == ("git", "remote", "get-url", "origin"):
+            return url
+        if args[:3] == ("git", "branch", "--show-current"):
+            return "main"
+        return ""
+
+    monkeypatch.setattr(manager, "_docker_command", fake_command)
+    await manager.update(
+        url,
+        "app:1:admission-registration",
+        source_only=True,
+        repository_branch="dev",
+    )
+
+    assert (
+        "git",
+        "fetch",
+        "--depth",
+        "1",
+        "origin",
+        "+refs/heads/dev:refs/remotes/origin/dev",
+    ) in calls
+    assert ("git", "switch", "--track", "-c", "dev", "origin/dev") in calls
+    assert ("git", "pull", "--ff-only", "origin", "dev") in calls
+
+
+@pytest.mark.asyncio
+async def test_cnb_git_auth_uses_and_removes_temporary_credentials(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manager = ProjectServiceManager(None, {}, tmp_path / "projects")
+    token = "secret/token value"
+    captured: dict[str, object] = {}
+
+    async def fake_command(*args: str, **_kwargs: object) -> str:
+        captured["args"] = args
+        helper = next(arg for arg in args if arg.startswith("credential.helper="))
+        credential_file = Path(helper.split("--file=", 1)[1].strip("'\""))
+        captured["credential_file"] = credential_file
+        captured["contents"] = credential_file.read_text(encoding="utf-8")
+        return ""
+
+    monkeypatch.setattr(manager, "_docker_command", fake_command)
+    await manager._git_command(token, "pull", "--ff-only")
+
+    args = captured["args"]
+    assert isinstance(args, tuple)
+    assert token not in " ".join(args)
+    assert captured["contents"] == "https://cnb:secret%2Ftoken%20value@cnb.cool\n"
+    credential_file = captured["credential_file"]
+    assert isinstance(credential_file, Path)
+    assert not credential_file.exists()

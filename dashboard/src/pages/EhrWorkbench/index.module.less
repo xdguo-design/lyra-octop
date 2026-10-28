@@ -1,61 +1,6 @@
 .ehrWorkbench {
   height: 100%;
-  background: #f5f5f5;
-}
-
-.ehrSider {
-  background: #fff !important;
-  border-right: 1px solid #f0f0f0;
-  display: flex;
-  flex-direction: column;
-  padding: 12px 8px;
-}
-
-.ehrBrand {
-  display: flex;
-  align-items: center;
-  padding: 4px 8px 12px;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.ehrNav {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-top: 12px;
-  flex: 1;
-}
-
-.ehrNavItem,
-.ehrNavItemActive {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border: none;
-  background: transparent;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  color: #262626;
-  text-align: left;
-  width: 100%;
-}
-
-.ehrNavItem:hover {
-  background: #f5f5f5;
-}
-
-.ehrNavItemActive {
-  background: #e6f4ff;
-  color: #1677ff;
-  font-weight: 500;
-}
-
-.ehrSiderFooter {
-  padding: 8px;
-  border-top: 1px solid #f0f0f0;
-  font-size: 12px;
+  background: #f8f7f4;
 }
 
 .ehrContent {
@@ -68,9 +13,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
-  background: #fff;
-  border-bottom: 1px solid #f0f0f0;
+  min-height: 48px;
+  padding: 6px 24px;
+  background: #f8f7f4;
+  border-bottom: 1px solid #e9e5dd;
   flex-wrap: wrap;
   gap: 8px;
 }
@@ -84,12 +30,12 @@
 .ehrMain {
   flex: 1;
   overflow-y: auto;
-  padding: 20px 24px;
+  padding: 0 24px 32px;
   min-width: 0;
 }
 
 .ehrAgent {
-  width: 360px;
+  width: min(480px, 42vw);
   border-left: 1px solid #f0f0f0;
   background: #fff;
   display: flex;
@@ -102,13 +48,135 @@
   border-bottom: 1px solid #f0f0f0;
 }
 
-.ehrAgentMessages {
+.ehrAgent :global(.ehr-agent-panel) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.ehrAgent :global(.ehr-agent-header) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e9e5dd;
+}
+
+.ehrAgent :global(.ehr-agent-messages) {
   flex: 1;
   overflow-y: auto;
   padding: 12px 16px;
 }
 
-.ehrAgentInput {
+.ehrAgent :global(.ehr-delivery-content) {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.ehrAgent :global(.ehr-launch-card) {
+  padding: 16px;
+  border: 1px solid #dfe8ef;
+  border-radius: 10px;
+  background: #f7fafc;
+}
+
+.ehrAgent :global(.ehr-launch-card .ant-typography) {
+  margin-bottom: 10px;
+}
+
+.ehrAgent :global(.ehr-launch-meta) {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 8px 0 10px;
+}
+
+.ehrAgent :global(.ehr-delivery-heading) {
+  display: flex;
+  justify-content: space-between;
+  margin: 22px 0 10px;
+}
+
+.ehrAgent :global(.ehr-delivery-list) {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ehrAgent :global(.ehr-delivery-item) {
+  padding: 12px;
+  border: 1px solid #ece8e1;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.ehrAgent :global(.ehr-delivery-item summary) {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.ehrAgent :global(.ehr-delivery-item summary::-webkit-details-marker) {
+  display: none;
+}
+
+.ehrAgent :global(.ehr-delivery-item[open] summary) {
+  margin-bottom: 12px;
+}
+
+.ehrAgent :global(.ehr-delivery-item .ant-typography) {
+  margin-bottom: 8px;
+}
+
+.ehrAgent :global(.ehr-delivery-title) {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ehrAgent :global(.ehr-delivery-title > span:last-child) {
+  display: flex;
+  flex-direction: column;
+}
+
+.ehrAgent :global(.ehr-delivery-label) {
+  display: block;
+  margin: 10px 0 5px;
+  font-size: 12px;
+}
+
+.ehrAgent :global(.ehr-delivery-doc-path) {
+  display: block;
+  padding: 7px 8px;
+  border-radius: 6px;
+  background: #f5f4f1;
+  color: #53616b;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.ehrAgent :global(.ehr-delivery-code-list) {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ehrAgent :global(.ehr-delivery-code-path) {
+  display: block;
+  color: #315b78;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ehrAgent :global(.ehr-agent-input) {
   display: flex;
   gap: 8px;
   padding: 12px 16px;
@@ -116,7 +184,7 @@
   align-items: flex-end;
 }
 
-.ehrMsg {
+.ehrAgent :global(.ehr-msg) {
   max-width: 92%;
   padding: 8px 12px;
   border-radius: 10px;
@@ -127,52 +195,159 @@
   word-break: break-word;
 }
 
-.ehrMsgUser {
+.ehrAgent :global(.ehr-msg-user) {
   margin-left: auto;
   background: #1677ff;
   color: #fff;
 }
 
-.ehrMsgBot {
+.ehrAgent :global(.ehr-msg-bot) {
   margin-right: auto;
   background: #f5f5f5;
   color: #262626;
 }
 
-.ehrMsgSources {
+.ehrAgent :global(.ehr-msg-sources) {
   border-top: 1px dashed #e0e0e0;
   padding-top: 4px;
 }
 
-/* 搜索首页 */
+.ehrSearchHome {
+  width: 100%;
+  min-height: 100%;
+}
+
 .ehrSearchHero {
+  width: min(920px, 100%);
+  margin: 0 auto;
+  padding: clamp(68px, 14vh, 132px) 12px 40px;
+  text-align: center;
+}
+
+.ehrEyebrow {
+  color: #8a8175;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+}
+
+.ehrSearchTitle {
+  margin: 18px 0 10px !important;
+  color: #172d43 !important;
+  font-family: Georgia, "Noto Serif SC", "Songti SC", serif;
+  font-size: clamp(34px, 4vw, 48px) !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.015em;
+  line-height: 1.2 !important;
+}
+
+.ehrSearchDescription {
+  margin: 0 auto 30px !important;
+  color: #737b80;
+  font-size: 15px;
+}
+
+.ehrSearchInput {
+  width: 100%;
+  max-width: 860px;
+  text-align: left;
+}
+
+.ehrSearchInput :global(.octop-input-group),
+.ehrSearchBar :global(.octop-input-group) {
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid #e5e1da;
+  border-radius: 10px;
   background: #fff;
-  border: 1px solid #f0f0f0;
-  border-radius: 12px;
-  padding: 24px;
-  margin-bottom: 16px;
+  box-shadow: 0 8px 28px rgba(41, 51, 58, 0.07);
+}
+
+.ehrSearchInput :global(.octop-input-group-addon),
+.ehrSearchBar :global(.octop-input-group-addon) {
+  width: auto;
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+}
+
+.ehrSearchInput :global(.octop-input-group-addon:first-child),
+.ehrSearchBar :global(.octop-input-group-addon:first-child) {
+  display: flex;
+  align-items: center;
+  padding-inline: 14px;
+  border-right: 1px solid #eeece6;
+}
+
+.ehrSearchInput :global(.octop-select-selector),
+.ehrSearchBar :global(.octop-select-selector) {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.ehrSearchInput :global(.octop-input-group .octop-input-affix-wrapper),
+.ehrSearchBar :global(.octop-input-group .octop-input-affix-wrapper) {
+  flex: 1;
+  min-width: 0;
+  min-height: 58px;
+  padding-inline: 18px;
+  border: 0 !important;
+  background: transparent;
+  box-shadow: none !important;
+}
+
+.ehrSearchInput :global(.octop-input-search-button),
+.ehrSearchBar :global(.octop-input-search-button) {
+  min-height: 58px;
+  padding-inline: 22px;
+  border: 0;
+  border-left: 1px solid #eeece6;
+  border-radius: 0;
+  color: #17324b !important;
+  box-shadow: none;
 }
 
 .ehrSearchBar {
-  display: flex;
-  gap: 12px;
-  margin-top: 16px;
-  flex-wrap: wrap;
+  width: min(960px, 100%);
+  margin: 20px auto 28px;
 }
 
-.ehrSearchBar > :first-child {
-  flex: 1;
-  min-width: 260px;
+.ehrSecondaryLinks {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-top: 22px;
+  color: #707a80;
+  font-size: 13px;
+}
+
+.ehrSecondaryLinks a,
+.ehrSecondaryLinks :global(.ant-btn-link) {
+  padding: 0;
+  color: #687680;
+  font-size: 13px;
+}
+
+.ehrSecondaryLinks a:hover,
+.ehrSecondaryLinks :global(.ant-btn-link:hover) {
+  color: #254d69;
 }
 
 .ehrResultList {
+  width: min(960px, 100%);
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
 .ehrResultCard {
-  border-radius: 10px;
+  border-color: #e9e5dd;
+  border-radius: 8px;
 }
 
 /* 图谱视图 */
@@ -241,5 +416,40 @@
 @media (max-width: 1080px) {
   .ehrAgent {
     display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .ehrTopbar {
+    padding-inline: 12px;
+  }
+
+  .ehrMain {
+    padding-inline: 14px;
+  }
+
+  .ehrSearchHero {
+    padding: 12vh 0 32px;
+  }
+
+  .ehrSearchDescription {
+    max-width: 320px;
+    font-size: 14px;
+  }
+
+  .ehrSearchInput :global(.octop-input-group-addon:first-child),
+  .ehrSearchBar :global(.octop-input-group-addon:first-child) {
+    padding-inline: 4px;
+  }
+
+  .ehrSearchInput :global(.octop-select-selection-item),
+  .ehrSearchBar :global(.octop-select-selection-item) {
+    max-width: 84px;
+    font-size: 12px;
+  }
+
+  .ehrSearchInput :global(.octop-input-search-button),
+  .ehrSearchBar :global(.octop-input-search-button) {
+    padding-inline: 12px;
   }
 }

@@ -6,7 +6,7 @@
 
 ## 当前行为
 
-- 工作台 Agent 选择器只显示运行中的 Octop Agent；测试明确要求 ACP Runner 不出现在选择器里。
+- 工作台 Agent 选择器列出运行中的 Octop Agent 和账号已启用的 ACP Runner。
 - ACP Runner 由账号级配置管理；每个 Octop Agent 需要单独启用 `acp_runner` 工具，之后由模型在对话中决定是否委派。
 - `acp_runner` 支持创建、续接、查询、回应权限请求和关闭 ACP 会话；Octop 聊天线程和 Runner 目标当前没有直接绑定关系。
 - Runner 命令运行在 Octop 服务所在主机；ACP 协议通过 stdio 通信。
@@ -20,7 +20,7 @@
 ## 用户交互
 
 - Agent 选择器新增“ACP Runner”分组，仅向有权限管理 ACP Runner 的管理员展示其账号配置中 `enabled=true` 的 Runner；关闭或删除的 Runner 不可选。
-- 选中 Runner 后，聊天标题/选择器明确显示 Runner 名称。模型选择器隐藏或禁用，因为请求由 Runner 自己的模型处理。
+- 选中 Runner 后，聊天标题/选择器明确显示 Runner 名称。模型在 ACP 页对应 Runner 的编辑面板中设置。Octop 从 ACP `config_options` 读取可选模型，并将默认模型应用到该 Runner 的直聊 session；直聊时隐藏工作台通用模型选择器。Runner 未暴露模型选项时使用 CLI 自身默认模型。
 - 新聊天和续聊都直接请求该 Runner。相同 Octop 工作区 Agent 下，Runner 目标与普通 Octop Agent 目标的聊天记录隔离；切换目标不会把普通 Agent 回复追加进 ACP 对话，反之亦然。
 - 每个 ACP 目标线程续接自己的 ACP session；线程标题、用户消息、Runner 回复和 ACP 权限状态在 Octop 聊天历史中可见。
 - 首版限定本机可映射目录的工作区。选择 Runner 后使用当前聊天 Agent 的本机工作区目录作为进程启动 cwd；远程或无法映射成本机目录的工作区不显示/禁用 ACP 目标，并给出原因。此 cwd 只是启动位置，不是文件访问隔离边界。

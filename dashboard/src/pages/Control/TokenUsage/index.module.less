@@ -98,13 +98,16 @@
 .statsRow {
   display: flex;
   flex-wrap: nowrap;
-  gap: 12px;
+  gap: 0;
   align-items: stretch;
+  background: var(--fn-bg-secondary);
+  border-radius: 10px;
+  padding: 4px 0;
 }
 
 .statsGrid {
   display: grid;
-  gap: 12px;
+  gap: 0;
   flex: 1 1 auto;
   min-width: 0;
   grid-auto-flow: column;
@@ -170,18 +173,27 @@
 }
 
 .statBlock {
+  position: relative;
   min-width: 0;
-  padding: 12px 16px;
-  background: var(--fn-bg-secondary);
-  border-radius: 6px;
-  border: 1px solid var(--fn-border-secondary);
+  padding: 14px 16px;
+  text-align: center;
+}
+
+/* Hairline divider between stat cells (desktop strip only). */
+.statBlock:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 22%;
+  bottom: 22%;
+  width: 1px;
+  background: var(--fn-border-secondary);
 }
 
 .statLabel {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--fn-text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -190,9 +202,10 @@
 .statValue {
   font-size: 22px;
   font-weight: 600;
-  margin-top: 4px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pieGrid,
@@ -210,7 +223,7 @@
 }
 
 /*
- * Donut: fill grid cell (match sibling bar). Plot flex-grows; legend fixed.
+ * Donut: plot left, legend list right (name + compact value + pct row).
  * Body/class rules live after .chartCard so they win the cascade.
  */
 .donutBody {
@@ -218,57 +231,79 @@
   min-height: 0;
   height: 100%;
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
   width: 100%;
 }
 
 .donutPlot {
-  flex: 1 1 auto;
+  flex: 1 1 46%;
   min-height: 200px;
-  width: 100%;
+  height: 100%;
   min-width: 0;
 }
 
 .donutLegend {
+  flex: 1 1 54%;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   justify-content: center;
-  align-items: center;
-  gap: 4px 10px;
+  align-items: stretch;
+  gap: 0;
   margin: 0;
-  padding: 0 2px;
+  padding: 4px 2px;
   list-style: none;
-  width: 100%;
-  flex: 0 0 auto;
-  max-height: 44px;
-  overflow: hidden;
+  min-width: 0;
+  max-height: 100%;
+  overflow-y: auto;
 }
 
 .donutLegendItem {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 5px;
-  max-width: 100%;
+  gap: 8px;
+  padding: 6px 2px;
   min-width: 0;
 }
 
 .donutLegendSwatch {
   width: 8px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: 50%;
   flex-shrink: 0;
+}
+
+.donutLegendMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .donutLegendLabel {
   font-size: 12px;
-  line-height: 1.2;
-  color: var(--fn-text-secondary);
+  line-height: 1.3;
+  color: var(--fn-text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 10em;
+}
+
+.donutLegendValue {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--fn-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.donutLegendPct {
+  font-size: 12px;
+  color: var(--fn-text-secondary);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 /* Fixed-size chart host: height set inline, or flex-fill for summary trend. */
@@ -287,7 +322,7 @@
 
 .summaryTrendCard {
   flex: 1 1 auto;
-  min-height: 260px;
+  min-height: 340px;
   display: flex;
   flex-direction: column;
 }
@@ -440,5 +475,30 @@
 
   .chartCard {
     height: auto;
+  }
+
+  /* Mobile tiles: standalone gray cards instead of one divided strip. */
+  .statsRow {
+    background: transparent;
+    padding: 0;
+  }
+
+  .statsGridMobile .statBlock {
+    background: var(--fn-bg-secondary);
+    border-radius: 8px;
+  }
+
+  .statsGridMobile .statBlock::before {
+    display: none;
+  }
+
+  .donutBody {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .donutPlot {
+    flex-basis: auto;
+    min-height: 180px;
   }
 }

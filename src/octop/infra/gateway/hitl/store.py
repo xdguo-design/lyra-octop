@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import secrets
 import time
 from dataclasses import dataclass, field
 from typing import Any, Literal
+
+from octop.infra.utils.ulid import new_ulid
 
 HitlPendingStatus = Literal["pending", "approved", "rejected", "expired"]
 
@@ -30,6 +31,8 @@ class HitlPendingRecord:
     # Resume still targets the member agent and ``room~member`` thread.
     resume_agent_id: str | None = None
     resume_thread_id: str | None = None
+    run_id: str | None = None
+    step_id: str | None = None
 
 
 @dataclass
@@ -50,6 +53,8 @@ class HitlPendingStore:
         action_requests: list[dict[str, Any]],
         review_configs: list[dict[str, Any]] | None,
         resume_agent_id: str | None = None,
+        run_id: str | None = None,
+        step_id: str | None = None,
     ) -> HitlPendingRecord:
         self._gc()
         # A new pause replaces only the same slot. Two team members share the
@@ -63,9 +68,9 @@ class HitlPendingStore:
             elif existing.resume_agent_id:
                 continue
             existing.status = "expired"
-        pending_id = secrets.token_hex(2)
+        pending_id = new_ulid()
         while pending_id in self._records:
-            pending_id = secrets.token_hex(2)
+            pending_id = new_ulid()
         record = HitlPendingRecord(
             pending_id=pending_id,
             thread_id=thread_id,
@@ -77,8 +82,18 @@ class HitlPendingStore:
             review_configs=list(review_configs) if review_configs else None,
             created_at=time.time(),
             resume_agent_id=resume_agent_id,
+            run_id=run_id,
+            step_id=step_id,
         )
         self._records[pending_id] = record
+        return record
+
+    def restore(self, record: HitlPendingRecord) -> HitlPendingRecord:
+        """Cache an unexpired durable record after process restart."""
+        if record.status == "pending" and time.time() - record.created_at <= self.ttl_seconds:
+            self._records[record.pending_id] = record
+            return record
+        record.status = "expired"
         return record
 
     def get(self, pending_id: str) -> HitlPendingRecord | None:
@@ -175,6 +190,28 @@ class HitlPendingStore:
             if latest is None or record.created_at > latest.created_at:
                 latest = record
         return latest
+
+    def list_pending_for_thread(
+        self,
+        thread_id: str,
+        *,
+        agent_id: str,
+        user_id: int | None = None,
+    ) -> list[HitlPendingRecord]:
+        """Return all unexpired pauses bound to the requested thread."""
+        self._gc()
+        rows = [
+            record
+            for record in self._records.values()
+            if self._thread_pending_match(
+                record,
+                thread_id=thread_id,
+                agent_id=agent_id,
+                user_id=user_id,
+            )
+        ]
+        rows.sort(key=lambda record: record.created_at, reverse=True)
+        return rows
 
     def _thread_pending_match(
         self,

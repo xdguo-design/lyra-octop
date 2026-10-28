@@ -23,6 +23,7 @@ from octop.infra.admission_registration_demo import (
     StoreCapacityError,
     candidate_result,
     demo_store,
+    phone_only_input,
     regions_for,
     validate_fields,
 )
@@ -199,7 +200,9 @@ class AiCandidatesResponse(StrictModel):
     errors: dict[str, str] = Field(
         default_factory=dict, description="按字段返回未采纳候选的具体原因"
     )
-    modelName: str = Field(description="本次抽取实际使用的模型展示名；未配置展示名时返回模型 ID")
+    modelName: str | None = Field(
+        default=None, description="本次抽取实际使用的模型展示名；未配置展示名时返回模型 ID"
+    )
 
 
 def _validate_or_422(fields: dict[str, Any]) -> None:
@@ -316,6 +319,7 @@ async def select_application(
         for key, value in identity_fields.items()
         if key not in {"name", "idNumber", "nationality", "ethnicity"}
     }
+    server.services.admission_session_repo.delete_expired()
     session = server.services.admission_session_repo.create_or_get(
         session_id=session_id,
         owner_user_id=user.id,
@@ -417,6 +421,17 @@ async def save_admission_turn(
     server: Any = Depends(get_server),
 ) -> dict[str, object]:
     _identity, session = _owned_admission_session(server, user, body.identityToken, session_id)
+    saved_turns = server.services.admission_session_repo.list_turns(session_id, user.id)
+    existing_turn_id = any(turn.turn_id == body.turnId for turn in saved_turns)
+    dialog_turn_count = sum(turn.action != "manual_edit" for turn in saved_turns)
+    if not existing_turn_id and body.action != "manual_edit" and dialog_turn_count >= 20:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": "ADMISSION_TURN_LIMIT",
+                "message": "本次办理已达到20轮对话上限，请直接修改表单。",
+            },
+        )
     allowed = set(FIELD_SCHEMA["properties"]) - {
         "name",
         "idNumber",
@@ -425,12 +440,59 @@ async def save_admission_turn(
     }
     if set(body.fields) - allowed:
         raise HTTPException(status_code=422, detail="对话包含不支持修改的身份字段")
+    existing_facts = json.loads(session.facts_json)
+    known_values = {
+        key: fact.get("value")
+        for key, fact in existing_facts.items()
+        if key in allowed and isinstance(fact, dict) and "value" in fact
+    }
+    field_errors = validate_fields({**known_values, **body.fields})
+    field_errors = {key: message for key, message in field_errors.items() if key in body.fields}
+    if field_errors:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "VALIDATION_FAILED", "errors": field_errors},
+        )
     if len(json.dumps(body.pendingProposal, ensure_ascii=False)) > 10_000:
         raise HTTPException(status_code=422, detail="待确认修改内容过长")
-    facts = json.loads(session.facts_json)
-    pending = body.pendingProposal
+    facts = existing_facts
+    decision_field = None
     if body.action in {"candidate_accept", "candidate_reject"}:
-        pending = None
+        decision = body.pendingProposal
+        if not isinstance(decision, dict) or decision.get("field") not in allowed:
+            raise HTTPException(status_code=422, detail="待确认修改内容格式不正确")
+        decision_field = decision["field"]
+        pending = json.loads(session.pending_proposal_json) if session.pending_proposal_json else {}
+        pending.pop(decision_field, None)
+    else:
+        pending = body.pendingProposal
+        if isinstance(pending, dict):
+            pending = {
+                key: proposal
+                if isinstance(proposal, dict)
+                else {
+                    "currentValue": known_values.get(key),
+                    "proposedValue": proposal,
+                }
+                for key, proposal in pending.items()
+            }
+    if pending is not None:
+        invalid_pending = set(pending) - allowed
+        if invalid_pending or any(
+            not isinstance(proposal, dict) or set(proposal) != {"currentValue", "proposedValue"}
+            for proposal in pending.values()
+        ):
+            raise HTTPException(status_code=422, detail="待确认修改内容格式不正确")
+        proposed = {key: value["proposedValue"] for key, value in pending.items()}
+        pending_errors = validate_fields({**known_values, **proposed})
+        pending_errors = {
+            key: message for key, message in pending_errors.items() if key in proposed
+        }
+        if pending_errors:
+            raise HTTPException(
+                status_code=422,
+                detail={"code": "VALIDATION_FAILED", "errors": pending_errors},
+            )
     pending_fields = set(pending) if isinstance(pending, dict) else set()
     for key, value in body.fields.items():
         facts[key] = {
@@ -439,16 +501,23 @@ async def save_admission_turn(
             "confirmed": key not in pending_fields,
             "source_turn_id": body.turnId,
         }
+    if body.action == "candidate_reject" and decision_field in facts:
+        facts[decision_field]["confirmed"] = True
     important = {
         key: facts[key]["value"]
         for key in ("phone", "nativeRegion", "residentRegion", "addressDetail", "emergencyContact")
         if key in facts
     }
-    summary = {
-        "applicationId": session.application_id,
-        "important": important,
-        "pendingAction": body.action if pending else None,
-    }
+    summary = json.loads(session.summary_json)
+    summary.update(
+        {
+            "applicationId": session.application_id,
+            "important": important,
+            "pendingAction": body.action if pending else None,
+        }
+    )
+    if "application" in summary and not isinstance(summary["application"], dict):
+        summary.pop("application")
     saved = server.services.admission_session_repo.append_turn(
         session_id=session_id,
         owner_user_id=user.id,
@@ -649,6 +718,26 @@ async def ai_candidates(
 ) -> dict[str, object]:
     _identity, session = _owned_admission_session(server, user, body.identityToken, body.sessionId)
     turns = server.services.admission_session_repo.list_turns(body.sessionId, user.id)
+    dialog_turns = [turn for turn in turns if turn.action != "manual_edit"]
+    if body.turnId:
+        existing_turn = next((turn for turn in turns if turn.turn_id == body.turnId), None)
+        if existing_turn is not None:
+            return {
+                "fields": json.loads(existing_turn.fields_json),
+                "turnCount": len(dialog_turns),
+                "maxTurns": 20,
+            }
+    if len(dialog_turns) >= 20:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": "ADMISSION_TURN_LIMIT",
+                "message": "本次办理已达到20轮对话上限，请直接修改表单。",
+            },
+        )
+    phone = phone_only_input(body.text) if body.page in (0, 1) else None
+    if phone:
+        return {"fields": {"phone": phone}, "errors": {}, "modelName": None}
     application = demo_store.selected_application(user.id, body.identityToken)
     context = {
         "current_page": body.page,

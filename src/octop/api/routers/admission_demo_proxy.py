@@ -35,7 +35,7 @@ async def _forward(request: Request, path: str) -> Response:
     try:
         # The target is operator-configured; never follow redirects with a patient's token.
         async with httpx.AsyncClient(
-            timeout=httpx.Timeout(40.0, connect=3.0), trust_env=False, follow_redirects=False
+            timeout=httpx.Timeout(50.0, connect=3.0), trust_env=False, follow_redirects=False
         ) as client:
             upstream = await client.request(
                 request.method,

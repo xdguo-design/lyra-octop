@@ -39,9 +39,8 @@ describe("collectTurnWebSearchSources", () => {
       answerMessage: null,
     } as AssistantTurnSplit;
 
-    expect(collectTurnWebSearchSources(split).map((source) => source.url)).toEqual([
-      "https://example.com/a",
-      "https://example.com/b",
-    ]);
+    expect(
+      collectTurnWebSearchSources(split).map((source) => source.url),
+    ).toEqual(["https://example.com/a", "https://example.com/b"]);
   });
 });

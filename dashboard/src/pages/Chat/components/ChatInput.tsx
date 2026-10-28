@@ -29,6 +29,7 @@ import MentionPickerMenu from "./MentionPickerMenu";
 import ChatInputPreviewBar from "./ChatInputPreviewBar";
 import ChatInputActionsRow from "./ChatInputActionsRow";
 import ChatQueuedMessages from "./ChatQueuedMessages";
+import { ThreadTextArtifactDialog } from "./ThreadTextArtifactDialog";
 import { useVoiceInput } from "../../../hooks/useVoiceInput";
 import { useChatAttachments } from "../hooks/useChatAttachments";
 import { useSlashMentionInput } from "../hooks/useSlashMentionInput";
@@ -201,6 +202,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const isMobile = useIsMobile();
     const shellRef = useRef<HTMLDivElement>(null);
     const [nativeDropActive, setNativeDropActive] = useState(false);
+    const [textArtifactOpen, setTextArtifactOpen] = useState(false);
     useEffect(() => {
       const el = shellRef.current;
       if (!el) return;
@@ -992,6 +994,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             slashMenuItems={slashMenuItems}
             onSlashShortcutSelect={handleSlashSelect}
             onFileSelect={handleFileSelect}
+            onTextArtifactOpen={() => setTextArtifactOpen(true)}
             onFolderSelect={handleFolderSelect}
             onNewChat={onNewChat}
             onPolish={() => void handlePolish()}
@@ -1017,6 +1020,14 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         </div>
         {!isMobile && (
           <p className={styles.aiDisclaimer}>{t("chatWelcome.aiDisclaimer")}</p>
+        )}
+        {agentId && threadId && (
+          <ThreadTextArtifactDialog
+            open={textArtifactOpen}
+            agentId={agentId}
+            threadId={threadId}
+            onClose={() => setTextArtifactOpen(false)}
+          />
         )}
       </div>
     );

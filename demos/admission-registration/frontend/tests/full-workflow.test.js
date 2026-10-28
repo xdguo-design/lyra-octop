@@ -941,7 +941,7 @@ describe('complete admission workflow', () => {
     wrapper.destroy()
   })
 
-  it('keeps applied candidates while clearly reporting conversation-save failure', async () => {
+  it('reverts candidates when conversation saving fails', async () => {
     const wrapper = mountApp()
     await enterForm(wrapper)
     api.extract.mockResolvedValueOnce({ fields: { phone: '13900139000' } })
@@ -949,8 +949,8 @@ describe('complete admission workflow', () => {
 
     await wrapper.vm.applyAi('联系电话13900139000', wrapper.vm.generation)
 
-    expect(wrapper.vm.fields.phone).toBe('13900139000')
-    expect(wrapper.vm.aiNotice).toContain('候选信息已回填')
+    expect(wrapper.vm.fields.phone).toBe(validFields().phone)
+    expect(wrapper.vm.aiNotice).toContain('候选信息已撤回')
     expect(wrapper.vm.aiNotice).toContain('本轮对话未能保存')
     expect(wrapper.vm.aiNotice).not.toContain('解析失败')
     wrapper.destroy()
@@ -1575,13 +1575,12 @@ describe('complete admission workflow', () => {
 
   it('records directly from the held home mic and opens the dialog after release', async () => {
     const wrapper = mountApp()
-    api.platform.mockResolvedValueOnce({ active: true })
 
     await wrapper.find('.mic-button').trigger('pointerdown')
     await settle(wrapper)
 
     // 按住即录，弹窗在按住期间保持关闭，由全屏遮罩展示状态。
-    expect(api.platform).toHaveBeenCalledOnce()
+    expect(api.platform).not.toHaveBeenCalled()
     expect(recorder.start).toHaveBeenCalledOnce()
     expect(wrapper.vm.recording).toBe(true)
     expect(wrapper.vm.holdActive).toBe(true)
@@ -2035,25 +2034,26 @@ describe('complete admission workflow', () => {
     wrapper.destroy()
   })
 
-  it('does not start multiple recorders while the voice service check is pending', async () => {
+  it('does not start multiple recorders while microphone permission is pending', async () => {
     const wrapper = mountApp()
     await startAdmission(wrapper)
-    let resolveProbe
-    api.platform.mockReturnValueOnce(
+    let resolveStart
+    recorder.start.mockReturnValueOnce(
       new Promise((resolve) => {
-        resolveProbe = resolve
+        resolveStart = resolve
       })
     )
 
     await wrapper.find('.mic-button').trigger('pointerdown')
     await settle(wrapper)
     expect(wrapper.vm.holdActive).toBe(true)
-    // 按住期间的重复按下不应触发第二次探测。
+    // 麦克风权限请求仍在等待时，重复按下不应启动第二次录音。
     await wrapper.find('.mic-button').trigger('pointerdown')
-    expect(api.platform).toHaveBeenCalledOnce()
+    expect(recorder.start).toHaveBeenCalledOnce()
+    expect(api.platform).not.toHaveBeenCalled()
     expect(wrapper.vm.startingVoice).toBe(true)
 
-    resolveProbe({ active: true })
+    resolveStart()
     await settle(wrapper)
     expect(recorder.start).toHaveBeenCalledOnce()
     expect(wrapper.vm.recording).toBe(true)
@@ -2823,11 +2823,15 @@ describe('complete admission workflow', () => {
   ])('shows a recoverable error when %s', async (message, errorText) => {
     const wrapper = mountApp()
     await startAdmission(wrapper)
-    if (message === 'voice service unavailable')
+    if (message === 'voice service unavailable') {
       api.platform.mockRejectedValueOnce(new Error(errorText))
-    else recorder.start.mockRejectedValueOnce(new Error(errorText))
+      await wrapper.vm.startRecording()
+      await settle(wrapper)
+    } else {
+      recorder.start.mockRejectedValueOnce(new Error(errorText))
+      await toggleIdentityRecording(wrapper)
+    }
 
-    await toggleIdentityRecording(wrapper)
     expect(wrapper.vm.recording).toBe(false)
     expect(wrapper.vm.voiceError).toBe(errorText)
     wrapper.destroy()

@@ -45,6 +45,37 @@ export type PendingApproval = {
   pendingId?: string;
 };
 
+const SESSION_BYPASSABLE_TOOLS = new Set([
+  "ls",
+  "read_file",
+  "glob",
+  "grep",
+  "current_time",
+  "web_fetch",
+  "desktop_screenshot",
+  "tavily_search",
+  "brave_search",
+  "google_search",
+  "kimi_search",
+  "searchfree_search",
+  "memory_search",
+  "memory_get",
+  "cronjob_list",
+  "cronjob_get",
+  "search_knowledge",
+  "mobile_screenshot",
+  "mobile_ui_dump",
+  "agent_list",
+]);
+
+/** Only explicitly read-only tools may be approved by a thread session policy. */
+export function canSessionBypassActions(actions: HitlActionRequest[]): boolean {
+  return (
+    actions.length > 0 &&
+    actions.every((action) => SESSION_BYPASSABLE_TOOLS.has(action.name))
+  );
+}
+
 /** Latest pending tool-approval card, if any (questions are excluded). */
 export function findPendingApproval(
   messages: ChatMessage[],
@@ -75,7 +106,7 @@ export function findAutoResumableApproval(
   messages: ChatMessage[],
 ): PendingApproval | null {
   const pending = findPendingApproval(messages);
-  if (!pending) return null;
+  if (!pending || !canSessionBypassActions(pending.actions)) return null;
   if (policy.mode === "allow_all") return pending;
   if (policy.mode === "allow_tools") {
     const allowed = new Set(policy.tools ?? []);

@@ -12,6 +12,7 @@ import {
 import { message } from "../../utils/antdMessage";
 import { formatServerDateTime } from "../../utils/formatMessageTime";
 import { useServerTimezone } from "../../hooks/useServerTimezone";
+import { copyText } from "../../utils/copyText";
 
 interface ProjectShareDialogProps {
   project: WorkbenchProject | null;
@@ -87,10 +88,9 @@ export default function ProjectShareDialog({
   const copyLink = async () => {
     if (!created) return;
     const url = `${window.location.origin}/share/${created.token}`;
-    try {
-      await navigator.clipboard.writeText(url);
+    if (await copyText(url)) {
       message.success(t("workbench.home.projects.shareCopied"));
-    } catch {
+    } else {
       message.error(t("workbench.home.projects.shareCopyFailed"));
     }
   };

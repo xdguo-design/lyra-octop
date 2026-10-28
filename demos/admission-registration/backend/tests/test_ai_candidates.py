@@ -150,6 +150,22 @@ def test_ai_keeps_unambiguous_phone_when_model_marks_it_uncertain() -> None:
     ) == ({}, {})
 
 
+def test_ai_does_not_use_emergency_contact_phone_as_patient_phone() -> None:
+    assert (
+        accepted_candidates(
+            "紧急联系人是我女儿，她的电话是13800138000",
+            {"contact_phone": "13800138000"},
+        )
+        == {}
+    )
+
+
+def test_ai_matches_unique_region_returned_as_canonical_path() -> None:
+    assert accepted_candidates("籍贯大东区", {"native_region": "辽宁省沈阳市大东区"}) == {
+        "nativeRegion": ["210000", "210100", "210104"]
+    }
+
+
 def test_ai_returns_field_specific_reasons_for_invalid_phone_and_occupation() -> None:
     assert candidate_result("联系电话1234567890", {"contact_phone": "1234567890"}) == (
         {},

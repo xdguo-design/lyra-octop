@@ -7,6 +7,7 @@ import hashlib
 import os
 import re
 import secrets
+import shlex
 import signal
 import socket
 import subprocess
@@ -16,13 +17,14 @@ from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path, PureWindowsPath
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 import httpx
 
 from octop.infra.utils import posix_compat
 
-_REPO_PATH_RE = re.compile(r"^/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?$")
+_REPO_SEGMENT_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+_REPO_HOSTS = {"github.com", "cnb.cool"}
 _ENV_NAME_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 _COMMAND_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 _MAX_LOG_BYTES = 8192
@@ -102,24 +104,46 @@ class _DockerRuntime:
 def normalize_repository_url(value: str) -> str | None:
     try:
         parsed = urlsplit(value.strip())
-        match = _REPO_PATH_RE.fullmatch(parsed.path)
+        parts = parsed.path.strip("/").removesuffix(".git").split("/")
+        host = parsed.hostname.lower() if parsed.hostname else ""
         if (
             parsed.scheme.lower() != "https"
-            or parsed.hostname is None
-            or parsed.hostname.lower() != "github.com"
+            or host not in _REPO_HOSTS
             or parsed.port is not None
             or parsed.username is not None
             or parsed.password is not None
             or parsed.query
             or parsed.fragment
-            or match is None
+            or len(parts) < 2
+            or (host == "github.com" and len(parts) != 2)
+            or any(not _REPO_SEGMENT_RE.fullmatch(part) or part in {".", ".."} for part in parts)
         ):
             return None
-        if match.group(1) in {".", ".."} or match.group(2) in {".", ".."}:
-            return None
-        return f"https://github.com/{match.group(1).lower()}/{match.group(2).lower()}"
+        normalized_parts = [part.lower() for part in parts] if host == "github.com" else parts
+        return f"https://{host}/{'/'.join(normalized_parts)}"
     except ValueError:
         return None
+
+
+def normalize_repository_branch(value: str | None) -> str | None:
+    if value is None or not value.strip():
+        return None
+    branch = value.strip()
+    if (
+        len(branch) > 255
+        or branch.startswith(("-", "/"))
+        or branch.endswith(("/", "."))
+        or ".." in branch
+        or "@{" in branch
+        or branch == "@"
+        or "//" in branch
+        or "\\" in branch
+        or any(ord(char) < 32 or ord(char) == 127 or char in " ~^:?*[" for char in branch)
+        or any(part.startswith(".") or part.endswith(".lock") for part in branch.split("/"))
+        or any(part in {"", ".", ".."} for part in branch.split("/"))
+    ):
+        return None
+    return branch
 
 
 def _normalize_preview_domain(value: str | None) -> str | None:
@@ -380,14 +404,18 @@ class ProjectServiceManager:
         return token if re.fullmatch(r"[0-9a-f]{48}", token) else None
 
     async def start(
-        self, repository_url: str, project_id: str | None = None
+        self,
+        repository_url: str,
+        project_id: str | None = None,
+        *,
+        access_token: str | None = None,
     ) -> dict[str, str | None]:
         key = normalize_repository_url(repository_url)
         profile = self._profiles.get(key or "")
         if key is None:
             raise KeyError("project launch profile not found")
         if profile is None:
-            return await self._start_docker_project(key, project_id)
+            return await self._start_docker_project(key, project_id, access_token)
         async with self._lock:
             current = self.status(key)
             if current["status"] == "running":
@@ -440,20 +468,23 @@ class ProjectServiceManager:
     def _docker_names(self, repository_url: str, project_id: str | None) -> tuple[Path, str, str]:
         if self._project_root is None:
             raise RuntimeError("Docker project previews are not configured")
-        parsed = urlsplit(repository_url)
-        match = _REPO_PATH_RE.fullmatch(parsed.path)
-        if match is None:
-            raise ValueError("invalid GitHub repository URL")
-        owner, repository = match.groups()
+        canonical_url = normalize_repository_url(repository_url)
+        if canonical_url is None:
+            raise ValueError("invalid GitHub or CNB repository URL")
+        parsed = urlsplit(canonical_url)
+        parts = parsed.path.strip("/").split("/")
+        if parsed.hostname not in _REPO_HOSTS or len(parts) < 2:
+            raise ValueError("invalid GitHub or CNB repository URL")
         root = self._project_root.resolve()
-        project_name = repository.removesuffix(".git").lower()
         item_suffix = (
             hashlib.sha256(project_id.encode()).hexdigest()[:16] if project_id else "shared"
         )
-        checkout = (root / "github" / owner.lower() / project_name / item_suffix).resolve()
+        host_folder = "github" if parsed.hostname == "github.com" else "cnb"
+        path_parts = [part.lower() for part in parts] if host_folder == "github" else parts
+        checkout = (root / host_folder / Path(*path_parts) / item_suffix).resolve()
         if not checkout.is_relative_to(root):
             raise ValueError("repository path escapes the project root")
-        name = hashlib.sha256(f"{repository_url}\0{project_id or ''}".encode()).hexdigest()[:16]
+        name = hashlib.sha256(f"{canonical_url}\0{project_id or ''}".encode()).hexdigest()[:16]
         return checkout, f"octop-project-{name}", f"octop-project:{name}"
 
     async def _docker_command(
@@ -498,7 +529,32 @@ class ProjectServiceManager:
             return ""
         return text.strip()
 
-    async def _clone_project(self, repository_url: str, checkout: Path) -> None:
+    async def _git_command(
+        self,
+        access_token: str | None,
+        *args: str,
+        cwd: Path | None = None,
+        timeout: float = 30.0,
+    ) -> str:
+        if access_token is None:
+            return await self._docker_command("git", *args, cwd=cwd, timeout=timeout)
+        with tempfile.TemporaryDirectory(prefix="octop-git-auth-") as temp:
+            credentials = Path(temp) / "credentials"
+            credentials.write_text(
+                f"https://cnb:{quote(access_token, safe='')}@cnb.cool\n", encoding="utf-8"
+            )
+            helper = f"store --file={shlex.quote(str(credentials))}"
+            return await self._docker_command(
+                "git", "-c", f"credential.helper={helper}", *args, cwd=cwd, timeout=timeout
+            )
+
+    async def _clone_project(
+        self,
+        repository_url: str,
+        checkout: Path,
+        access_token: str | None = None,
+        branch: str | None = None,
+    ) -> None:
         checkout.parent.mkdir(parents=True, exist_ok=True)
         if checkout.exists():
             if checkout.is_symlink() or not checkout.is_dir():
@@ -506,10 +562,123 @@ class ProjectServiceManager:
             return
         with tempfile.TemporaryDirectory(prefix="octop-clone-", dir=checkout.parent) as temp:
             target = Path(temp) / "source"
-            await self._docker_command(
-                "git", "clone", "--depth", "1", repository_url, str(target), timeout=180
-            )
+            args = ["clone", "--depth", "1"]
+            if branch:
+                args.extend(("--branch", branch))
+            args.extend((repository_url, str(target)))
+            await self._git_command(access_token, *args, timeout=180)
             target.replace(checkout)
+
+    async def update(
+        self,
+        repository_url: str,
+        project_id: str,
+        *,
+        access_token: str | None = None,
+        source_only: bool = False,
+        repository_branch: str | None = None,
+    ) -> None:
+        key = normalize_repository_url(repository_url)
+        if key is None:
+            raise KeyError("project repository is not updateable")
+        branch = normalize_repository_branch(repository_branch)
+        if repository_branch is not None and branch is None:
+            raise RuntimeError("project repository branch is invalid")
+        profile = None if source_only else self._profiles.get(key)
+        if source_only:
+            checkout, _container, _image = self._docker_names(key, project_id)
+            container = image = None
+        elif profile is not None:
+            checkout = resolve_project_root(self._code_root, profile.relative_path)
+            container = image = None
+        elif self._project_root is not None:
+            checkout, container, image = self._docker_names(key, project_id)
+        else:
+            raise KeyError("project repository is not updateable")
+        async with self._lock:
+            if profile is None and not checkout.exists():
+                await self._clone_project(key, checkout, access_token, branch)
+            if not checkout.is_dir() or (profile is None and checkout.is_symlink()):
+                raise RuntimeError("project checkout is not a directory")
+            remote = await self._docker_command("git", "remote", "get-url", "origin", cwd=checkout)
+            if normalize_repository_url(remote) != key:
+                raise RuntimeError("project origin does not match the registered repository")
+            if await self._docker_command("git", "status", "--porcelain", cwd=checkout):
+                raise RuntimeError("project checkout has local changes; update cancelled")
+            if source_only:
+                if branch is None:
+                    refs = await self._git_command(
+                        access_token,
+                        "ls-remote",
+                        "--symref",
+                        "origin",
+                        "HEAD",
+                        cwd=checkout,
+                    )
+                    match = re.search(r"^ref: refs/heads/(\S+)\s+HEAD$", refs, re.MULTILINE)
+                    branch = normalize_repository_branch(match.group(1)) if match else None
+                    if branch is None:
+                        raise RuntimeError("project repository default branch is unavailable")
+                current_branch = await self._docker_command(
+                    "git", "branch", "--show-current", cwd=checkout
+                )
+                if current_branch.strip() != branch:
+                    await self._git_command(
+                        access_token,
+                        "fetch",
+                        "--depth",
+                        "1",
+                        "origin",
+                        f"+refs/heads/{branch}:refs/remotes/origin/{branch}",
+                        cwd=checkout,
+                    )
+                    local_branch = await self._docker_command(
+                        "git", "branch", "--list", branch, cwd=checkout
+                    )
+                    if local_branch.strip():
+                        await self._docker_command("git", "switch", branch, cwd=checkout)
+                    else:
+                        await self._docker_command(
+                            "git",
+                            "switch",
+                            "--track",
+                            "-c",
+                            branch,
+                            f"origin/{branch}",
+                            cwd=checkout,
+                        )
+                await self._git_command(
+                    access_token,
+                    "pull",
+                    "--ff-only",
+                    "origin",
+                    branch,
+                    timeout=180,
+                    cwd=checkout,
+                )
+            else:
+                await self._git_command(
+                    access_token, "pull", "--ff-only", timeout=180, cwd=checkout
+                )
+            if source_only:
+                return
+            if profile is not None:
+                process_runtime = self._runtimes.get(key)
+                if process_runtime is not None:
+                    await self._stop_runtime(process_runtime)
+                    process_runtime.status = "stopped"
+                    process_runtime.logs.clear()
+            else:
+                assert container is not None and image is not None
+                await self._docker_command("docker", "rm", "--force", container, check=False)
+                await self._docker_command("docker", "image", "rm", image, check=False)
+                docker_runtime = self._docker_runtimes.setdefault(
+                    (key, project_id), _DockerRuntime(key, project_id)
+                )
+                docker_runtime.status = "stopped"
+                docker_runtime.url = None
+                docker_runtime.upstream_url = None
+                docker_runtime.logs.clear()
 
     @staticmethod
     def _container_port(checkout: Path) -> int:
@@ -525,7 +694,7 @@ class ProjectServiceManager:
         raise RuntimeError("Dockerfile must expose a numeric TCP port")
 
     async def _start_docker_project(
-        self, repository_url: str, project_id: str | None
+        self, repository_url: str, project_id: str | None, access_token: str | None = None
     ) -> dict[str, str | None]:
         checkout, container, image = self._docker_names(repository_url, project_id)
         async with self._lock:
@@ -541,7 +710,7 @@ class ProjectServiceManager:
             runtime.logs.clear()
             try:
                 await self._docker_command("docker", "info", "--format={{.ServerVersion}}")
-                await self._clone_project(repository_url, checkout)
+                await self._clone_project(repository_url, checkout, access_token)
                 port = self._container_port(checkout)
                 image_result = await self._docker_command(
                     "docker", "image", "inspect", image, check=False

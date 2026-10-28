@@ -265,18 +265,22 @@ export function useChatAttachments(agentId: string | null | undefined) {
     [agentId, items, runUpload],
   );
 
-  const removeUpload = useCallback((key: string) => {
-    const item = items.find((candidate) => candidate.key === key);
-    if (!item) return;
-    if (item.status === "done" && item.attachment?.fileId) {
-      void deleteChatFileDraft(item.uploadAgentId, item.attachment.fileId).catch(
-        () => undefined,
-      );
-    } else if (item.status === "pending" || item.status === "uploading") {
-      removedUploadKeysRef.current.add(key);
-    }
-    setItems((prev) => prev.filter((item) => item.key !== key));
-  }, [items]);
+  const removeUpload = useCallback(
+    (key: string) => {
+      const item = items.find((candidate) => candidate.key === key);
+      if (!item) return;
+      if (item.status === "done" && item.attachment?.fileId) {
+        void deleteChatFileDraft(
+          item.uploadAgentId,
+          item.attachment.fileId,
+        ).catch(() => undefined);
+      } else if (item.status === "pending" || item.status === "uploading") {
+        removedUploadKeysRef.current.add(key);
+      }
+      setItems((prev) => prev.filter((item) => item.key !== key));
+    },
+    [items],
+  );
 
   const removeAttachment = useCallback(
     (index: number) => {

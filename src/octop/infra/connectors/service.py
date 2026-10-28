@@ -111,6 +111,12 @@ class ConnectorService:
             return {}
         return decrypt_credentials(self._secret_repo, row.credential_blob)
 
+    def active_credentials_for_user_kind(self, user_id: int, kind: str) -> dict[str, Any]:
+        row = self._repo.get_by_user_kind(user_id, kind)
+        if row is None or row.status != "active" or not row.credential_blob:
+            return {}
+        return decrypt_credentials(self._secret_repo, row.credential_blob)
+
     def encrypt_and_store(
         self,
         *,

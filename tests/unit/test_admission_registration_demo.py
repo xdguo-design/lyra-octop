@@ -8,6 +8,7 @@ from octop.infra.admission_registration_demo import (
     DemoStore,
     accepted_candidates,
     candidate_result,
+    phone_only_input,
     regions_for,
     validate_fields,
 )
@@ -33,6 +34,25 @@ def test_contract_rejects_unlisted_fields_and_ai_candidates_need_transcript_evid
         "addressDetail": "北京市朝阳区建国路1号",
     }
     assert accepted_candidates("联系电话13800138000或者13900139000", candidates) == {}
+
+
+def test_uncertain_phone_uses_one_explicit_patient_number_but_not_contact_number() -> None:
+    assert candidate_result("我的手机号是13900001234", {}, uncertain_fields=["contact_phone"]) == (
+        {"phone": "13900001234"},
+        {},
+    )
+    assert candidate_result(
+        "紧急联系人电话是13800138000", {}, uncertain_fields=["contact_phone"]
+    ) == ({}, {})
+
+
+def test_phone_only_fast_path_requires_a_single_labeled_value() -> None:
+    assert phone_only_input("我的手机号是13900001234。") == "13900001234"
+    assert phone_only_input("13900001234") == "13900001234"
+    assert phone_only_input("联系电话是13900001234") is None
+    assert phone_only_input("紧急联系人电话是13900001234") is None
+    assert phone_only_input("我的电话可能是13900001234") is None
+    assert phone_only_input("13900001234，现住北京市朝阳区") is None
 
 
 def test_labeled_single_phone_is_recovered_when_agent_omits_it() -> None:

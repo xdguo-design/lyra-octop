@@ -59,6 +59,37 @@ import {
 } from "lucide-react";
 import { useAuthImageSrc } from "../../../hooks/useAuthImageSrc";
 import { needsAuthBlobFetch } from "../../../utils/toolMediaBlocks";
+import monaLisa from "../../../assets/avatars/expert-paintings/mona-lisa.jpg";
+import girlWithPearl from "../../../assets/avatars/expert-paintings/girl-with-pearl.jpg";
+import vanGogh from "../../../assets/avatars/expert-paintings/van-gogh.jpg";
+import rembrandt from "../../../assets/avatars/expert-paintings/rembrandt.jpg";
+import venus from "../../../assets/avatars/expert-paintings/venus.jpg";
+import klimt from "../../../assets/avatars/expert-paintings/klimt.jpg";
+import ophelia from "../../../assets/avatars/expert-paintings/ophelia.jpg";
+import renaissanceScholar from "../../../assets/avatars/expert-paintings/renaissance-scholar.jpg";
+import baroqueAstronomer from "../../../assets/avatars/expert-paintings/baroque-astronomer.jpg";
+import classicalPhysician from "../../../assets/avatars/expert-paintings/classical-physician.jpg";
+import gardenPainter from "../../../assets/avatars/expert-paintings/garden-painter.jpg";
+import botanist from "../../../assets/avatars/expert-paintings/botanist.jpg";
+
+const paintingAvatarMap: Record<string, string> = {
+  "painting-mona-lisa": monaLisa,
+  "painting-girl-with-pearl": girlWithPearl,
+  "painting-van-gogh": vanGogh,
+  "painting-rembrandt": rembrandt,
+  "painting-venus": venus,
+  "painting-klimt": klimt,
+  "painting-ophelia": ophelia,
+  "painting-renaissance-scholar": renaissanceScholar,
+  "painting-baroque-astronomer": baroqueAstronomer,
+  "painting-classical-physician": classicalPhysician,
+  "painting-garden-painter": gardenPainter,
+  "painting-botanist": botanist,
+};
+
+export function isPaintingAvatarName(name: string | null | undefined): boolean {
+  return Boolean(name && paintingAvatarMap[name]);
+}
 
 const iconMap: Record<string, (size: number) => ReactNode> = {
   sparkles: (size) => <Sparkles size={size} />,
@@ -114,6 +145,23 @@ export function iconForName(
   size = 22,
 ): ReactNode {
   if (!name) return <Layers size={size} />;
+  const painting = paintingAvatarMap[name];
+  if (painting) {
+    return (
+      <img
+        src={painting}
+        alt=""
+        width={size}
+        height={size}
+        style={{
+          width: size,
+          height: size,
+          objectFit: "cover",
+          display: "block",
+        }}
+      />
+    );
+  }
   const fn = iconMap[name];
   return fn ? fn(size) : <Layers size={size} />;
 }

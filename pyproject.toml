@@ -50,6 +50,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+presentations = ["XlsxWriter>=3.0", "PyYAML>=6.0"]
 # PEP 621 extras — kept so `pip install -e ".[dev]"` keeps working for
 # legacy / CI flows. `uv sync` reads `[dependency-groups].dev` below.
 dev = [

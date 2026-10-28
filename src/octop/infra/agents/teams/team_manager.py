@@ -13,10 +13,12 @@ reached with ``ask_agent``. This class owns the room side of that call:
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import inspect
 import json
 import logging
 from collections.abc import Callable, Sequence
+from contextlib import suppress
 from dataclasses import fields
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
@@ -36,11 +38,14 @@ from octop.i18n import tr
 from octop.infra.agents.teams.service import _user_may_use_member, is_team_agent
 from octop.infra.agents.threads.artifact import artifact_path_allowed, extract_artifact_paths
 from octop.infra.db.repos.agents import AgentRow
+from octop.infra.db.repos.runs import RunRepo
+from octop.infra.db.repos.secrets import SecretRepo
 from octop.infra.gateway.media.tool_media import tool_name_base
 from octop.infra.history.projection import (
     live_message_inputs,
     message_inputs,
 )
+from octop.infra.run_context import current_run_context
 from octop.infra.utils.locale import DEFAULT_LOCALE, resolve_user_locale
 from octop.infra.utils.turn_failure import log_failed_tool_results
 from octop.infra.utils.ulid import new_ulid
@@ -116,6 +121,8 @@ class TeamManager:
         thread_message_repo: Any | None = None,
         gateway: Any | None = None,
         hitl_coordinator: Any | None = None,
+        run_repo: RunRepo | None = None,
+        secret_repo: SecretRepo | None = None,
     ) -> None:
         self._agent_manager = agent_manager
         self._thread_registry = thread_registry
@@ -123,6 +130,14 @@ class TeamManager:
         self._thread_message_repo = thread_message_repo
         self._gateway = gateway
         self._hitl = hitl_coordinator
+        self._run_repo = run_repo
+        self._secret_repo = secret_repo
+        self._dispatch_lock = asyncio.Lock()
+        self._dispatch_instance_id = f"team-dispatch-{new_ulid()}"
+        self._dispatch_lease_owners: dict[str, int] = {}
+        self._dispatch_lease_task: asyncio.Task[None] | None = None
+        self._dispatch_recovery_task: asyncio.Task[None] | None = None
+        self._dispatch_recovery_team: Any | None = None
         self._hitl_waiters: dict[str, asyncio.Future[list[dict[str, Any]]]] = {}
         self._peer_prompts: dict[tuple[str, str], tuple[str, str]] = {}
         self._live_host_replies: set[str] = set()
@@ -143,6 +158,7 @@ class TeamManager:
         uid = _octop_user_id(call.user_id)
         group = self._is_group_dispatch(call)
         extra = self._member_runtime(call)
+        await self._start_team_dispatch(call)
         question = ""
         dispatch_message = None
         if group:
@@ -288,6 +304,7 @@ class TeamManager:
 
     async def on_reply(self, event: ReplyEvent) -> None:
         self._end_job_from_reply(event)
+        await self._finish_team_dispatch(event)
         room = str(event.source_thread_id or "").strip()
         speaker = event.source_agent_id
         text = (
@@ -679,7 +696,330 @@ class TeamManager:
             stream_peer=self.stream_peer_to_room,
             stream_host=self.stream_host_followup_to_room,
             take_prompt=self.take_peer_prompt,
+            on_dispatch=self._create_team_dispatch,
+            on_dispatch_failed=self._fail_team_dispatch,
+            dispatch_lock=self._dispatch_lock,
         )
+
+    async def start_dispatch_recovery(self, harness_team: Any) -> None:
+        if self._run_repo is None or self._secret_repo is None:
+            return
+        self._dispatch_recovery_team = harness_team
+        await self._recover_expired_team_dispatches()
+        if self._dispatch_recovery_task is None or self._dispatch_recovery_task.done():
+            self._dispatch_recovery_task = asyncio.create_task(
+                self._recover_queued_team_dispatches(), name="octop-team-dispatch-recovery"
+            )
+
+    async def shutdown_dispatch_recovery(self) -> None:
+        for name in ("_dispatch_recovery_task", "_dispatch_lease_task"):
+            task = getattr(self, name)
+            setattr(self, name, None)
+            if task is not None and not task.done():
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
+        self._dispatch_lease_owners.clear()
+
+    async def _recover_queued_team_dispatches(self) -> None:
+        while self._dispatch_recovery_team is not None:
+            await asyncio.sleep(5)
+            await self._recover_expired_team_dispatches()
+
+    async def _recover_expired_team_dispatches(self) -> None:
+        run_repo = self._run_repo
+        if run_repo is None:
+            return
+        try:
+            rows = await asyncio.to_thread(
+                run_repo.claim_expired_team_dispatches,
+                executor_id=self._dispatch_instance_id,
+            )
+            for row in rows:
+                await self._restore_team_dispatch(row)
+        except Exception:
+            logger.warning("failed to scan expired Team dispatches")
+
+    async def _restore_team_dispatch(self, row: dict[str, Any]) -> None:
+        inbox_id = str(row["inbox_id"])
+        owner_user_id = int(row["owner_user_id"])
+        run_repo = self._run_repo
+        secret_repo = self._secret_repo
+        if run_repo is None or secret_repo is None:
+            return
+        try:
+            from octop.infra.agents.teams.dispatch_crypto import decrypt_dispatch
+
+            payload = decrypt_dispatch(secret_repo, row["payload_blob"])
+            user_id = payload.get("user_id")
+            source_agent_id = payload.get("source_agent_id")
+            target_agent_id = payload.get("target_agent_id")
+            message = payload.get("message")
+            source_thread_id = payload.get("source_thread_id")
+            session_key = payload.get("session_key")
+            original_user_prompt = payload.get("original_user_prompt")
+            if (
+                not isinstance(user_id, (str, int))
+                or isinstance(user_id, bool)
+                or _octop_user_id(user_id) != owner_user_id
+                or not isinstance(source_agent_id, str)
+                or not isinstance(target_agent_id, str)
+                or not isinstance(message, str)
+                or (source_thread_id is not None and not isinstance(source_thread_id, str))
+                or (session_key is not None and not isinstance(session_key, str))
+                or (original_user_prompt is not None and not isinstance(original_user_prompt, str))
+            ):
+                raise ValueError("invalid queued Team dispatch payload")
+            if source_thread_id:
+                thread = self._thread_registry.get_thread(source_thread_id)
+                if (
+                    thread is None
+                    or thread.agent_id != source_agent_id
+                    or int(thread.user_id) != owner_user_id
+                ):
+                    raise PermissionError("queued Team dispatch thread is no longer owned")
+            team = self._dispatch_recovery_team
+            submit_peer = getattr(team, "submit_peer", None)
+            if not callable(submit_peer):
+                raise RuntimeError("Harness Team inbox is unavailable")
+            submit_peer(
+                from_agent_id=source_agent_id,
+                to_agent_id=target_agent_id,
+                message=message,
+                user_id=user_id,
+                source_thread_id=source_thread_id,
+                original_user_prompt=original_user_prompt,
+                job_id=inbox_id,
+                metadata={"session_key": session_key} if session_key else None,
+            )
+        except Exception:
+            logger.warning("failed to restore queued Team dispatch inbox=%s", inbox_id)
+            try:
+                await asyncio.to_thread(
+                    run_repo.finish_team_dispatch,
+                    inbox_id,
+                    owner_user_id=owner_user_id,
+                    outcome="failed",
+                )
+            except Exception:
+                logger.warning("failed to close unrestorable Team dispatch inbox=%s", inbox_id)
+            return
+        self._dispatch_lease_owners[inbox_id] = owner_user_id
+        if self._dispatch_lease_task is None or self._dispatch_lease_task.done():
+            self._dispatch_lease_task = asyncio.create_task(
+                self._heartbeat_team_dispatches(), name="octop-team-dispatch-leases"
+            )
+
+    async def _create_team_dispatch(
+        self,
+        *,
+        inbox_id: str,
+        from_agent_id: str,
+        to_agent_id: str,
+        user_id: str | int,
+        source_thread_id: str | None,
+        message: str = "",
+        session_key: str | None = None,
+        original_user_prompt: str | None = None,
+    ) -> None:
+        if self._run_repo is None:
+            return
+        owner_user_id = _octop_user_id(user_id)
+        if owner_user_id is None:
+            raise PermissionError("team dispatch has no authenticated user")
+        if source_thread_id:
+            thread = self._thread_registry.get_thread(source_thread_id)
+            if (
+                thread is None
+                or thread.agent_id != from_agent_id
+                or int(thread.user_id) != owner_user_id
+            ):
+                raise PermissionError("team dispatch thread is not owned by its caller")
+        request_hash = hashlib.sha256(
+            json.dumps(
+                [
+                    inbox_id,
+                    owner_user_id,
+                    from_agent_id,
+                    to_agent_id,
+                    source_thread_id,
+                    message,
+                    session_key,
+                    original_user_prompt,
+                ],
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+        run_context = current_run_context.get()
+        if run_context is not None and run_context.owner_user_id != owner_user_id:
+            raise PermissionError("team dispatch owner does not match parent run")
+        encrypted_payload = None
+        if self._secret_repo is not None:
+            from octop.infra.agents.teams.dispatch_crypto import encrypt_dispatch
+
+            encrypted_payload = encrypt_dispatch(
+                self._secret_repo,
+                {
+                    "user_id": user_id,
+                    "source_agent_id": from_agent_id,
+                    "target_agent_id": to_agent_id,
+                    "message": message,
+                    "source_thread_id": source_thread_id,
+                    "session_key": session_key,
+                    "original_user_prompt": original_user_prompt,
+                },
+            )
+        await asyncio.to_thread(
+            self._run_repo.create_team_dispatch,
+            run_id=new_ulid(),
+            step_id=new_ulid(),
+            inbox_id=inbox_id,
+            owner_user_id=owner_user_id,
+            team_agent_id=from_agent_id,
+            member_agent_id=to_agent_id,
+            request_hash=request_hash,
+            encrypted_payload=encrypted_payload,
+            parent_run_id=run_context.run_id if run_context is not None else None,
+            lease_owner=self._dispatch_instance_id,
+        )
+        self._dispatch_lease_owners[inbox_id] = owner_user_id
+        if self._dispatch_lease_task is None or self._dispatch_lease_task.done():
+            self._dispatch_lease_task = asyncio.create_task(
+                self._heartbeat_team_dispatches(), name="octop-team-dispatch-leases"
+            )
+
+    async def _start_team_dispatch(self, call: PeerCall) -> None:
+        if (
+            self._run_repo is None
+            or not call.job_id
+            or not is_team_agent(self._agent_manager.get_row(call.from_agent_id))
+        ):
+            return
+        owner_user_id = _octop_user_id(call.user_id)
+        if owner_user_id is not None:
+            started = await asyncio.to_thread(
+                self._run_repo.start_team_dispatch,
+                call.job_id,
+                owner_user_id=owner_user_id,
+                executor_id=self._dispatch_instance_id,
+            )
+            if not started:
+                raise RuntimeError("Team dispatch lease expired before execution")
+
+    async def _heartbeat_team_dispatches(self) -> None:
+        run_repo = self._run_repo
+        if run_repo is None:
+            return
+        while self._dispatch_lease_owners:
+            await asyncio.sleep(10)
+            for inbox_id, owner_user_id in tuple(self._dispatch_lease_owners.items()):
+                try:
+                    alive = await asyncio.to_thread(
+                        run_repo.heartbeat_team_dispatch,
+                        inbox_id,
+                        owner_user_id=owner_user_id,
+                        executor_id=self._dispatch_instance_id,
+                    )
+                except Exception:
+                    logger.warning("failed to heartbeat Team dispatch inbox=%s", inbox_id)
+                    continue
+                if not alive:
+                    self._dispatch_lease_owners.pop(inbox_id, None)
+                    team = getattr(
+                        getattr(self._agent_manager, "_harness_manager", None), "team", None
+                    )
+                    inbox = getattr(team, "inbox", None)
+                    cancel = getattr(inbox, "cancel", None)
+                    if callable(cancel):
+                        cancel(inbox_id)
+
+    async def _fail_team_dispatch(self, inbox_id: str, user_id: str | int) -> None:
+        self._dispatch_lease_owners.pop(inbox_id, None)
+        if self._run_repo is None:
+            return
+        owner_user_id = _octop_user_id(user_id)
+        if owner_user_id is not None:
+            await asyncio.to_thread(
+                self._run_repo.finish_team_dispatch,
+                inbox_id,
+                owner_user_id=owner_user_id,
+                outcome="failed",
+            )
+
+    async def _finish_team_dispatch(self, event: ReplyEvent) -> None:
+        if self._run_repo is None or event.status not in {
+            "done",
+            "failed",
+            "cancelled",
+            "interrupted",
+        }:
+            return
+        owner_user_id = _octop_user_id(event.user_id)
+        if owner_user_id is None:
+            return
+        try:
+            await asyncio.to_thread(
+                self._run_repo.finish_team_dispatch,
+                event.inbox_id,
+                owner_user_id=owner_user_id,
+                outcome=event.status,
+            )
+        except Exception:
+            logger.warning("failed to persist team dispatch outcome inbox=%s", event.inbox_id)
+        finally:
+            self._dispatch_lease_owners.pop(event.inbox_id, None)
+
+    async def cancel_run_dispatches(self, run_id: str, *, owner_user_id: int) -> None:
+        """Signal the Run's Team dispatches and direct child dispatches."""
+        if self._run_repo is None:
+            return
+        async with self._dispatch_lock:
+            children = await asyncio.to_thread(
+                self._run_repo.list_children, run_id, owner_user_id=owner_user_id
+            )
+            if children is None:
+                return
+            run_ids = [run_id, *(str(child["run_id"]) for child in children)]
+            for current_id in run_ids:
+                steps = await asyncio.to_thread(
+                    self._run_repo.list_steps, current_id, owner_user_id=owner_user_id
+                )
+                for step in steps:
+                    if step.get("kind") == "team_dispatch" and step.get("inbox_id"):
+                        await self.cancel_dispatch(
+                            str(step["inbox_id"]), owner_user_id=owner_user_id
+                        )
+
+    async def cancel_dispatch(self, inbox_id: str, *, owner_user_id: int) -> bool:
+        """Cancel a live inbox job or close its stale durable Run after process loss."""
+        if self._run_repo is None:
+            return False
+        harness_manager = getattr(self._agent_manager, "_harness_manager", None)
+        team = getattr(harness_manager, "team", None)
+        inbox = getattr(team, "inbox", None)
+        get_message = getattr(inbox, "get", None)
+        message = get_message(inbox_id) if callable(get_message) else None
+        if message is None:
+            await asyncio.to_thread(
+                self._run_repo.finish_team_dispatch,
+                inbox_id,
+                owner_user_id=owner_user_id,
+                outcome="interrupted",
+            )
+            return False
+        cancel = getattr(inbox, "cancel", None)
+        if callable(cancel) and cancel(inbox_id):
+            return True
+        status = str(getattr(message, "status", ""))
+        if status in {"done", "failed", "cancelled"}:
+            await asyncio.to_thread(
+                self._run_repo.finish_team_dispatch,
+                inbox_id,
+                owner_user_id=owner_user_id,
+                outcome={"done": "done", "failed": "failed", "cancelled": "cancelled"}[status],
+            )
+            return True
+        return False
 
     # -- jobs / runtime -------------------------------------------------------
 
@@ -1091,8 +1431,11 @@ class TeamManager:
         if not record.action_requests:
             self._expire_hitl(record.pending_id)
             raise RuntimeError("team member paused without an approval request")
-        record.resume_agent_id = speaker_id
-        record.resume_thread_id = member_thread_id
+        coordinator.set_resume_target(
+            record,
+            agent_id=speaker_id,
+            thread_id=member_thread_id,
+        )
         loop = asyncio.get_running_loop()
         self._hitl_waiters[record.pending_id] = loop.create_future()
         request = dict(request)
@@ -2046,10 +2389,14 @@ def wire_host_dispatch(
     stream_peer: Callable[..., Any] | None = None,
     stream_host: Callable[..., Any] | None = None,
     take_prompt: Callable[[str, str | None], tuple[str, str] | None] | None = None,
+    on_dispatch: Callable[..., Any] | None = None,
+    on_dispatch_failed: Callable[..., Any] | None = None,
+    dispatch_lock: asyncio.Lock | None = None,
 ) -> None:
     """Patch harness TeamManager so async ``ask_agent`` uses inbox + room stream."""
     if harness_team is None:
         return
+    lock = dispatch_lock if dispatch_lock is not None else asyncio.Lock()
     original_call = getattr(harness_team, "call_peer", None)
 
     async def call_peer(
@@ -2064,14 +2411,36 @@ def wire_host_dispatch(
         **kwargs: Any,
     ) -> Any:
         if getattr(harness_team, "enabled", False) and is_team(from_agent_id):
-            return harness_team.submit_peer(
-                from_agent_id=from_agent_id,
-                to_agent_id=to_agent_id,
-                message=message,
-                user_id=user_id,
-                source_thread_id=source_thread_id,
-                metadata={"session_key": session_key} if session_key else None,
-            )
+            async with lock:
+                inbox_id = str(kwargs.get("job_id") or new_ulid())
+                resolver = getattr(harness_team, "_resolve_peer_entry", None)
+                if on_dispatch is not None and callable(resolver):
+                    resolver(from_agent_id, to_agent_id, user_id)
+                    await on_dispatch(
+                        inbox_id=inbox_id,
+                        from_agent_id=from_agent_id,
+                        to_agent_id=to_agent_id,
+                        user_id=user_id,
+                        source_thread_id=source_thread_id,
+                        message=message,
+                        session_key=session_key,
+                        original_user_prompt=kwargs.get("original_user_prompt"),
+                    )
+                try:
+                    return harness_team.submit_peer(
+                        from_agent_id=from_agent_id,
+                        to_agent_id=to_agent_id,
+                        message=message,
+                        user_id=user_id,
+                        source_thread_id=source_thread_id,
+                        original_user_prompt=kwargs.get("original_user_prompt"),
+                        job_id=inbox_id,
+                        metadata={"session_key": session_key} if session_key else None,
+                    )
+                except Exception:
+                    if on_dispatch_failed is not None:
+                        await on_dispatch_failed(inbox_id, user_id)
+                    raise
         if original_call is None:
             raise TypeError("harness team has no call_peer")
         return await original_call(

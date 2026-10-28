@@ -15,12 +15,16 @@ from typing import Any
 
 from octop.infra.knowledge.parse import _parse_html, _parse_json, _read_text
 
-_PARSER_VERSION = 1
+PARSER_VERSION = 2
 _OFFICE_EXTENSIONS = frozenset({".docx", ".xlsx", ".xlsm", ".pptx"})
 
 
 class FileParseError(ValueError):
     """The attachment cannot be safely or completely interpreted."""
+
+
+class UnsupportedFileTypeError(FileParseError):
+    """No parser is available for the attachment format."""
 
 
 @dataclass(frozen=True)
@@ -52,7 +56,7 @@ class ParseCoverage:
     processed_units: int
     empty_units: int
     truncated: bool
-    parser_version: int = _PARSER_VERSION
+    parser_version: int = PARSER_VERSION
     ocr_needed_units: int = 0
 
 
@@ -252,6 +256,7 @@ def _docx(path: Path, collector: _Collector) -> FileParseResult:
 
 def _xlsx(path: Path, collector: _Collector) -> FileParseResult:
     from openpyxl import load_workbook
+    from openpyxl.utils import get_column_letter
 
     try:
         workbook = load_workbook(path, read_only=True, data_only=True)
@@ -272,21 +277,25 @@ def _xlsx(path: Path, collector: _Collector) -> FileParseResult:
                 total_cells += sheet_cells
                 total_units += max_row
                 for row_number, row in enumerate(sheet.iter_rows(values_only=True), start=1):
-                    values = [
-                        ""
-                        if value is None
-                        else str(value).replace("\t", " ").replace("\n", " ").strip()
-                        for value in row
-                    ]
-                    while values and not values[-1]:
-                        values.pop()
-                    if not collector.add(
-                        "\t".join(values),
-                        {"kind": "spreadsheet_row", "sheet": sheet.title, "row": row_number},
-                    ):
-                        total_units = None
-                        break
+                    for column_number, value in enumerate(row, start=1):
+                        if value is None:
+                            continue
+                        text = str(value).replace("\t", " ").replace("\n", " ").strip()
+                        if not text:
+                            continue
+                        if not collector.add(
+                            text,
+                            {
+                                "kind": "spreadsheet_cell",
+                                "sheet": sheet.title,
+                                "cell": f"{get_column_letter(column_number)}{row_number}",
+                            },
+                        ):
+                            total_units = None
+                            break
                     collector.processed_units += 1
+                    if collector.truncated:
+                        break
                 if collector.truncated:
                     break
             return collector.result(total_units=total_units)
@@ -394,4 +403,4 @@ def parse_file(path: Path, *, limits: ParseLimits = DEFAULT_PARSE_LIMITS) -> Fil
         return _xlsx(path, collector)
     if suffix == ".pptx":
         return _pptx(path, collector)
-    raise FileParseError(f"unsupported document format: {suffix or '(none)'}")
+    raise UnsupportedFileTypeError(f"unsupported document format: {suffix or '(none)'}")

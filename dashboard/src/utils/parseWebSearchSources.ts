@@ -56,18 +56,18 @@ function sourceFromRecord(
     typeof row.title === "string"
       ? row.title.trim()
       : typeof row.name === "string"
-        ? row.name.trim()
-        : "";
+      ? row.name.trim()
+      : "";
   const url = safeUrl(row.url ?? row.link ?? row.href);
   if (!title || !url) return undefined;
   const snippet =
     typeof row.snippet === "string"
       ? row.snippet.trim()
       : typeof row.content === "string"
-        ? row.content.trim()
-        : typeof row.description === "string"
-          ? row.description.trim()
-          : "";
+      ? row.content.trim()
+      : typeof row.description === "string"
+      ? row.description.trim()
+      : "";
   return { title, url, ...(snippet ? { snippet } : {}), provider };
 }
 
@@ -90,10 +90,7 @@ function parseExplicitMarkdownLinks(
   const out: WebSearchSource[] = [];
   const pattern = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
   for (const match of text.matchAll(pattern)) {
-    const item = sourceFromRecord(
-      { title: match[1], url: match[2] },
-      provider,
-    );
+    const item = sourceFromRecord({ title: match[1], url: match[2] }, provider);
     if (item) out.push(item);
   }
   return out;

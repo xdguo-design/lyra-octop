@@ -19,7 +19,7 @@ Open **ACP** in the sidebar (`/acp`).
 
 | Setting | Scope | Stored in |
 |---------|--------|-----------|
-| Runner cards (command, args, enabled, …) | **Per user** — shared by all your agents | `settings` table (`acp_runners:user:{id}`) |
+| Runner cards (command, args, enabled, default model, …) | **Per user** — shared by all your agents | `settings` table (`acp_runners:user:{id}`) |
 | **Enable acp_runner tool** toggle | **Per agent** | Agent `config_json.acp.tool_enabled` |
 
 Legacy per-agent `config_json.acp.runners` is migrated to the user-global store on first load.
@@ -38,6 +38,10 @@ Legacy per-agent `config_json.acp.runners` is migrated to the user-global store 
 | `kilo_code` | `kilo` | `acp` |
 
 The ACP page can install OpenCode on the Linux host where `octop run` executes and enable its runner for the current account. Installation uses the Octop service account and does not require `sudo`. Then sign OpenCode in as that same service account so its connected models are available. Other runners must be installed on the host where `octop run` executes and be on `PATH` (or use an absolute `command` in the runner drawer). Built-in runners cannot be deleted; custom runners can be added from **Add runner**.
+
+Set each CLI's **Default model** in that Runner's edit panel. Octop reads selectable models from the CLI's ACP session `config_options` and applies the saved default to direct workbench conversations. The workbench model picker is hidden for direct ACP chats. Runners that do not expose a model option over ACP cannot provide a dropdown and use their own CLI default.
+
+The workbench Agent menu lists every enabled ACP Runner. Selecting one starts a direct ACP conversation; it does not call the agent's normal provider model. The `acp_runner` tool remains available for agent-driven delegation.
 
 #### Kilo Code (optional external coding agent)
 

@@ -9,6 +9,10 @@ from octop.infra.db.repos._base import now_ts
 from octop.infra.utils.ulid import new_short_id
 
 
+class WorkbenchContextConflict(ValueError):
+    """The project instructions changed since the caller last read them."""
+
+
 class WorkbenchRepo:
     def __init__(self, db: DatabasePool) -> None:
         self._db = db
@@ -200,6 +204,54 @@ class WorkbenchRepo:
                     (name, icon, now_ts(), owner_user_id, project_id),
                 )
         return bool(cur.rowcount > 0)
+
+    def get_project_context(self, *, owner_user_id: int, project_id: str) -> dict[str, Any] | None:
+        with self._db.connect() as conn:
+            project = conn.execute(
+                "SELECT project_id, instructions, instructions_revision, updated_at "
+                "FROM workbench_projects WHERE owner_user_id = ? AND project_id = ?",
+                (owner_user_id, project_id),
+            ).fetchone()
+            if project is None:
+                return None
+            knowledge_bases = conn.execute(
+                "SELECT knowledge_base_id FROM workbench_project_knowledge_bases "
+                "WHERE owner_user_id = ? AND project_id = ? ORDER BY knowledge_base_id",
+                (owner_user_id, project_id),
+            ).fetchall()
+        return {
+            **dict(project),
+            "knowledge_base_ids": [str(row["knowledge_base_id"]) for row in knowledge_bases],
+        }
+
+    def update_project_instructions(
+        self,
+        *,
+        owner_user_id: int,
+        project_id: str,
+        instructions: str,
+        expected_revision: int,
+    ) -> dict[str, Any] | None:
+        with self._db.transaction() as conn:
+            row = conn.execute(
+                "SELECT instructions_revision FROM workbench_projects "
+                "WHERE owner_user_id = ? AND project_id = ?",
+                (owner_user_id, project_id),
+            ).fetchone()
+            if row is None:
+                return None
+            current_revision = int(row["instructions_revision"])
+            if current_revision != expected_revision:
+                raise WorkbenchContextConflict("project instructions revision conflict")
+            changed = conn.execute(
+                "UPDATE workbench_projects SET instructions = ?, "
+                "instructions_revision = instructions_revision + 1, updated_at = ? "
+                "WHERE owner_user_id = ? AND project_id = ? AND instructions_revision = ?",
+                (instructions, now_ts(), owner_user_id, project_id, expected_revision),
+            ).rowcount
+            if not changed:
+                raise WorkbenchContextConflict("project instructions revision conflict")
+        return self.get_project_context(owner_user_id=owner_user_id, project_id=project_id)
 
     def owns_code_project(self, *, owner_user_id: int, project_id: str) -> bool:
         with self._db.connect() as conn:

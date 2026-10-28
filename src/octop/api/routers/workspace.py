@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
@@ -25,6 +26,8 @@ from octop.api.deps import current_user, get_server
 from octop.infra.backend.tree_listing import dedupe_tree_rows
 from octop.infra.backup.workspace_archive import export_workspace_zip, import_workspace_zip
 from octop.infra.errors import ErrorCode, OctopError
+from octop.infra.files.service import FileIntegrityError, FileService
+from octop.infra.gateway.media.attachment_hints import is_preview_media_type
 from octop.infra.gateway.media.backend_files import (
     backend_workspace_path,
     is_allowed_host_download_abs_path,
@@ -62,6 +65,51 @@ def _assert_not_registered_chat_file(
         agent_id=agent_id, workspace_path=path, include_descendants=descendants
     ):
         raise OctopError(ErrorCode.FORBIDDEN, "cannot modify a registered chat file revision")
+
+
+def _registered_path_key(workspace: Any, path: str) -> str:
+    raw = path.strip().replace("\\", "/")
+    root = getattr(workspace, "workspace_dir", None)
+    if root is not None and is_host_absolute_path(raw):
+        try:
+            return Path(raw).resolve().relative_to(Path(root).resolve()).as_posix()
+        except (OSError, ValueError):
+            pass
+    return raw.strip("/")
+
+
+async def _read_registered_chat_path(
+    server: Any, *, agent_id: str, user_id: int, workspace: Any, path: str
+) -> tuple[bytes, str] | None:
+    repo = getattr(getattr(server, "services", None), "chat_file_repo", None)
+    if repo is None:
+        return None
+    try:
+        return await FileService(repo).read_registered_path_bytes(
+            workspace=workspace,
+            agent_id=agent_id,
+            user_id=user_id,
+            workspace_path=_registered_path_key(workspace, path),
+        )
+    except (FileNotFoundError, PermissionError) as exc:
+        raise OctopError.localized(ErrorCode.NOT_FOUND) from exc
+    except FileIntegrityError as exc:
+        raise OctopError.localized(ErrorCode.FILE_INTEGRITY_FAILED) from exc
+
+
+def _hidden_chat_path_keys(server: Any, *, agent_id: str, user_id: int, workspace: Any) -> set[str]:
+    repo = getattr(getattr(server, "services", None), "chat_file_repo", None)
+    if repo is None:
+        return set()
+    return {
+        _registered_path_key(workspace, path)
+        for path in repo.list_workspace_paths_hidden_from_user(agent_id=agent_id, user_id=user_id)
+    }
+
+
+def _listed_path_is_hidden(workspace: Any, row: dict[str, Any], hidden: set[str]) -> bool:
+    path = row.get("path")
+    return isinstance(path, str) and _registered_path_key(workspace, path) in hidden
 
 
 def _map_workspace_fs_error(exc: Exception, *, operation: str, path: str) -> OctopError:
@@ -150,7 +198,10 @@ async def list_tree(
     if not is_host_absolute_path(io_path):
         for row in rows:
             row["path"] = reanchor_entry_path(str(row.get("path") or ""), parent=io_path)
-    return dedupe_tree_rows(rows, parent=io_path)
+    hidden = _hidden_chat_path_keys(server, agent_id=agent_id, user_id=int(user.id), workspace=ws)
+    return dedupe_tree_rows(
+        [row for row in rows if not _listed_path_is_hidden(ws, row, hidden)], parent=io_path
+    )
 
 
 class WriteFileBody(BaseModel):
@@ -174,7 +225,18 @@ async def read_file(
 ) -> dict[str, Any]:
     """Read a UTF-8 text file."""
     ws = await require_agent_workspace(agent_id, user=user, as_user=as_user, server=server)
-    content = await ws.aread_text(_workspace_io_path(path, from_workspace=from_workspace))
+    io_path = _workspace_io_path(path, from_workspace=from_workspace)
+    registered = await _read_registered_chat_path(
+        server, agent_id=agent_id, user_id=int(user.id), workspace=ws, path=io_path
+    )
+    content: str | None
+    if registered is not None:
+        try:
+            content = registered[0].decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise OctopError.localized(ErrorCode.ATTACHMENT_UNSUPPORTED_TYPE) from exc
+    else:
+        content = await ws.aread_text(io_path)
     if content is None:
         raise OctopError(ErrorCode.NOT_FOUND, f"cannot read {path!r}")
     return {"path": path, "content": coerce_read_content(content)}
@@ -369,8 +431,11 @@ async def download_file(
     ):
         raise OctopError(ErrorCode.FORBIDDEN, f"cannot download {path!r}: path not allowed")
 
+    registered = await _read_registered_chat_path(
+        server, agent_id=agent_id, user_id=int(user.id), workspace=ws, path=io_path
+    )
     try:
-        file_blob = await ws.adownload_bytes(io_path)
+        file_blob = registered[0] if registered is not None else await ws.adownload_bytes(io_path)
     except PermissionError as exc:
         raise OctopError(ErrorCode.NOT_FOUND, f"cannot download {path!r}") from exc
     if file_blob is None:
@@ -397,8 +462,11 @@ async def read_doc(
     converter = _ensure_editable_doc(path)
     ws = await require_agent_workspace(agent_id, user=user, as_user=as_user, server=server)
     io_path = _workspace_io_path(path, from_workspace=from_workspace)
+    registered = await _read_registered_chat_path(
+        server, agent_id=agent_id, user_id=int(user.id), workspace=ws, path=io_path
+    )
     try:
-        blob = await ws.adownload_bytes(io_path)
+        blob = registered[0] if registered is not None else await ws.adownload_bytes(io_path)
     except PermissionError as exc:
         raise OctopError(ErrorCode.NOT_FOUND, f"cannot read {path!r}") from exc
     if blob is None:
@@ -460,14 +528,26 @@ async def preview_media(
     path_agent = _agent_id_from_media_source(source)
     effective_agent = path_agent or agent_id
     ws = await require_running_workspace(effective_agent, user=user, as_user=as_user, server=server)
-    payload = await resolve_preview_payload(
-        source=source,
+    registered = await _read_registered_chat_path(
+        server,
+        agent_id=effective_agent,
+        user_id=int(user.id),
         workspace=ws,
-        mime_hint=mime_type or "",
+        path=_workspace_io_path(source, from_workspace=False),
     )
-    if payload is None:
-        raise OctopError(ErrorCode.NOT_FOUND, "preview not available for this source")
-    data, mime = payload
+    if registered is not None:
+        if not is_preview_media_type(registered[1]):
+            raise OctopError.localized(ErrorCode.NOT_FOUND)
+        data, mime = registered
+    else:
+        payload = await resolve_preview_payload(
+            source=source,
+            workspace=ws,
+            mime_hint=mime_type or "",
+        )
+        if payload is None:
+            raise OctopError(ErrorCode.NOT_FOUND, "preview not available for this source")
+        data, mime = payload
 
     # The source bytes are user-controlled (uploads, tool outputs). Serving them
     # inline without a sandbox CSP would let a navigated SVG (any image/* type)
@@ -511,12 +591,17 @@ async def glob_files(
             entry_path = str(row.get("path") or "")
             if entry_path.endswith(".md"):
                 matches.append(row)
-        return matches
+        hidden = _hidden_chat_path_keys(
+            server, agent_id=agent_id, user_id=int(user.id), workspace=ws
+        )
+        return [row for row in matches if not _listed_path_is_hidden(ws, row, hidden)]
     glob_result = await ws.aglob(pattern, root)
     if glob_result is None:
         raise OctopError(ErrorCode.NOT_FOUND, "glob failed")
     matches = getattr(glob_result, "matches", None) or []
-    return [file_info_to_dict(item) for item in matches]
+    hidden = _hidden_chat_path_keys(server, agent_id=agent_id, user_id=int(user.id), workspace=ws)
+    rows = [file_info_to_dict(item) for item in matches]
+    return [row for row in rows if not _listed_path_is_hidden(ws, row, hidden)]
 
 
 @router.get("/agents/{agent_id}/workspace/grep")
@@ -536,7 +621,9 @@ async def grep_files(
     if result is None:
         raise OctopError(ErrorCode.NOT_FOUND, "grep failed")
     matches = getattr(result, "matches", None) or []
-    return [dict(m) for m in matches]
+    hidden = _hidden_chat_path_keys(server, agent_id=agent_id, user_id=int(user.id), workspace=ws)
+    rows = [dict(match) for match in matches]
+    return [row for row in rows if not _listed_path_is_hidden(ws, row, hidden)]
 
 
 _MAX_WORKSPACE_ARCHIVE_BYTES = 200 * 1024 * 1024
@@ -557,7 +644,10 @@ async def export_workspace_archive(
     ws = await require_running_workspace(
         agent_id, user=user, as_user=as_user, server=server, owner_only=True
     )
-    data = await export_workspace_zip(ws)
+    if server.services is None:
+        raise OctopError(ErrorCode.INTERNAL_ERROR, "file metadata service is unavailable")
+    hidden = _hidden_chat_path_keys(server, agent_id=agent_id, user_id=int(user.id), workspace=ws)
+    data = await export_workspace_zip(ws, excluded_paths=hidden)
     filename = f"workspace-{agent_id}.zip"
     return StreamingResponse(
         iter([data]),
@@ -589,10 +679,17 @@ async def import_workspace_archive(
         agent_id, user=user, as_user=as_user, server=server, owner_only=True
     )
     local_ws = resolve_agent_workspace_dir(server, agent_id)
+    chat_file_repo = getattr(server.services, "chat_file_repo", None)
+    protected_paths = (
+        set(chat_file_repo.list_registered_workspace_paths(agent_id=agent_id))
+        if chat_file_repo is not None
+        else set()
+    )
     result = await import_workspace_zip(
         ws,
         raw,
         mode=mode,
         local_workspace_dir=local_ws,
+        protected_paths=protected_paths,
     )
     return {"ok": True, **result}

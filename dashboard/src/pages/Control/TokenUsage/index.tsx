@@ -32,6 +32,11 @@ import {
   Pie,
   Cell,
   Legend,
+  RadarChart,
+  Radar,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
 } from "recharts";
 import dayjs, { type Dayjs } from "dayjs";
 import { Download } from "lucide-react";
@@ -135,6 +140,34 @@ function formatNumber(n: number): string {
   return n.toLocaleString();
 }
 
+/**
+ * Compact token counts: zh ``30.5 亿`` / ``3000万``, en ``30.5M`` / ``8.2K``.
+ * Short form (axis ticks, legend rows) drops the space; full precision stays
+ * available via ``formatNumber`` in tooltips / titles.
+ */
+function formatCompact(n: number, lng: string, short = false): string {
+  const trim = (v: number) => v.toFixed(1).replace(/\.0$/, "");
+  const abs = Math.abs(n);
+  const zh = lng.startsWith("zh");
+  const units: [number, string][] = zh
+    ? [
+        [1e8, "亿"],
+        [1e4, "万"],
+      ]
+    : [
+        [1e9, "B"],
+        [1e6, "M"],
+        [1e3, "K"],
+      ];
+  for (const [size, suffix] of units) {
+    if (abs >= size) {
+      const text = trim(n / size);
+      return short ? `${text}${suffix}` : `${text} ${suffix}`;
+    }
+  }
+  return n.toLocaleString();
+}
+
 function formatDayTick(label: string): string {
   if (/^\d{4}-\d{2}-\d{2}$/.test(label)) return label.slice(5);
   return label;
@@ -160,6 +193,7 @@ function UsageBarChart({
   fillParent = false,
   showLegend = false,
   tickFormatter,
+  yTickFormatter,
 }: {
   data: UsageBucket[];
   series: UsageBarSeries[];
@@ -168,6 +202,7 @@ function UsageBarChart({
   fillParent?: boolean;
   showLegend?: boolean;
   tickFormatter?: (label: string) => string;
+  yTickFormatter?: (value: number) => string;
 }) {
   return (
     <div
@@ -203,16 +238,21 @@ function UsageBarChart({
             tick={AXIS_TICK}
             tickLine={false}
             axisLine={AXIS_LINE}
-            width={44}
+            width={56}
             allowDecimals={false}
+            tickFormatter={yTickFormatter}
           />
-          <RechartsTooltip contentStyle={CHART_TOOLTIP_STYLE} />
+          <RechartsTooltip
+            formatter={(value) => formatNumber(Number(value ?? 0))}
+            contentStyle={CHART_TOOLTIP_STYLE}
+          />
           {showLegend ? (
             <Legend
               verticalAlign="top"
               align="right"
               height={24}
               iconSize={10}
+              iconType="circle"
               wrapperStyle={{
                 fontSize: 12,
                 top: 0,
@@ -238,30 +278,116 @@ function UsageBarChart({
   );
 }
 
+/**
+ * Radar view of daily consumption (summary page): one spoke per day,
+ * input vs output polygons. Same data as the dimension bar view.
+ */
+function UsageRadarChart({
+  data,
+  inputLabel,
+  outputLabel,
+  fillParent = false,
+}: {
+  data: UsageBucket[];
+  inputLabel: string;
+  outputLabel: string;
+  fillParent?: boolean;
+}) {
+  return (
+    <div
+      className={
+        fillParent
+          ? `${styles.chartFrame} ${styles.chartFrameFill}`
+          : styles.chartFrame
+      }
+      style={fillParent ? undefined : { height: CHART_HEIGHT.bar }}
+    >
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+        <RadarChart
+          data={data}
+          cx="50%"
+          cy="50%"
+          outerRadius="72%"
+          margin={{ top: 8, right: 24, bottom: 0, left: 24 }}
+        >
+          <PolarGrid
+            stroke="var(--fn-border-secondary)"
+            strokeDasharray="3 3"
+          />
+          <PolarAngleAxis
+            dataKey="label"
+            tick={AXIS_TICK}
+            tickLine={false}
+            tickFormatter={formatDayTick}
+          />
+          <PolarRadiusAxis tick={false} tickCount={4} axisLine={false} />
+          <Radar
+            dataKey="input_tokens"
+            name={inputLabel}
+            stroke={IO_COLORS.input}
+            fill={IO_COLORS.input}
+            fillOpacity={0.25}
+            strokeWidth={2}
+          />
+          <Radar
+            dataKey="output_tokens"
+            name={outputLabel}
+            stroke={IO_COLORS.output}
+            fill={IO_COLORS.output}
+            fillOpacity={0.25}
+            strokeWidth={2}
+          />
+          <Legend
+            verticalAlign="top"
+            align="right"
+            iconType="circle"
+            iconSize={8}
+            wrapperStyle={{
+              fontSize: 12,
+              top: 0,
+              right: 0,
+              lineHeight: "20px",
+            }}
+          />
+          <RechartsTooltip
+            formatter={(value) => formatNumber(Number(value ?? 0))}
+            contentStyle={CHART_TOOLTIP_STYLE}
+          />
+        </RadarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 function usageStatItems(
   totals: UsageSummary,
   t: (key: string) => string,
+  lng: string,
 ): UsageStatItem[] {
   return [
     {
       key: "total",
       label: t("tokenUsage.totalTokens"),
-      value: formatNumber(totals.total_tokens),
+      value: formatCompact(totals.total_tokens, lng),
+      title: formatNumber(totals.total_tokens),
     },
     {
       key: "input",
       label: t("tokenUsage.input"),
-      value: formatNumber(totals.input_tokens),
+      value: formatCompact(totals.input_tokens, lng),
+      title: formatNumber(totals.input_tokens),
     },
     {
       key: "output",
       label: t("tokenUsage.output"),
-      value: formatNumber(totals.output_tokens),
+      value: formatCompact(totals.output_tokens, lng),
+      title: formatNumber(totals.output_tokens),
     },
     {
       key: "cacheRead",
       label: t("tokenUsage.cacheRead"),
-      value: formatNumber(totals.cache_read_tokens),
+      value: formatCompact(totals.cache_read_tokens, lng),
+      title: formatNumber(totals.cache_read_tokens),
     },
     {
       key: "cacheHit",
@@ -272,7 +398,8 @@ function usageStatItems(
     {
       key: "avg",
       label: t("tokenUsage.avgPerTurn"),
-      value: formatNumber(totals.avg_per_turn),
+      value: formatCompact(totals.avg_per_turn, lng),
+      title: formatNumber(totals.avg_per_turn),
     },
   ];
 }
@@ -315,8 +442,10 @@ function DailyTrendCharts({
   turnsLabel: string;
 }) {
   const { palette, isDark, customColor } = useTheme();
+  const { i18n } = useTranslation();
   const turnsColor = brandPrimary(palette, isDark, customColor);
   const empty = data.length === 0;
+  const yTickFormatter = (v: number) => formatCompact(v, i18n.language, true);
 
   return (
     <div className={styles.trendGrid}>
@@ -337,6 +466,7 @@ function DailyTrendCharts({
             height={CHART_HEIGHT.bar}
             showLegend
             tickFormatter={formatDayTick}
+            yTickFormatter={yTickFormatter}
             series={[
               {
                 dataKey: "input_tokens",
@@ -372,6 +502,7 @@ function DailyTrendCharts({
             data={data}
             height={CHART_HEIGHT.bar}
             tickFormatter={formatDayTick}
+            yTickFormatter={yTickFormatter}
             series={[
               {
                 dataKey: "turns",
@@ -495,12 +626,14 @@ function DonutCard({
   emptyText: string;
   colors?: string[] | Record<string, string>;
 }) {
+  const { i18n } = useTranslation();
   const colorFor = (name: string, index: number) => {
     if (Array.isArray(colors)) return colors[index % colors.length];
     return colors[name] ?? CHART_COLORS[index % CHART_COLORS.length];
   };
 
   const empty = data.length === 0 || data.every((d) => d.value === 0);
+  const totalValue = data.reduce((s, d) => s + d.value, 0);
 
   return (
     <Card
@@ -522,8 +655,8 @@ function DonutCard({
                   nameKey="name"
                   cx="50%"
                   cy="50%"
-                  innerRadius="50%"
-                  outerRadius="90%"
+                  innerRadius="55%"
+                  outerRadius="92%"
                   paddingAngle={2}
                   stroke="none"
                 >
@@ -539,16 +672,29 @@ function DonutCard({
             </ResponsiveContainer>
           </div>
           <ul className={styles.donutLegend}>
-            {data.map((entry, i) => (
-              <li key={entry.name} className={styles.donutLegendItem}>
-                <span
-                  className={styles.donutLegendSwatch}
-                  style={{ background: colorFor(entry.name, i) }}
-                  aria-hidden
-                />
-                <span className={styles.donutLegendLabel}>{entry.name}</span>
-              </li>
-            ))}
+            {data.map((entry, i) => {
+              const pct = totalValue > 0 ? (entry.value / totalValue) * 100 : 0;
+              return (
+                <li key={entry.name} className={styles.donutLegendItem}>
+                  <span
+                    className={styles.donutLegendSwatch}
+                    style={{ background: colorFor(entry.name, i) }}
+                    aria-hidden
+                  />
+                  <span className={styles.donutLegendMeta}>
+                    <span className={styles.donutLegendLabel}>
+                      {entry.name}
+                    </span>
+                    <span className={styles.donutLegendValue}>
+                      {formatCompact(entry.value, i18n.language, true)}
+                    </span>
+                  </span>
+                  <span className={styles.donutLegendPct}>
+                    {pct.toFixed(pct > 0 && pct < 10 ? 1 : 0)}%
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
@@ -569,7 +715,7 @@ function SummaryView({
   byDay: UsageBucket[];
   isMobile: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const ioData = useMemo(
     () => [
@@ -582,11 +728,16 @@ function SummaryView({
   const expertPie = useMemo(() => toPieData(byExpert), [byExpert]);
   const modelPie = useMemo(() => toPieData(byModel), [byModel]);
   const dayBars = useMemo(() => [...byDay].reverse().slice(-14), [byDay]);
+  // Fewer spokes keep radar labels readable on phones.
+  const radarDays = useMemo(
+    () => (isMobile ? dayBars.slice(-8) : dayBars),
+    [dayBars, isMobile],
+  );
 
   return (
     <div className={styles.summaryBody}>
       <UsageStats
-        items={usageStatItems(totals, t)}
+        items={usageStatItems(totals, t, i18n.language)}
         overflowEnabled={!isMobile}
       />
 
@@ -619,35 +770,21 @@ function SummaryView({
 
       <Card
         size="small"
-        title={t("tokenUsage.dailyTrend")}
+        title={t("tokenUsage.dailyRadar")}
         className={`${styles.chartCard} ${styles.summaryTrendCard}`}
       >
-        {dayBars.length === 0 ? (
+        {radarDays.length === 0 ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description={t("tokenUsage.noRecordsInRange")}
             style={{ padding: "24px 0" }}
           />
         ) : (
-          <UsageBarChart
-            data={dayBars}
+          <UsageRadarChart
+            data={radarDays}
             fillParent
-            showLegend
-            series={[
-              {
-                dataKey: "input_tokens",
-                name: t("tokenUsage.input"),
-                fill: IO_COLORS.input,
-                stackId: "a",
-              },
-              {
-                dataKey: "output_tokens",
-                name: t("tokenUsage.output"),
-                fill: IO_COLORS.output,
-                stackId: "a",
-                radius: [3, 3, 0, 0],
-              },
-            ]}
+            inputLabel={t("tokenUsage.input")}
+            outputLabel={t("tokenUsage.output")}
           />
         )}
       </Card>
@@ -666,7 +803,7 @@ function DimensionView({
   totals: UsageSummary;
   isMobile: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const chartBuckets = useMemo(() => {
     if (granularity === "by_day") return [...buckets].reverse();
@@ -682,7 +819,7 @@ function DimensionView({
   return (
     <div className={styles.summaryBody}>
       <UsageStats
-        items={usageStatItems(totals, t)}
+        items={usageStatItems(totals, t, i18n.language)}
         overflowEnabled={!isMobile}
       />
 
@@ -711,6 +848,7 @@ function DimensionView({
               data={chartBuckets}
               height={CHART_HEIGHT.bar}
               showLegend
+              yTickFormatter={(v) => formatCompact(v, i18n.language, true)}
               series={[
                 {
                   dataKey: "input_tokens",

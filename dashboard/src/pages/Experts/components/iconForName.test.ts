@@ -1,8 +1,24 @@
 import { describe, expect, it } from "vitest";
 import {
+  isPaintingAvatarName,
   normalizeAgentScopedApiUrl,
   resolveExpertAvatarUrl,
 } from "./iconForName";
+
+describe("isPaintingAvatarName", () => {
+  it("recognizes every bundled painting portrait", () => {
+    expect(
+      [
+        "painting-renaissance-scholar",
+        "painting-baroque-astronomer",
+        "painting-classical-physician",
+        "painting-garden-painter",
+        "painting-botanist",
+      ].map(isPaintingAvatarName),
+    ).toEqual([true, true, true, true, true]);
+    expect(isPaintingAvatarName("sparkles")).toBe(false);
+  });
+});
 
 describe("normalizeAgentScopedApiUrl", () => {
   it("encodes bridge shadow agent ids the same way as chat WS paths", () => {

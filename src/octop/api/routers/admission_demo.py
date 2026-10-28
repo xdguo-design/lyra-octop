@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from octop.api.deps import current_user, get_server
 from octop.infra.admission_demo import (
+    AdmissionContextTooLongError,
     AdmissionModelRateLimitError,
     AdmissionModelUnavailableError,
     classify_active_admission_intent,
@@ -92,6 +93,7 @@ class AdmissionCandidateConfirmationResponse(BaseModel):
         "determine eligibility or submit an admission."
     ),
     responses={
+        413: {"description": "The structured context exceeds the model input budget."},
         429: {"description": "The active AI model provider rate limited the request."},
         503: {"description": "The active AI model is unavailable or timed out."},
     },
@@ -117,6 +119,14 @@ async def extract_admission_fields(
             detail={
                 "code": "AI_RATE_LIMITED",
                 "message": "AI 服务请求过于频繁，请稍后重试；转写内容已保留。",
+            },
+        ) from exc
+    except AdmissionContextTooLongError as exc:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "code": "AI_CONTEXT_TOO_LONG",
+                "message": "转写内容超出模型输入预算，请缩短后重试。",
             },
         ) from exc
     except AdmissionModelUnavailableError as exc:

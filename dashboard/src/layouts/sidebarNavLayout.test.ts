@@ -40,6 +40,8 @@ describe("sidebarNavLayout", () => {
       "ehr",
       "experts",
       "tasks",
+      "runs",
+      "apps",
       "token-usage",
     ]);
     expect(editor.groups.map((group) => group.id)).toEqual([

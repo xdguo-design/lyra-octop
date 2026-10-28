@@ -1,3 +1,5 @@
+import { request } from "../request";
+
 /**
  * EHR RAG 服务 API 客户端。
  *
@@ -14,9 +16,7 @@ export function resolveRagBaseUrl(): string {
   if (stored && stored.trim()) return stored.trim().replace(/\/+$/, "");
   const fromEnv = import.meta.env.VITE_EHR_RAG_URL as string | undefined;
   if (fromEnv && fromEnv.trim()) return fromEnv.trim().replace(/\/+$/, "");
-  const host = window.location.hostname || "127.0.0.1";
-  const proto = window.location.protocol === "https:" ? "https" : "http";
-  return `${proto}://${host}:8600`;
+  return "/ehr-rag";
 }
 
 export function setRagBaseUrl(url: string): void {
@@ -25,6 +25,7 @@ export function setRagBaseUrl(url: string): void {
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const base = resolveRagBaseUrl();
+  if (base.startsWith("/")) return request<T>(`${base}${path}`, init);
   const resp = await fetch(`${base}${path}`, {
     ...init,
     headers: {
@@ -141,13 +142,14 @@ export const ehrApi = {
 
   async search(
     query: string,
-    opts: { type?: string; top_k?: number } = {},
+    opts: { type?: string; types?: string[]; top_k?: number } = {},
   ): Promise<SearchResponse> {
     return call("/api/search", {
       method: "POST",
       body: JSON.stringify({
         query,
         type: opts.type || undefined,
+        filters: opts.types?.length ? { type: opts.types } : undefined,
         top_k: opts.top_k || 10,
       }),
     });
@@ -204,6 +206,19 @@ export const ehrApi = {
     return call(`/api/skills/${encodeURIComponent(name)}/run`, {
       method: "POST",
       body: JSON.stringify({ args }),
+    });
+  },
+};
+
+export const publicEhrApi = {
+  async health(): Promise<{ ok: boolean }> {
+    return request("/public/ehr/health");
+  },
+
+  async search(query: string, topK = 12): Promise<SearchResponse> {
+    return request("/public/ehr/search", {
+      method: "POST",
+      body: JSON.stringify({ query, top_k: topK }),
     });
   },
 };

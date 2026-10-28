@@ -5,6 +5,7 @@ import type { HitlActionRequest } from "../../../api/types/hitl";
 import { useToolDisplayNames } from "../hooks/toolDisplayNames";
 import type { HitlRequestResolution } from "../hooks/sseHelpers";
 import type { HitlDecisionHandler } from "../utils/hitlSessionPolicy";
+import { canSessionBypassActions } from "../utils/pendingHitl";
 import {
   summarizeHitlAction,
   type HitlTranslate,
@@ -55,6 +56,7 @@ export default function HitlApprovalCard({
     toolNames.length > 1
       ? t("chat.hitl.allowTools", "Allow these tools for this chat")
       : t("chat.hitl.allowTool", "Allow this tool for this chat");
+  const canRememberApproval = canSessionBypassActions(actions);
 
   const resolvedLabel =
     status === "rejected"
@@ -123,44 +125,46 @@ export default function HitlApprovalCard({
           >
             {t("chat.hitl.approve", "Approve")}
           </button>
-          <Dropdown
-            trigger={["click"]}
-            menu={{
-              items: [
-                { key: "allow_tools", label: allowToolsLabel },
-                {
-                  key: "allow_all",
-                  label: t("chat.hitl.allowAll", "Allow all for this chat"),
-                },
-              ],
-              onClick: ({ key }) => {
-                if (key === "allow_all") {
+          {canRememberApproval ? (
+            <Dropdown
+              trigger={["click"]}
+              menu={{
+                items: [
+                  { key: "allow_tools", label: allowToolsLabel },
+                  {
+                    key: "allow_all",
+                    label: t("chat.hitl.allowAll", "Allow all for this chat"),
+                  },
+                ],
+                onClick: ({ key }) => {
+                  if (key === "allow_all") {
+                    emit(
+                      actions.map(() => ({ type: "approve" })),
+                      {
+                        mode: "allow_all",
+                      },
+                    );
+                    return;
+                  }
                   emit(
                     actions.map(() => ({ type: "approve" })),
                     {
-                      mode: "allow_all",
+                      mode: "allow_tools",
+                      tools: toolNames,
                     },
                   );
-                  return;
-                }
-                emit(
-                  actions.map(() => ({ type: "approve" })),
-                  {
-                    mode: "allow_tools",
-                    tools: toolNames,
-                  },
-                );
-              },
-            }}
-          >
-            <button
-              type="button"
-              className={`${styles.actionButton} ${styles.secondaryAction}`}
+                },
+              }}
             >
-              {t("chat.hitl.allowMenu", "Allow")}
-              <ChevronDown size={14} />
-            </button>
-          </Dropdown>
+              <button
+                type="button"
+                className={`${styles.actionButton} ${styles.secondaryAction}`}
+              >
+                {t("chat.hitl.allowMenu", "Allow")}
+                <ChevronDown size={14} />
+              </button>
+            </Dropdown>
+          ) : null}
           <button
             type="button"
             className={`${styles.actionButton} ${styles.dangerAction}`}

@@ -58,10 +58,7 @@ import { browserApi } from "../../api/modules/browser";
 import { octopThreadsApi } from "../../api/modules/octopThreads";
 import type { TokenUsage } from "../../api/types";
 import type { TodoListItem } from "../../utils/parseWriteTodos";
-import {
-  buildTodoSyncPrompt,
-  todoSyncTargetAgents,
-} from "./utils/todoSync";
+import { buildTodoSyncPrompt, todoSyncTargetAgents } from "./utils/todoSync";
 import type { ChatAttachment } from "./hooks/useChat";
 import MessageList from "./components/MessageList";
 import ChatInput, { type ChatInputHandle } from "./components/ChatInput";
@@ -819,9 +816,7 @@ function ChatPageInner() {
       const selectedTargetAgents = todoSyncTargetAgents(syncContext);
       wrappedHandleSend(prompt, undefined, {
         conversationMode: "craft",
-        ...(selectedTargetAgents === undefined
-          ? {}
-          : { selectedTargetAgents }),
+        ...(selectedTargetAgents === undefined ? {} : { selectedTargetAgents }),
       });
     },
     [

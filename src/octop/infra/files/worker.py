@@ -17,6 +17,7 @@ from octop.infra.files.parse import (
     FileSegment,
     ParseCoverage,
     ParseLimits,
+    UnsupportedFileTypeError,
 )
 
 _WORKSPACE_ROOT = Path(__file__).resolve().parents[4]
@@ -86,6 +87,8 @@ def parse_file_in_worker(
     )
     try:
         data = json.loads(stdout)
+        if data.get("error") == "unsupported":
+            raise UnsupportedFileTypeError("unsupported document format")
         if data.get("error") == "unreadable":
             raise FileParseError("file cannot be read")
         segments = tuple(
@@ -123,6 +126,8 @@ def main() -> None:
             },
         }
         json.dump(output, sys.stdout, ensure_ascii=True, separators=(",", ":"))
+    except UnsupportedFileTypeError:
+        json.dump({"error": "unsupported"}, sys.stdout)
     except FileParseError:
         json.dump({"error": "unreadable"}, sys.stdout)
     except Exception:

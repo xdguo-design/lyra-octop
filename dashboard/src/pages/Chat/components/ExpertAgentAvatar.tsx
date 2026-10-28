@@ -1,4 +1,7 @@
-import { ExpertIcon } from "../../Experts/components/iconForName";
+import {
+  ExpertIcon,
+  isPaintingAvatarName,
+} from "../../Experts/components/iconForName";
 import styles from "../index.module.less";
 
 export interface ChatAgentOption {
@@ -43,9 +46,10 @@ export default function ExpertAgentAvatar({
 }: ExpertAgentAvatarProps) {
   const accent = muted ? "#94a3b8" : color || "#6366f1";
   const photo = Boolean(iconUrl?.trim());
-  const inner = photo
-    ? size
-    : iconSize ?? Math.max(12, Math.round(size * 0.55));
+  const inner =
+    photo || isPaintingAvatarName(iconName)
+      ? size
+      : iconSize ?? Math.max(12, Math.round(size * 0.55));
 
   return (
     <span

@@ -216,7 +216,7 @@ async def test_list_threads_derives_has_messages_from_db() -> None:
     )
     server.app_runtime.gateway.thread_registry = thread_registry
     server.app_runtime.gateway.ws_hub.is_turn_active.side_effect = lambda tid: tid == "thr_used"
-    server.app_runtime.gateway.processor.hitl_coordinator.store.pending_thread_ids.return_value = (
+    server.app_runtime.gateway.processor.hitl_coordinator.pending_thread_ids.return_value = (
         frozenset({"thr_empty"})
     )
 

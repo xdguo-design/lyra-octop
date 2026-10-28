@@ -125,13 +125,15 @@ describe("pendingHitl", () => {
     expect(pending?.actions[0]?.name).toBe("execute");
   });
 
-  it("auto-resumes tool approvals under allow-all but not questions", () => {
+  it("auto-resumes only explicitly read-only approvals under session policies", () => {
     const messages = [
       msg({
         id: "tool",
         role: "assistant",
         hitlData: {
-          action_requests: [{ name: "execute", args: { command: "ls" } }],
+          action_requests: [
+            { name: "read_file", args: { file_path: "notes.md" } },
+          ],
           status: "pending",
         },
       }),
@@ -141,7 +143,7 @@ describe("pendingHitl", () => {
     ).toBe("tool");
     expect(
       findAutoResumableApproval(
-        { mode: "allow_tools", tools: ["execute"] },
+        { mode: "allow_tools", tools: ["read_file"] },
         messages,
       )?.messageId,
     ).toBe("tool");
@@ -150,6 +152,32 @@ describe("pendingHitl", () => {
         { mode: "allow_tools", tools: ["write_file"] },
         messages,
       ),
+    ).toBeNull();
+    expect(
+      findAutoResumableApproval({ mode: "allow_all" }, [
+        msg({
+          id: "write",
+          role: "assistant",
+          hitlData: {
+            action_requests: [
+              { name: "execute", args: { command: "touch x" } },
+            ],
+            status: "pending",
+          },
+        }),
+      ]),
+    ).toBeNull();
+    expect(
+      findAutoResumableApproval({ mode: "allow_all" }, [
+        msg({
+          id: "unknown",
+          role: "assistant",
+          hitlData: {
+            action_requests: [{ name: "custom_mcp__write", args: {} }],
+            status: "pending",
+          },
+        }),
+      ]),
     ).toBeNull();
     expect(findAutoResumableApproval({ mode: "ask" }, messages)).toBeNull();
     expect(

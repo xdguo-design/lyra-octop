@@ -1,5 +1,8 @@
 import type { AssistantTurnSplit } from "../pages/Chat/utils/messageContent";
-import { parseWebSearchSources, type WebSearchSource } from "./parseWebSearchSources";
+import {
+  parseWebSearchSources,
+  type WebSearchSource,
+} from "./parseWebSearchSources";
 
 /** Collect unique sources from persisted search-tool results in one assistant turn. */
 export function collectTurnWebSearchSources(

@@ -133,11 +133,14 @@ async def dashboard_chat_ws(
                         {"type": "error", "message": f"thread {thread_id!r} not found"},
                     )
                     continue
-                if row.acp_runner == "opencode":
+                if row.acp_runner:
                     from octop.infra.agents.acp_direct import cancel_direct_turn
 
                     await cancel_direct_turn(
-                        user_id=user.id, agent_id=agent_id, thread_id=thread_id
+                        user_id=user.id,
+                        agent_id=agent_id,
+                        thread_id=thread_id,
+                        runner_name=row.acp_runner,
                     )
                 else:
                     server.app_runtime.agent_registry.cancel_stream(agent_id, thread_id)
@@ -173,7 +176,7 @@ async def dashboard_chat_ws(
                 continue
 
             thread_row = gateway.thread_registry.get_thread(prepared.thread_id)
-            if thread_row is not None and thread_row.acp_runner == "opencode":
+            if thread_row is not None and thread_row.acp_runner:
                 has_attachments = any(
                     isinstance(message.get("content"), list) for message in (frame.messages or [])
                 )
@@ -181,7 +184,7 @@ async def dashboard_chat_ws(
                     await send_frame(
                         {
                             "type": "error",
-                            "message": "OpenCode direct chat currently accepts text only",
+                            "message": "ACP direct chat currently accepts text only",
                         }
                     )
                     await send_frame({"type": "done"})
@@ -194,7 +197,10 @@ async def dashboard_chat_ws(
                     from octop.infra.agents.acp_direct import run_direct_turn
 
                     async def on_acp_message(
-                        event: dict[str, Any], _is_last: bool, thread_id: str = direct_thread_id
+                        event: dict[str, Any],
+                        _is_last: bool,
+                        thread_id: str = direct_thread_id,
+                        runner_name: str = thread_row.acp_runner,
                     ) -> None:
                         if event.get("type") == "tool_start":
                             await hub.push_to_thread(
@@ -213,12 +219,13 @@ async def dashboard_chat_ws(
                                 user_id=user.id,
                                 agent_id=agent_id,
                                 thread_id=thread_id,
+                                runner_name=runner_name,
                             )
                             await hub.push_to_thread(
                                 thread_id,
                                 {
                                     "type": "error",
-                                    "message": "OpenCode requested tool permission; approve it in the OpenCode session and retry.",
+                                    "message": f"{runner_name} requested tool permission; approve it in that CLI session and retry.",
                                 },
                             )
 
@@ -232,6 +239,7 @@ async def dashboard_chat_ws(
                         user_id=user.id,
                         agent_id=agent_id,
                         thread_id=prepared.thread_id,
+                        runner_name=thread_row.acp_runner,
                         model=thread_row.acp_model,
                         prompt=prompt_text,
                         on_message=on_acp_message,

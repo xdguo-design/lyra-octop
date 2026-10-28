@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import secrets
+from collections.abc import Callable
 from typing import Any
 from urllib.parse import quote, urlsplit, urlunsplit
 
@@ -632,6 +633,7 @@ def inject_missing_gateway_tools(
     user_id: int,
     agent_id: str,
     mcp_server_configs: dict[str, Any],
+    prepare_tools: Callable[[list[Any]], None] | None = None,
 ) -> None:
     """Register gateway tools in-process when HTTP MCP load did not produce them."""
     import logging
@@ -683,6 +685,8 @@ def inject_missing_gateway_tools(
             http_loaded,
         )
         return
+    if prepare_tools is not None:
+        prepare_tools(extra)
     agent.inject_mcp_tools(extra)
     tool_set = mcp_tool_names(getattr(agent, "_mcp_tools", []))
     ima_names = sorted(n for n in tool_set if n.startswith("tencent-ima__") or "_ima__" in n)

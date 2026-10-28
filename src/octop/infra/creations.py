@@ -6,17 +6,47 @@ import asyncio
 import ipaddress
 import os
 import re
+import shutil
 import socket
 from contextlib import suppress
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-_CAPTURE_TIMEOUT_SECONDS = 15
+_CAPTURE_TIMEOUT_SECONDS = 30
 _MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024
 _MAX_PROXY_BYTES = 20 * 1024 * 1024
 _ITEM_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _CAPTURE_SEMAPHORE = asyncio.Semaphore(2)
+
+
+def _system_chromium_executable() -> str | None:
+    for name in ("chrome", "chromium", "chromium-browser", "google-chrome", "msedge"):
+        if executable := shutil.which(name):
+            return executable
+    if os.name == "nt":
+        for variable, relative in (
+            ("PROGRAMFILES", "Google/Chrome/Application/chrome.exe"),
+            ("PROGRAMFILES(X86)", "Microsoft/Edge/Application/msedge.exe"),
+            ("PROGRAMFILES", "Microsoft/Edge/Application/msedge.exe"),
+        ):
+            root = os.environ.get(variable)
+            candidate = Path(root, relative) if root else None
+            if candidate and candidate.is_file():
+                return str(candidate)
+    return None
+
+
+async def _launch_chromium(playwright: Any, **options: Any) -> Any:
+    from playwright.async_api import Error as PlaywrightError
+
+    try:
+        return await playwright.chromium.launch(headless=True, **options)
+    except PlaywrightError:
+        if not (system_executable := _system_chromium_executable()):
+            raise
+        options["executable_path"] = system_executable
+        return await playwright.chromium.launch(headless=True, **options)
 
 
 def creation_thumbnail_path(root: Path, owner_user_id: int, item_id: str) -> Path:
@@ -78,7 +108,7 @@ async def _capture_trusted_local(url: str, allowed_origins: set[str]) -> bytes:
     from playwright.async_api import async_playwright
 
     async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(headless=True)
+        browser = await _launch_chromium(playwright)
         try:
             context = await browser.new_context(
                 viewport={"width": 1280, "height": 800},
@@ -117,7 +147,7 @@ async def _capture_trusted_local(url: str, allowed_origins: set[str]) -> bytes:
                 page.on("response", lambda response: asyncio.create_task(limit_response(response)))
                 await page.goto(url, wait_until="domcontentloaded", timeout=12_000)
                 await page.wait_for_timeout(500)
-                return await page.screenshot(type="jpeg", quality=70, full_page=False)
+                return bytes(await page.screenshot(type="jpeg", quality=70, full_page=False))
             finally:
                 await context.close()
         finally:
@@ -129,8 +159,8 @@ async def _capture(url: str) -> bytes:
 
     proxy = _PublicEgressProxy()
     async with proxy, async_playwright() as playwright:
-        browser = await playwright.chromium.launch(
-            headless=True,
+        browser = await _launch_chromium(
+            playwright,
             proxy={"server": proxy.url, "bypass": "<-loopback>"},
             args=["--proxy-bypass-list=<-loopback>"],
         )
@@ -165,7 +195,7 @@ async def _capture(url: str) -> bytes:
                 await page.route("**/*", allow_web_request)
                 await page.goto(url, wait_until="domcontentloaded", timeout=12_000)
                 await page.wait_for_timeout(500)
-                return await page.screenshot(type="jpeg", quality=70, full_page=False)
+                return bytes(await page.screenshot(type="jpeg", quality=70, full_page=False))
             finally:
                 await context.close()
         finally:

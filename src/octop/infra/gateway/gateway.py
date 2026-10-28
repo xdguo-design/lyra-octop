@@ -134,6 +134,8 @@ class Gateway:
         )
         if self._processor is not None:
             self._processor.replace_thread_message_repo(repos.thread_message_repo)
+            self._processor.replace_audit_repo(repos.audit_repo)
+            self._processor.replace_hitl_repos(repos.hitl_approval_repo, repos.secret_repo)
             self._processor.hitl_coordinator.session_policies.replace_repo(repos.thread_repo)
 
     @property
@@ -237,6 +239,9 @@ class Gateway:
             dispatcher=self._dispatcher,
             usage_repo=self._repos.usage_repo,
             thread_message_repo=self._repos.thread_message_repo,
+            run_repo=self._repos.run_repo,
+            hitl_approval_repo=self._repos.hitl_approval_repo,
+            secret_repo=self._repos.secret_repo,
             gateway=self,
             trajectory_service=self._trajectory_service,
             history_archive=self._history_archive,

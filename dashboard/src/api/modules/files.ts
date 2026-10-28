@@ -1,11 +1,31 @@
 import { request } from "../request";
 
+export type ChatFileReadStatus =
+  | "stored"
+  | "processing"
+  | "ready"
+  | "partial"
+  | "needs_ocr"
+  | "unsupported"
+  | "failed";
+
+/** A parser-derived location pinned to a content hash and immutable revision. */
+export interface ChatFileSourceSpan {
+  file_id: string;
+  revision_id: string;
+  parser_version: number;
+  content_hash: string;
+  ordinal: number;
+  locator: Record<string, unknown>;
+}
+
 /** One parsed, locator-backed file segment (never a host path). */
 export interface ChatFileSegment {
   ordinal: number;
   locator_json: string;
   text: string;
   char_count: number;
+  source_span: ChatFileSourceSpan | null;
 }
 
 export interface ChatFileSummary {
@@ -13,8 +33,9 @@ export interface ChatFileSummary {
   display_name: string;
   media_type: string;
   byte_size: number;
-  read_status: string;
+  read_status: ChatFileReadStatus;
   current_revision_id: string | null;
+  origin_kind: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -23,20 +44,22 @@ export interface ChatFileRevisionSummary {
   revision_id: string;
   parent_revision_id: string | null;
   origin_kind: string;
-  read_status: string;
+  read_status: ChatFileReadStatus;
   byte_size: number;
   created_at: number;
+  access_url?: string;
 }
 
 export interface ChatFileDetail extends ChatFileSummary {
   coverage: Record<string, unknown>;
   revisions: ChatFileRevisionSummary[];
+  access_url?: string | null;
 }
 
 export interface ChatFileSegmentsPage {
   file_id: string;
   revision_id: string;
-  read_status: string;
+  read_status: ChatFileReadStatus;
   segments: ChatFileSegment[];
   next_offset: number | null;
 }
@@ -46,6 +69,66 @@ export interface ChatFileSearchResult {
   revision_id: string;
   query: string;
   matches: ChatFileSegment[];
+}
+
+export interface TextArtifactInput {
+  filename: string;
+  content: string;
+}
+
+export interface TextArtifactRevisionInput {
+  thread_id: string;
+  base_revision_id: string;
+  content: string;
+}
+
+export interface TextArtifactContent {
+  file_id: string;
+  revision_id: string;
+  content: string;
+}
+
+/** Create a conversation-owned TXT, MD or CSV file. */
+export async function createThreadTextFile(
+  agentId: string,
+  threadId: string,
+  input: TextArtifactInput,
+): Promise<ChatFileDetail> {
+  return request<ChatFileDetail>(
+    `/agents/${encodeURIComponent(agentId)}/threads/${encodeURIComponent(
+      threadId,
+    )}/files`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+/** Append a text revision only if the supplied base is still current. */
+export async function createTextFileRevision(
+  agentId: string,
+  fileId: string,
+  input: TextArtifactRevisionInput,
+): Promise<ChatFileDetail> {
+  return request<ChatFileDetail>(
+    `/agents/${encodeURIComponent(agentId)}/files/${encodeURIComponent(
+      fileId,
+    )}/revisions`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+/** Read one exact text revision after the server checks file/thread ownership. */
+export async function readTextFileRevision(
+  agentId: string,
+  fileId: string,
+  revisionId: string,
+  threadId: string,
+): Promise<TextArtifactContent> {
+  const query = new URLSearchParams({ thread_id: threadId });
+  return request<TextArtifactContent>(
+    `/agents/${encodeURIComponent(agentId)}/files/${encodeURIComponent(
+      fileId,
+    )}/revisions/${encodeURIComponent(revisionId)}/text?${query.toString()}`,
+  );
 }
 
 /** Soft-delete an owned attachment draft that has not been bound to a thread. */
@@ -127,6 +210,9 @@ export async function searchFile(
 }
 
 export const filesApi = {
+  createThreadTextFile,
+  createTextFileRevision,
+  readTextFileRevision,
   listThreadFiles,
   getFile,
   getFileSegments,

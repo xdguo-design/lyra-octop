@@ -88,7 +88,7 @@ async def test_settings_hitl_is_readable_by_regular_user(
     assert r.json() == {
         "enabled": False,
         "tool_guard_require_approval": False,
-        "show_approval_ui": False,
+        "show_approval_ui": True,
     }
 
     forbidden = await client.get("/api/admin/security", headers=alice_auth)

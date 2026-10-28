@@ -21,6 +21,16 @@ export const PLANET_URL = "http://127.0.0.1:8130/";
 
 export const BUILT_IN_CREATIONS: BuiltInCreation[] = [
   {
+    id: "ppt-studio",
+    type: "app",
+    category: "platform",
+    titleKey: "pptStudio.title",
+    descriptionKey: "pptStudio.creationDescription",
+    thumb: "/ppt-studio-cover.svg",
+    url: "/ppt-studio",
+    route: "/ppt-studio",
+  },
+  {
     id: "speech-recognition",
     type: "app",
     category: "applet",
@@ -59,6 +69,16 @@ export const BUILT_IN_CREATIONS: BuiltInCreation[] = [
     url: PLANET_URL,
   },
   {
+    id: "ehr-knowledge-platform",
+    type: "app",
+    category: "platform",
+    titleKey: "creationsPage.builtIn.ehrKnowledgePlatform",
+    descriptionKey: "creationsPage.builtIn.ehrKnowledgePlatformDescription",
+    thumb: "/ehr-knowledge-cover.svg",
+    url: "/public/ehr",
+    route: "/ehr",
+  },
+  {
     id: "lyra-print",
     type: "external",
     category: "service",
@@ -81,5 +101,13 @@ export const BUILT_IN_CREATIONS: BuiltInCreation[] = [
     titleKey: "creationsPage.builtIn.lyraNarrative",
     descriptionKey: "creationsPage.builtIn.lyraNarrativeDescription",
     url: "http://119.3.216.103:9090/",
+  },
+  {
+    id: "manus-clinicemr",
+    type: "external",
+    category: "service",
+    titleKey: "creationsPage.builtIn.manus-clinicemr",
+    descriptionKey: "creationsPage.builtIn.manus-clinicemrDescription",
+    url: "https://clinicemr-7tb6c7b9.manus.space/",
   },
 ];

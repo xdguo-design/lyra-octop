@@ -1,13 +1,121 @@
 # 项目长期上下文
 
+## 2026-10-28：LYRA 文件 Artifact 读取授权共用
+
+- 专用 revision 下载、legacy workspace exact-path 读取和解析读取统一通过 `FileService` 校验 revision owner/绑定及 byte-size/SHA256；API 适配器仍各自映射旧错误合同。不要将 owner-scoped 文件内容切回只凭 workspace path 授权。
+- 定向回归：`tests/unit/files/test_service.py` 11 passed；`tests/integration/test_chat_files_api.py` 17 passed；相关 Ruff、format、strict mypy 通过。跨 Project/Run/Chat 的 Artifact 仓储、预览和下载仍未统一。
+
+## 2026-10-28：LYRA Run Effect 终态对账
+
+- Run 终态时，将仍处于 `requested` 的 Effect 标记为 `unknown` 并写安全事件；RunExecutor 终态路径立即对账，启动周期重复扫描以覆盖崩溃窗口。该过程不重放 provider 操作；`unknown` 仅可由显式对账后转 `succeeded`/`failed`。
+- 定向验证：RunEffectRepo 与 RunExecutor **5 passed**，Run API 集成 **17 passed**，触及 Ruff、格式检查和 strict mypy 通过。真实 Harness tool handler 仍未接入 ledger，Provider 超时查询/结果回填仍未实现。
+
+## 2026-10-28：LYRA Project Run Artifact 汇总
+
+- 项目 Artifact API 从 owner-scoped Runs 聚合已关联的 ChatFile revisions，按 `revision_id` 稳定去重并复用 Chat/Run 的认证下载 URL；只涵盖 Run 已登记的 revision，不能视作任意 Chat/Project 文件的通用仓储。查询会重验 File owner、Agent、Thread 与 revision 绑定。
+- 定向验收：Run Artifact 集成 **1 passed**（含跨 Run 去重、URL 一致、错绑 Thread 隐藏），Project Runs UI **3 passed**，Dashboard `npx tsc -b` 成功，i18n **80 passed**，Ruff、Prettier、strict mypy 通过。
+
+## 2026-10-27：LYRA 线程内 DOCX 文本 Artifact
+
+- Chat 文件 API 可把 Markdown 创建/修订为有效 DOCX，并以同一 revision 的 Markdown 读回；转换复用 `infra/utils/doc_edit.py`，读写均在线程池执行。快速编辑只接受 `origin_kind=generated`，上传 DOCX 仍由受限 FileWorker 解析，避免将不可信 ZIP/XML 直接交给编辑转换器。
+- DOCX 转换限 200,000 个字符与 10,000 行，并校验 XML 不允许的控制码；超限返回双语 `DOCUMENT_CONVERSION_LIMIT`。生成内容通过既有 ChatFile revision、CAS、SHA256 和 owner/thread 授权。DOCX 为 Markdown 的简化呈现，不保留页面布局、图片等复杂排版。
+
+## 2026-10-26：Team Inbox 与 Run 审计映射
+
+- 每个 Harness `job_id` 唯一映射到 owner-scoped Run/Step。派工前先让 Harness 解析主持人/成员授权，再持久化 queued 状态，之后才提交同一 job ID；没有原始任务 prompt 入事件。
+- RunRepo 对状态更新以事务 + version CAS 写审计事件；同用户回调幂等，跨用户不可见；排队失败记录固定 `team_member_failed`，成员成功/失败/取消/中断映射为终态，避免将未可信异常或 prompt 写入摘要。
+- 当前每个 inbox 是独立 Run；并发冲突终态回调由事务保障只有一个获胜，已有 SQLite 仓储竞态测试；还没有 Team 父级聚合、取消主动传播、重启恢复或端到端成员并行/乱序回调验证。取消 Run 的终态需要 Harness 实际回调确认，不能把 cancel_requested 伪报为已停止。
+
+## 2026-10-26：HITL 审批审计
+
+- 现有 HITL 暂停由 `HitlChannelCoordinator` 统一登记/决策；待办的工具请求参数用安装级 Fernet key 加密存入 `hitl_approvals`，不写明文审计；终态决定与 `tool_approval.decision` 同事务 CAS 写入，并清空终态加密参数。Coordinator 重建后可按用户/Agent/Thread/session 恢复仍有效待办，Team 成员 pause 保存成员 Agent/Thread 恢复目标。非持久 Coordinator 保持旧 resume 失败重试合同；持久路径先提交决定再恢复，crash 后不盲目重放。
+- 审计与未过期 pending 可跨进程从 DB 查询/恢复；Harness checkpoint 单独持久化。持久决定以 CAS 抢占，只有胜者可恢复图，败者不得调用 Harness；终态会清空密文。若进程在决定提交后、图恢复前崩溃，状态保持 terminal 且不自动重放，因此仍可能需要人工对账。工具 read/write/external-send 分类和高风险强制审批已接入；RunEffectRepo 在执行写入前绑定 owner Run/Step、scope 与同一 Agent/Thread 的 owner approval。HITL 请求本身仍未写入 Run ID 或资源 scope，Run executor 未接通前不得声称端到端关联完成。审计记录不得被当成执行队列。
+- Dashboard HITL resume 必须先通过用户+Agent+Thread 所有权校验，并要求同一用户、Agent、Thread 的唯一 pending 或通过 pending_id 精确选中的待办；不允许因 pending 缺失或多个待办歧义就直接用客户端 thread_id/decisions 调用 Harness。Harness checkpoint 与待办元数据可恢复；RunEffectRepo 提供 owner-scoped 幂等写入台账并支持 unknown 对账，但尚未接到 Harness executor，approved 仍不代表副作用成功，崩溃后不自动重放。
+
+## 2026-10-26：文件解析来源定位升级
+
+- 聊天附件解析已将 XLSX 引用定位到具体 sheet/cell。解析合同含 `file_id/revision_id/parser_version/content_hash/locator/coverage`；解析器版本提升后，读取旧 revision 会以已读 parser version 做 CAS 原子替换 segment，重复或过期 worker 不得覆盖较新结果。
+- 当前解析仍受输入字节、单元格、字符和 segment 上限约束；XLSX 公式使用 `data_only=True`，没有缓存值时不声称获得公式结果。OCR/视频抽帧仍按真实能力报告。
+- 解析 revision 状态区分 stored、processing、ready、partial、needs_ocr、unsupported、failed；processing lease 60 秒，过期读取面显示可重试 stored。解析失败与不支持格式使用不同 API 错误。当前按请求同步解析，不伪报 queued；没有跨平台 OS 级内存硬限。
+- 原始 revision SHA256 校验失败时，以 parse_version CAS 清空 locator segments 与 coverage 并标记 failed；迟到 parser 在 failed 状态不能提交，防止旧提取文本继续从 segments/search 路径返回。
+- 线程内 TXT/MD/CSV 新建和编辑复用 `chat_files/chat_file_revisions`，原始 revision 不变；编辑使用 `base_revision_id` CAS，输掉并发的 draft 仍作为旧 revision 的子分支保留，409 `details.revision_id` 可定位该分支。此路径还未统一 Project/Run artifacts，也没有差异合并 UI。
+- 文件详情 revision 下载使用专用 `/files/{file_id}/revisions/{revision_id}/content` 路由；先校验当前用户拥有该文件、revision 属于文件，再读取 workspace bytes 并检查 SHA256。不要给 owner-scoped Artifact 返回通用 workspace path 下载 URL，否则共享 Agent 用户可能绕过 file owner 检查。
+- Chat TXT/MD/CSV 编辑器读取当前线程 revision 使用 `/files/{file_id}/revisions/{revision_id}/text?thread_id=…`；该入口也必须核验 user/Agent/Thread/file/revision 与 SHA256，不能用通用 workspace read 替代。冲突时保留本地 draft 与分支 revision，只有用户显式选择后才基于最新 revision 重试。
+
+## 2026-10-26：Workbench 项目指令与 Run 上下文快照
+
+- 项目指令保存 `instructions_revision`，更新必须提供 `expected_revision` 并以 CAS 拒绝旧写入。创建 Run 时快照当前指令 revision/内容和项目绑定的 KB IDs；快照不会因后续项目修改而变化。
+- Run 创建前按当前用户重新校验所有绑定知识库可见性。Run 创建时同时捕获 schema_version=1 的规范化 Agent 配置快照，以 Fernet 加密保存并校验 SHA-256；内容相同复用不可变版本，`current` alias 指向最新版本，Run 固定 `agent_version_id`。创建时有效 capability grant 也保存为只审计快照；未来执行器仍必须在读取资料时重新验权。
+- Run 可显式引用最多 50 个来源文件 revision，按用户/Agent/Thread 三重绑定重验后快照 thread_id、revision、SHA256、MIME、size；不保存文件正文或宿主路径。执行器读取文件时仍须即时验权。
+- Home 项目菜单提供项目指令编辑；快速切换项目时旧响应按序号丢弃，避免跨项目内容覆盖；保存携带当前读取到的 revision。
+
+## 2026-10-26：通用 Run/Step/Event 持久化首切片
+
+- GAP-003 首切片新增 `/api/runs` 的创建、列表、详情、steps 和有序 events 读取；只创建 `created` 持久记录，不启动执行器。Run/Step 状态转换带 version 乐观锁；failed/interrupted Step 重试时增加 attempt。
+- Migration 031 SQLite/PostgreSQL 双版本创建 `runs`、`run_steps`、`run_events`。Run 按 owner 隔离；`Idempotency-Key` 在 owner 范围唯一且按请求哈希拒绝异请求复用；项目创建只接受当前用户拥有的工作台项目。`input_ref` 是不含原始 prompt 的不透明引用，执行器读取前必须重新验权。
+- 每 Run 事件序号上限为 100,000；达到上限的状态迁移会整体回滚。SQLite 同版本并发迁移由 CAS 验证单一胜者；PostgreSQL 竞争行为仍需目标环境验证。
+- `POST /api/runs/{run_id}/cancel` 对未启动任务写 `cancelled`，对 queued/running/waiting_approval 写 `cancel_requested`；重复请求幂等。当前没有 Run 执行器，所以该状态不代表实际协程/Team 已停止；外部副作用也不可由取消回滚。
+- RunRepo 提供 executor-instance 原子 claim、300 秒以内心跳租约和 1 小时最大运行预算；租约过期将 Run/活动 Step 标为 interrupted 并写事件，不自动重排，以免未知外部副作用被重复执行。当前没有消费队列/运行 Harness 的执行器，取消尚不能强停；PostgreSQL SKIP LOCKED/迁移竞争需环境验证。
+- Home 项目菜单的任务记录视图只读 Run/Step/Event 服务端状态；在执行器和 Task step 尚未创建前保持真实空列表/created 状态，不模拟进度。
+- 验证：Run/P0/i18n/OpenAPI 定向回归 30 passed；`test_db_pool.py` 20 passed、1 skipped；涉及 Python 文件 Ruff 与 strict mypy 通过。未验证真实 PostgreSQL，也未接 Team、审批、worker 或跨重启恢复。
+
+## 2026-10-27：G3 mock capability contract
+
+- 增加 owner-scoped mock AppRegistration / CapabilityGrant，read/write scopes 分开，grant 可过期和撤销，app 停用会在每次授权检查时立即拒绝；仅允许内置 admission-registration scope，不接受任意 URL 或 provider 凭据。
+- 真实 EHR/Provider 隔离环境当前不可用。mock repo/API 和 SQLite migration 可测试，但不能据此宣称外部业务读写、审批关联、幂等副作用或超时对账已交付；这些验收在计划中标记 BLOCKED。
+
+## 2026-10-27：Run capability scope audit snapshot
+
+- Run 创建时快照当时有效且启用 app 的 grant ID、app key、registration ID、expiry 与 read/write scopes；过期、撤销或停用 grant 不进入新 Run 快照，幂等重放保留既有快照。Dashboard 详情显示该信息并标注仅审计用途。
+- 此快照不是授权凭证；任何未来 Run executor / ContextAssembler 在每次能力读取或写入前必须按当前 owner/agent/scope/expiry/app-enabled 状态重新验权。撤权不得被既有 Run 快照绕过。
+
+## 2026-10-27：Run external effect ledger
+
+- 未发布 schema 032 增加 `runs.capability_scopes_json` 和 owner-scoped `run_effects`；启动修复会为已到当前版本但缺列/表的 SQLite/PostgreSQL 数据库幂等补齐。不要修改已发版迁移；当前未发布 schema 增量继续折入 032。
+- `RunEffectRepo.request` 只允许 owner/agent 匹配且处于 running 的 Run/Step，并在写前检查当前启用 app 的 write grant 与 owner 已批准、未过期 HITL 记录。外部幂等键按 registration 唯一；重用时请求/资源/审批身份必须一致。只存 SHA-256 和安全元数据，不落请求正文或业务资源。
+- 状态先写 `requested`；崩溃或超时不能安全重试时应保留/转为 `unknown`，仅可显式对账到 `succeeded`/`failed`。这只是 executor 可用的台账合同，当前没有 Harness Run executor 调用它，因此不能推断外部写入已发生或成功。
+
+## 2026-10-27：高风险工具强制审批
+
+- 内置工具、插件工具和运行时 MCP 使用保守风险分类：只将明确只读工具视为 read，已知外发动作及读取环境变量（可能将密钥暴露给模型）标为 external_send，其余（包括未知 MCP）按 write 处理。write/external_send 在 Harness 编译工具图前加入 HITL；本会话 allow-all/allow-tools 不能跳过强制审批，已有工具 `when` 条件继续保留。
+- 全局 HITL 默认关闭仍保持不变，但风险写入单独强制审批；因此配置未启用 HITL 的旧实例首次使用写工具时会出现审批中断。HITL API 覆盖批准/拒绝入口；RunEffectRepo 仅提供预留记录、哈希、授权复核和对账状态机，不代表工具已经执行或外部服务已成功。副作用台账与 Harness executor / Provider 调用仍未集成。
+- Dashboard 的 allow-all/allow-tools 会话自动恢复也仅对明确只读工具生效；高风险待办不再显示可记住策略的 Allow 菜单，必须逐次人工决定。前端分类保持保守：未知工具不允许自动恢复。
+- Agent 在 Harness 注册后仍需完成 MCP 注入和强制审批策略编译；AgentManager 的 delivery entry 会等待该启动阶段完成，避免并发首轮对话抢在 HITL 策略安装前调用工具。
+- `tool_execution_may_pause()` / `GET /api/settings/hitl.show_approval_ui` 必须告知前端/CLI/Slash 始终可能出现审批，因为高风险写工具默认强制 HITL；管理员关闭全局 HITL 仍只关闭非强制的通用审批，不改变强制审批。
+- Run Events API 对持久化 payload 按 allowlist 投影；Step 失败摘要仅允许固定错误码，避免把 prompt、患者数据、凭据、异常文本或未来误加的嵌套字段回传。该投影不会让 Run 记录具备执行能力。
+
+## 2026-10-26：PPT 建稿前对话连续性
+
+- PPT 工作台对话在作品创建前按用户与专家保存为草稿日志；重进工作台且暂无作品时恢复该日志。首次创建作品后将草稿日志迁移到作品对话并删除草稿键；模型或动作执行错误也保留该轮内容。
+- 合稿时大纲解析失败显示大纲错误（原先被误标为 SVG 错误）；大纲、SVG 结构/安全校验失败均最多自动重试一次，校验白名单不放宽。
+- 不新增数据库表，继续使用 settings KV。对话仍按最近 60 条有界保留；不同用户/专家的草稿隔离。
+
+## 2026-10-26：PPT 制作工作台完成首版
+
+- Octop「创作」增加正式 PPT 工作台：作品按用户和专家隔离、复用所选专家模型；提供大纲生成、逐页 SVG 生成/修改、编辑预览、恢复进度与 PPTX 下载。文档与运行方式见 `docs/ppt-studio.md`；实施计划见 `docs/specs/plans/2026-10-24-ppt-workbench.md`。
+- 持久化复用 settings KV 和 revision CAS，不新增数据库表。模型任务逐页 checkpoint；SVG 使用受限白名单解析；PPT Master 固定 commit `0396656f4f5c28ba8096e8339716c338a576996c`，仅在临时目录处理已校验 SVG。导出产物写专家工作区。
+- 导出改用 `AgentManager.workspace_for_agent()`，停止状态的专家也可从其持久工作区导出。安装器在本机 Octop 数据目录安装运行时；真实导出成功，生成并验证 16,840 字节 PPTX。
+- 验证：后端单元 27 项、API 集成 3 项、前端 6 项、i18n 80 项通过；PPT 相关 Ruff、mypy、TypeScript、ESLint 与生产构建通过。全仓 `make all` 未执行以免改写其他未提交改动；未做真实模型内容生成和远端部署。
+
+## 2026-10-24：PPT 工作室范围与页面预览
+
+- 用户指定围绕 `hugohe3/ppt-master` 建设专用 PPT 制作页，首版范围为大纲、逐页修改、预览和 PPTX 下载。随后要求先看页面；尚未批准正式架构或选定视觉方向。
+- 一次性原型在 `dashboard/prototypes/ppt-studio/index.html`，包含 A 三栏制作、B 大纲总览、C 沉浸画布，通过 URL `?variant=A|B|C` 和底部切换器选择。原型用内存示例，AI 修改为本地规则演示，导出入口仅说明，刷新重置；不可当作正式功能已完成。
+- 原型用仓库官方 Logo，无新增依赖、生产路由或数据库变更。启动命令见同目录 `NOTES.md`；本次预览地址 `http://127.0.0.1:8767/`，三方向截图为 `preview-{A,B,C}.png`。后续按用户选定方向实施时，需保留原型与真实生成能力的区分。
+
 ## 2026-10-23：工作台深度思考开关
 
-- 工作台模型栏对支持 reasoning toggle 的模型显示“深度思考”开关；沿用模型能力默认模式和思考强度，会话设置写入线程并随每轮消息发送。OpenCode/不支持 reasoning toggle 的模型不显示该开关。
+- 工作台模型选择弹层持续显示当前服务商的模型；点服务商标题可从相邻菜单切换服务商，菜单底部进入模型管理。配置了 reasoning efforts 的模型用横向滑块展示所有离散档位，调整档位会启用推理并保存到会话；只有开关能力的模型用“关闭/开启”两档滑块。OpenCode 不显示这些推理控件。
 
 ## 2026-10-23：平台/团队专用 Agent 的聊天可见性
 
 - Agent 使用持久化的 `chat_visible` 元数据控制是否出现在主对话侧栏与选择器中；该标记不改变 Agent 的启停、共享权限或团队内部可调用性。专家管理页始终保留该 Agent，可由所有者或管理员恢复显示。
 - 新增字段折入当时未发布的 migration 029（SQLite/PostgreSQL 双版本），默认可见以兼容已有 Agent。
+
+## 2026-10-23：专家头像预设
+
+- 专家编辑/创建抽屉只提供油画头像预设和自定义图片上传，不展示 Lucide 备选图标。预设选择先在表单预览，保存时持久化 `icon_name`；如原有自定义头像图片，保存后清除图片以显示所选头像。团队头像入口保持原行为。
+- 专家头像共有十二张经典油画风格生成头像（`painting-*`）；JPEG 资源缩至 512px 后随前端打包，保存在 `icon_name` 中并在专家列表与聊天头像共用渲染。
 
 ## 2026-10-23：工作台文件夹回收站
 
@@ -754,3 +862,184 @@
 
 - 路由调用保持使用入院 Demo Agent 自己绑定的模型及 `admission-router` Skill；全局活动模型不参与替换。隐藏运行时工具时额外屏蔽工具目录遗漏的 `delete`，语义解析不需要该能力。
 - Demo Agent 配置 `model_retry_enabled=false`，避免额度耗尽时 Octop 外层重试多轮。glm-5.3-flash 当前返回 429（5 小时额度上限）；实测从约 10.47 秒/3 次调用缩至约 2.93 秒/1 次 Agent 模型调用（HTTP 429）。成功语义解析时延仍需额度恢复后复测；OpenAI SDK 内部仍会重试。
+
+## 2026-10-23：EHR 工作站文档治理与入口
+
+- `E:\old\pd\docs\DOCUMENT_STANDARD.md` 规定 PRD/ADR/证据/生成物/归档与知识库索引的权威来源；EHR 工程仓以 `docs/engineering/agent-team-operating-model.md` 定义 Agent 责任和交接，避免把旧 003/020 事实混为新平台规则。
+- Octop `/ehr` 保持知识检索为默认首页并保留图谱，同时链接现有项目、代码工作区、源码仓库、文档中心、知识库和 Agent 管理入口。当前改动提供导航和协作标准，不代表服务器已登记私有仓库、完成知识库重建或创建了团队成员。
+- 首页沿用 Octop 主导航，不重复绘制工作站侧栏；搜索页采用暖白医学编辑部视觉，首屏聚焦大搜索框并默认检索全部来源，知识图谱、项目文档、代码和 Agent 能力作为次级入口。本轮代码与生产构建已完成，尚未部署：当前源码树有多组其它未提交前端改动，不能把整包静态文件直接发布以免顺带上线无关更改。
+- 搜索首页默认检索全部来源；可切换医疗结构化集合（药品、诊疗项目、诊断、知识、频次、用法）、已索引文档和代码。“已索引文档”只代表当前索引，不暗示 PD HTML 已被收录。展示来源路径，不把未校准的混合检索分数显示成百分比。
+- `yy` RAG 的 BM25 关键词分在过滤候选集内归一化，避免其他类型文档压低筛选结果；改动已部署到 `ehr-rag.service` 并重启生效。PD 当前 RAG loader 不读取 HTML/图片，EHR/PD 文档索引需单独整理补齐。
+- 旧 yy 源码冻结且已有代码图谱，默认以 GitHub 固定提交和现有图谱作历史证据，不将完整源码复制到服务器；图片按引用保留，只有未来需要 OCR/多模态检索时再建立图片索引。
+- Octop 已有 GitHub 项目导入及受限 Docker 预览能力（需主机 Docker、项目根 Dockerfile 的数值 EXPOSE 端口；公网预览另需预览域名代理配置）。无需另造代码执行平台；是否可用须以目标服务器配置和部署状态为准。
+- 用户确认的原型服务器是 `http://119.3.216.103/`，不是 WorkBuddy 云沙箱。已部署 Octop `/ehr` 工作站与经平台登录鉴权的 RAG 代理；健康检查正常、9 个 Agent 运行，未认证代理返回 401，RAG 8600 仅回环监听。旧 `yy/rag-service/deploy.sh` 使用 `rsync --delete` 并同步旧代码/数据，禁止对该目标原样运行。
+
+## 2026-10-23：EHR 工作站部署到原型服务器
+
+- 用户通过截图提供 SSH 认证信息并授权部署到 `119.3.216.103`；截图中的密码仅用于交互式 SSH 登录，不得写入记录或复述。此前云端 WorkBuddy 地址不作为部署目标。
+- 已创建 root-only 回滚备份 `/root/.octop/backups/ehr-predeploy-20261023T090024Z`，含在线 SQLite `.backup`、config、systemd unit 和已安装 Octop 包。部署 Octop wheel `octop-1.0.2b7`（SHA256 `a10580bac42f619e332d4157c358a56756a704dfd9c510b8393c24855a9ffb05`）；重启后健康接口正常，`agents_running=9`。
+- RAG/图谱作为 systemd 服务 `ehr-rag.service` 运行于独立低权限用户 `octop-rag`，只绑定 `127.0.0.1:8600`；未在公网开端口。数据包仅含检索运行模块、7,492 条筛选后索引、7,355 节点/7,932 边图谱和 ONNX 模型；不含旧 yy 全源码和原始 HIS 数据。检索 `/api/search` 的“阿司匹林”返回药品结果；图谱搜索同词返回节点；健康检查 `ok=true`。`8600` 公网探测超时。
+- EHR 前端默认走 Octop 同源 `/api/ehr-rag`，后端代理复用 Octop 登录用户鉴权；未登录 `/api/ehr-rag/api/health` 返回 401。`/ehr` 返回 SPA 页面。相关代理/config/前端测试本地定向回归已通过（37 后端、8 前端；TSC/Ruff/构建也通过）。
+- RAG runtime bundle 缺少原 `sources.py`，导致首次启动失败。为让预建索引/图谱只读查询运行，在服务器补了一个兼容模块，`_is_test_record` 当前固定返回 false；当前检索不调用图谱重建逻辑。若以后要重建/增量构建图谱，必须先恢复原项目准确的测试记录过滤实现，不能依赖此兼容模块。
+- Docker daemon 已启动（Docker 29.6.1）；启动时发现并恢复了既有 Portainer 容器。Octop 当前未设置 `OCTOP_WORKBENCH_PREVIEW_DOMAIN`，Nginx 未发现预览代理配置，因此容器运行能力可用，但浏览器公网预览仍需配置域名/DNS/代理。文档/图片未重新导入知识库，旧 yy 图片也未建立 OCR/多模态索引；需后续按 `E:\old\pd\docs\DOCUMENT_STANDARD.md` 精简文档并再入库。
+
+
+## 2026-10-23：EHR 工作站接入 Octop 创作平台
+
+- 用户澄清工作站应作为截图所示 Octop「创作 → 平台」中的内置作品，而不是独立站点。`BUILT_IN_CREATIONS` 新增 EHR 知识工作站卡片，点击进入同平台 `/ehr`；标题说明提供中英双语。该页面复用 Octop Agent/知识库入口，临床检索和图谱仍读取同机回环 RAG 服务。
+- Creations 页面回归 16 项通过；dashboard 生产构建成功。只更新服务器内置 dashboard 静态文件，先备份至 `/root/.octop/backups/ehr-creations-card-20261023/dashboard-before.tar.gz`，新 `index.html` 最后替换；保留旧哈希资源。用户打开 `/creations` 后若缓存旧 UI，需硬刷新。
+
+## 2026-10-23：入院登记 Agent 调用与会话修复
+
+- 初始登记使用 page=0 的单次结构化提取；重复并发 turn 请求在同进程合并，地区树按 5 分钟缓存，技能文本只在首次读取磁盘。入院调用可覆盖 Agent 默认输出上限（路由 256、确认 64 tokens），其他 Agent 仍保持原有运行参数优先级。
+- Demo 与平台登记接口统一限制完整模型输入请求为 2,000 tokens：只发送精简的登记技能系统提示和脱敏后的动态 JSON，超限优先裁剪最旧历史，必需内容仍超限则返回 413；Agent 绑定模型不变，直连调用由 AgentRegistry 调用跟踪保护。2026-10-23 复测时，登记 Agent 实际绑定 `Zhipu Coding Plan (BigModel)/glm-5.3-flash`（全局活动模型虽为 ModelScope Qwen）；5 次真实合成请求输入 834–857 tokens，预检 1,109–1,130，均为单次调用且无工具，模型阶段 2.22–6.15 秒（中位 3.86 秒）。PII 脱敏后手机号由候选校验从唯一原话恢复通过；一次合成“职业工程师”未回填且触发澄清，需按职业白名单口径继续验证。 临时将内存模型引用切到 ModelScope Qwen 另测 3 次：输入 856–857 tokens、预检 1,117–1,118、单次调用，模型阶段 1.82–3.89 秒（中位数 2.45 秒），手机号恢复 3/3；学生职业通过，工程师/教师职业触发澄清。 2026-10-24 已窄同步 admission_demo.py 与该 Skill 到 119.3.216.103，远端备份 `/root/.octop/backups/admission-ai-2k-1792851601`；服务重启后 active、健康 HTTP 200、OpenAPI 中两个登记 AI 路由均已挂载。 两份 `.tmp` 部署脚本中的明文 SSH 凭据已改为读取 `OCTOP_DEPLOY_PASSWORD` 环境变量；远端 root 凭据未轮换，需由管理员安排轮换。
+- 保留 20 轮交互上限、结构化字段校验、逐字段待确认和保存失败时前端撤回尚未持久化的候选值；历史按 previousTurnId 链排序。联系人电话不得误填患者电话；地区模型返回规范全路径时仅在患者原话包含对应行政区名称后接受。模型非 JSON 输出按无效响应失败处理。
+
+## 2026-10-25：EHR业务与开发一体化文档标准
+
+- 用户要求优先发布可指导业务与开发的高标准文档，涵盖流程、节点/状态变化、003/020双版本源码差异、图表联动、工程规范与验收；不是仅做文档分类治理。
+- 文档主源：`E:\old\pd\docs\standards\EHR-BDS-001-business-engineering-standard.md`，版本1.0-candidate，In Review；同目录HTML阅读版、source-evidence.json和release-manifest.json。18节正文、3张SVG与Mermaid源、9节点联动、10项差异示例。
+- 本次直接读取yy固定提交`99753aa844237286d9b7c87f561d6103d31bda77`中003/020各Controller与查询Command共四文件指定片段；不是全74项功能审核；没有运行旧客户端、数据库、支付/医保。yy未配置origin，不编造远程源码链接。
+- 远端目标119.3.216.103；通过已授权SSH和BackendWorkspace.upload_bytes/download_bytes发布到共享工作区`/root/pd/docs/standards/`；产品F3XN0N与开发CBJWCP实际共享/root/pd，主持人SEAG8N工作区单独。平台已有五个相关Agent/主持人default_model均为Zhipu Coding Plan (BigModel)/glm-5.3-flash（本次远端CLI回读）。
+- BackendWorkspace在此远端版本是同步接口，system_files_path必须为workspace-relative `.octop`；上传文件用实际local_shell root=/ backend及upload_bytes/download_bytes精确回读，不用猜测filesystem backend映射。保持已部署Octop服务不重启。
+- 本次优先文档发布；第15节已写DOC-01至DOC-06分工，未新触发远端团队自动执行。当前无新增公开HTTP文档路由，入口为Octop产品/开发Agent工作区；不可把文件已上传说成已进入知识库索引或业务Approved。
+
+## 2026-10-26：创作页手动更新 Git / CNB 项目
+
+- 创作页可在内置应用卡片编辑窗口绑定 HTTPS GitHub 或 CNB（`cnb.cool`）仓库，并由管理员在卡片手动更新；独立仓库项目卡也保留更新入口。GitHub 支持公开仓库；CNB 通过「连接器」保存加密 Access Token，Git 操作时用临时凭据文件认证并随操作清除。更新使用 `git pull --ff-only`，发现本地改动、origin 不匹配或远端分叉时失败关闭。
+- 仓库克隆/更新到每个卡片独立的 `~/.octop/projects/` checkout。仓库项目卡更新后清理旧预览容器和镜像，重新启动预览会重建；绑定到内置应用卡片的仓库用于拉取并保存源码，不会替换应用自带的静态发布包。
+- 内置应用卡片可选绑定分支；留空时拉远程默认分支，也可以填 `main`、`dev`、`release/...`。切换前先检查工作区干净，显式 fetch 远程分支并用 `git switch` 切换，最后只允许 `git pull --ff-only origin <branch>`；旧卡片留空仍按远端默认分支更新。
+
+## 2026-10-26：LYRA 原型评审首个页面切片
+
+- 新增全局 `/runs` 运行记录列表与 `/runs/:runId` 详情；它和计划任务 `/tasks` 分开。列表使用现有 owner-scoped Runs API，支持状态筛选、分页和刷新；详情展示运行元信息、步骤与事件摘要，不展示输入引用或原始事件负载。
+- UI 严格按服务端状态呈现：创建记录不代表执行器已启动；取消请求只有服务端确认后才显示 `cancelled`，运行中取消显示 `cancel_requested`。本切片不提供执行/重试功能。
+
+## 2026-10-26：LYRA V2.2 全页面开发路线
+
+- 全量页面/跨页计划位于 `docs/specs/plans/2026-10-26-lyra-page-development.md`，按 19 项拆为核心对话与 HITL、项目/运行、知识/创作/EHR/连接器/个人设置、移动响应式/设计规范及延期概念页。
+- V2.2 是产品范围与状态语义，不是静态 HTML 的代码指令。项目详情必须先确认对象和共享权限；应用目录与系统管理总览属于 P2，不默认新增。
+- 2026-10-27 用户明确要求将项目详情、应用目录和系统管理总览纳入开发，并确认项目先使用所有者与可撤销分享链接、应用目录使用现有应用与管理入口。页面以现有服务端对象和权限为准；不新增成员协作或应用安装能力。
+- `/chat` HITL 确认卡现对参数名中的 password/passwd/secret/token/credential/authorization/cookie/API key/private key 进行递归值隐藏，保留参数名和提示；不杜撰接口未提供的权限来源或影响范围字段。定向测试、i18n、TSC、ESLint、Prettier 通过。
+
+## 2026-10-27：定时任务与通用运行记录入口
+
+- `/tasks` 页头提供“全部运行记录”入口导航到 owner-scoped `/runs`。Cron 任务详情里的历史仍由 Cron API 提供，状态为 `running/ok/error/cancelled/interrupted`；它与通用 Run/Step/Event 资源没有一一映射，不能把单条 Cron 历史伪装成 `/runs/:runId`。
+- Login 的初始化探测不可用时仍留在登录页；认证失败保留输入并重置 CAPTCHA。Experts 对共享 Agent 的变更入口按所有者/管理员条件门控，服务端仍为权限最终边界。
+
+## 2026-10-27：知识文档状态文案
+
+- 知识文档 API 的 `processing` 覆盖解析、分块、嵌入和索引写入，不拆成客户端无法确认的解析中/索引中子状态。卡片与表格统一显示 pending「待处理」、processing「处理中」、ready「可检索」、failed「失败」；失败原因来自服务端 `error_message`。可见知识库读取由服务端 `get_readable_base` 校验，写操作需 `knowledge_bases` 权限并由服务端检查 owner/admin。
+- EHR 默认同源 `/ehr-rag` 由 Octop 认证代理并限制上游路径；用户可在浏览器 localStorage 配置绝对 URL，随后请求直连该主机且不经 Octop 身份认证。部署需确保自定义 EHR 服务自带适当访问控制，不能把浏览器 URL 配置当成服务端权限边界。
+
+## 2026-10-27：LYRA effect idempotency concurrency
+
+- RunEffectRepo 在事务内使用唯一键冲突安全插入；并发同键请求只有获胜事务写 `external_effect.requested` 事件，竞争请求读取已有行并校验 owner、Run/Step、Agent、scope、资源/请求哈希及 approval。不同操作复用同一 registration-scoped key 时返回冲突。SQLite 并发回归通过；PostgreSQL 事务/锁行为仍待环境验证。
+- 当前 MCP cache 和 RunEffect 仓储定向回归 8 passed；本轮全量非 live 后端 4,915 passed、211 skipped，dashboard Vitest 1,486 passed，strict mypy（622 files）、src/tests Ruff check+format、dashboard lint errors 检查与 TypeScript 通过。PostgreSQL、Provider 和其他计划中明确未实现的 Run executor/Artifact 功能仍不得报告为已验收。
+
+## 2026-10-27：LYRA saved-message Run executor
+
+- Run start 只能引用同一 owner、Agent、Thread 中已持久化的 human/user 消息 ID；worker 再次校验 owner、Agent 当前分享状态、Thread、message role/ID 和 active user。模型收到的身份元数据由服务端生成，原始输入不写入 Run 行。
+- 单进程 RunExecutor 仅领取绑定 saved-message 的 queued Runs；Team Inbox 的 Run 不进入该 worker。Project 指令使用创建时 revision 快照，Knowledge Base 按当前用户重新校验，源文件逐次检查 owner/Agent/Thread/revision/hash；输入文本总量受限并标为不可信资料。
+- Run 创建的 HITL pending 持久关联原 run_id/step_id；恢复同一 Harness checkpoint 后更新原 Run/Step。取消 waiting_approval 会终结 Run/Step 并过期关联 pending，活动 Run 取消会传播到当前协程。当前版本漂移会 fail closed 且不调用 Harness；尚未按旧 AgentVersion 创建独立 graph，因此旧版本实际执行仍未实现。RunEffectRepo 也尚未接入 Harness 工具 handler。
+- 最终非 live 后端完整回归 4,921 passed、211 skipped；Dashboard `--maxWorkers=4` 全量回归 1,487 passed。Run/HITL 变更后定向集合 59 passed；Search/Media/Voice mock contract 集合 40 passed。LYRA Run/ProjectContext Dashboard 文件定向回归 5 passed；TSC、ESLint、Prettier 与生产构建通过。PostgreSQL、Provider、隔离业务端无环境时保持未验证/BLOCKED。
+
+## 2026-10-27：LYRA Run Artifact 关联
+
+- `run_artifacts` 关联 Run 与不可变 `chat_file_revisions(file_id, revision_id)`；API 对外以 `revision_id` 作为稳定 `artifact_id`，注册时事务校验 Run owner、Agent、Thread 与文件 revision 一致，数据库复合外键禁止 file/revision 错配。Project ID 从关联 Run 继承，不复制文件或暴露 workspace path；数据库内部关联键不对外暴露。
+- Run Artifact API 支持幂等登记与 owner-scoped 列表；Run 页面可将当前 thread 文件版本关联并通过现有 revision 下载接口读取。当前仍需人工关联，尚未从 Harness 生成器自动发现/登记，也未统一所有 Project/Chat 文件入口。SQLite 新库 migration 与已有 v32 数据库的 schema repair 必须保持同定义；PostgreSQL 实机尚未验证。
+
+## 2026-10-27：LYRA Team Run 取消
+
+- Run cancel 对 Team `team_dispatch` Step 调用 TeamManager，给运行中的 Harness Inbox job 发取消信号。Inbox 不存在（例如进程重启丢失内存队列）时，owner-scoped Run/Step 结束为 `interrupted`，不报告成功或已取消；活动 job 必须等 Inbox 回调终态。
+- Harness Inbox 对已执行中的不可中断工具没有通用强制终止保证；取消不会撤销既有外部副作用。Team 父 Run 汇总、持久 Inbox 重建与进程崩溃后的自动重新调度仍未实现。
+
+## 2026-10-27：LYRA 文本 revision 冲突合并保护
+
+- Chat TXT/MD/CSV 编辑冲突时读取并展示当前服务端 revision，同时保留本地分支内容；只有本地文本被编辑成合并结果后才启用基于最新 revision 的保存。不会自动把本地草稿覆盖到新 revision。
+
+## 2026-10-27：LYRA Team 子 Run 关联
+
+- RunExecutor 运行的 async context 将父 Run/owner 传给同一执行中的 Team dispatch；TeamManager 在入队前校验 owner，RunRepo 再校验父 Run 属于同一 owner、host Agent 且仍 running。子 Run 继承父 Project/Thread，并通过 `/api/runs/{run_id}/children` owner-scoped 查询；普通 Run API 响应不暴露 parent_run_id。
+- 父 Run 的取消与重试会向自身和直接子 Run 派工发信号；同进程的入队和取消扫描共享锁，PostgreSQL 派工事务锁定父行。Team 派工/Run Repo/API 定向回归 93 passed，Home 项目 Run 子任务视图 2 passed；PostgreSQL 和多进程 Inbox 未实机验证。父状态聚合、常规 Chat turn 父 Run 关联和 Inbox 重启恢复未实现。
+
+## 2026-10-27：LYRA Team 父 Run 聚合
+
+- 父 Run 在 RunExecutor 的 Harness stream 结束后，必须等所有 Team dispatch 子 Run 进入终态，再收敛父 Step/Run；子任务失败优先归为 `failed/team_member_failed`，中断或取消归为 `interrupted`，未知副作用归为 `unknown_external_effect`，否则保留 Harness 的成功、失败或 `waiting_approval` 结果。等待期间继续 heartbeat；事务中更新父状态/事件并清除 lease，避免失败、审批等待时遗留活跃租约。
+- PostgreSQL 锁父行的 SQL 路径已实现但未实机验证；Inbox 仍是内存队列，重启恢复与多进程协调未完成。RunExecutor 串行消费会使单个等待子任务的父 Run 延迟后续普通 Run，未来应基于负载和运行限制再决定并发模型。
+- 父 Run 聚合/审批等待/执行器定向回归 8 passed；完整非 live 后端 4,937 passed、211 skipped；Dashboard 282 files / 1,498 passed；Ruff 1,289 files、strict mypy 624 source files、Dashboard TSC/ESLint/build 均通过。
+
+## 2026-10-27：LYRA Team Inbox lease fencing
+
+- Team Inbox 的 Run 使用 `runs.lease_owner/lease_expires_at` 记录 dispatcher 实例；同一实例对本地 queued/running job 每 10 秒续租，丢失 lease 时取消本地 Inbox job。RunExecutor 每 30 秒只收敛已过期的 Team lease，所以多 worker 不会仅因另一个实例刚启动就判定活动 job 失效。
+- 过期 queued 派工归为 `interrupted`；过期 running/cancel-requested 归为 `unknown_external_effect`，从不自动重放。Inbox 消息正文仍未持久化，服务重启后不能恢复执行；这只使旧状态最终可见、避免永久悬挂。真实 PostgreSQL 与多进程压力未验证。
+- Team/Run 定向集合 105 passed，新 lease/reaper 子集 5 passed；Ruff 与 strict mypy 通过。上一轮完整后端 4,937 passed、211 skipped 是 lease 改动前结果，最终完整回归必须重跑。
+
+## 2026-10-27：LYRA 项目 Run Artifact 入口
+
+- Home 项目 Run 历史加载 owner-scoped `/runs/{run_id}/artifacts`，显示文件名与 revision 并使用已有 `downloadAuthFile` 调用受保护 content URL；不引入 workspace path 或另一套下载授权。Run 详情还展示 owner-scoped Effect scope/status，unknown 提示先核查业务系统，不提供自动重试或假对账。Run Event API 的安全 allowlist 错误码现在由 Run/Project 详情双语显示，不呈现异常正文；waiting_approval Run 可回到其绑定 Agent/Thread Chat，由已有 HITL UI 完成用户决策，工作台不代批。组件测试覆盖 API 加载、认证下载、审批路由、Run Event 固定错误码与 Run Effect unknown 状态展示；Run/ProjectRuns UI 9 passed。dashboard i18n 与 RunExecutor 组合回归 83 passed，TSC、ESLint quiet 和 touched TSX Prettier 通过。Dashboard 全量在 4-worker 下 1498 passed、3 timeout；AdmissionDemo/Channels 两个文件单 worker 定向 21 passed，最终全量门禁仍待重跑。Dashboard 子应用 static serve 测试需区分 iframe 舞台壳 `index.html` 与实际入口 `app.html`。RunExecutor 执行期会将项目指令和引用文件文本作为 JSON 上下文，并明确标记来源文件为不可信数据；`tests/unit/test_run_executor.py` 验证恶意指令字符串被标记、任务文本边界保持，未模拟模型是否会抵抗该指令。
+
+## 2026-10-27：LYRA Chat 文本 revision 行差异
+
+- TXT/MD/CSV CAS 冲突 UI 逐行对比服务端最新版本与本地草稿；使用 LCS 输出新增/删除/相同行，最多 20 万字符及 100 万矩阵单元，超限保留手动查看/合并路径，避免大文件触发无界计算。
+- 行差异和冲突 UI 定向 Vitest 5 passed；TSC、相关 TSX ESLint quiet 与触及文件 Prettier 通过。JSDOM 仍打印 Ant Design 伪元素样式未实现警告。
+- 本轮 Dashboard 全量低并发测试通过：283 files / 1,504 tests，无失败或超时，835.53 秒。
+- 随后端全量复跑通过：4,943 passed、211 skipped、0 failed（972.61 秒）；Ruff check/format（1,289 files）和 strict mypy（624 files）通过。
+- RunExecutor 项目上下文隔离回归对相同任务文本使用两个不同 ProjectContext，确认各自 prompt 不含另一个项目专属内容；test_run_executor.py 4 passed。
+
+## 2026-10-27：LYRA Team Inbox queued crash recovery
+
+- Team dispatch 的 queued 输入载荷放入独立 `team_dispatch_payloads`，使用专属 SecretRepo Fernet key 加密，不进入 Run/Step/Event API 投影；输入限 1 MiB。完成、失败、取消或中断事务清除密文。
+- AgentManager 启动完成后、RunExecutor 启动前先扫描一次并原子 claim lease 已过期且 Run/Step 都为 queued 的 dispatch；运行期每 5 秒扫描。恢复使用原 inbox ID，提交前重新校验 owner、来源 thread，并调用 Harness `submit_peer` 的当前成员授权解析。claim 先更新 lease owner，旧实例的 start 被 fencing 拒绝。子派工的父 Run 还必须为 running 且父 lease 有效。
+- running/cancel-requested 不恢复，保留 unknown external effect / existing reaper 语义；无有效密文、解密失败或当前授权失效时固定收敛为失败且不记录异常或任务正文。没有 secret repo 的轻量/测试装配不启用恢复。
+- Team/Run/migration 定向回归 111 passed、1 skipped；完整非 live 后端 4,947 passed、211 skipped、0 failed；Ruff check/format（1,290 files）与 strict mypy（625 source files）通过。本节 supersedes 前文“Inbox 未持久化/queued 重启后不可恢复”状态。PostgreSQL 实机与多进程负载仍未验证。
+
+## 2026-10-27：LYRA Chat File legacy workspace read guard
+
+- 对 `/workspace/file`、`/workspace/download`、`/workspace/doc` 和媒体预览读取已登记 ChatFile revision 的旧 workspace 路径时，重新查询 agent、owner、删除状态与 revision SHA256；不唯一、软删除、跨用户或字节已变化时 fail closed。共享 Agent 用户不能通过猜 `inbound/...` 绕过精确的 File API owner 检查。
+- 删除仍是 DB soft delete，物理 workspace bytes、通用 tree/archive 隐藏与过期清理未统一；这些路径仍需后续处理。Chat Files/Workspace 集成回归 38 passed。PostgreSQL / remote backend 实机未验证。
+
+## 2026-10-27：LYRA ChatFile workspace listing/archive isolation
+
+- Agent owner 的 workspace tree、glob、grep、ZIP archive 必须过滤已登记的其他用户和软删除 ChatFile 路径；exact-path 读取继续检查唯一 owner、deleted_at 和 SHA256。删除 draft 后尝试物理移除其 revision bytes；若存储删除失败，软删除元数据仍使旧 URL fail closed。
+- 不自动清理未绑定草稿或历史 revision；删除保留期尚无合同，未经确认不能设置推断的自动数据清理期限。
+- ChatFile/Workspace/archive 集成回归 48 passed；Ruff check/format 1,290 files 和 strict mypy 625 source files 通过。新的全量后端测试与 PostgreSQL/remote backend 实机验证待完成。
+- Workspace ZIP merge/replace 导入必须跳过所有已登记 ChatFile revision 路径；replace 清理只移除未受保护内容，保留受保护 revision 与祖先目录。冲突路径以 warning 告知；扩展定向回归 50 passed，最终完整非 live 后端回归 4,958 passed、211 skipped、0 failed。首轮全量出现一次 locale parity failure，i18n 子集 80 passed 且最终完整复跑通过；未改 locale。
+
+## 2026-10-27：Team Agent 流启动失败误报
+
+- Chat composer 显式选择的模型会覆盖 Agent 绑定默认模型；截图当时选中 `ModelScope/Qwen`，所以该轮并非使用绑定的 GLM-5.3-Flash。
+- 流报错中的 `SEAG8N` 是 Team host Agent ID。按需启动逻辑在 `_start_agent` 启动失败后会返回，但 `_ensure_running` 仍继续调用 Harness，最终将缺少注册项的 `KeyError(agent_id)` 显示成模型错误。已在工作区增加启动失败短路并用 `AGENT_FAILED` 映射，同时加单测；10 项定向测试和 Ruff 检查通过。
+- 远端 Team host 启动失败的具体原因仍需查看服务器 `last_error`/日志；本地补丁未提交或部署，浏览器自动化读取远端详情超时，SSH 当前不可用。
+
+## 2026-10-27：入院登记首页分层意图路由
+
+- 首页意图链路保留“入院登记/住院登记”精确匹配短路；其他表达先尝试已配置且已下载的本地 ONNX embedding 对固定意图样例做 cosine 排序，再使用 Octop「模型与算力」中已配置的 `groq` 供应商和 `qwen/qwen3.8-27b` 做严格 JSON Schema 意图决策。Groq 未配置、模型不可用、限流、超时、输出无效或置信度不足时回退原绑定模型；开始办理阈值 0.9，其他意图为 0.8。发到 Groq 的用户原话先做 PII mask；流程问答仍由原绑定模型生成文本。
+- 不再要求单独的 `OCTOP_ADMISSION_DECIDER_API_KEY`；决策器复用 provider repo 中已配置的 base URL、密钥和启用模型。仅用无患者信息样例实测 Groq API：Qwen 3.8 27B 对入院开始、问候、流程问答、无关输入分别返回预期类别，confidence 0.95–1.0。聊天中出现的 API key 应撤销并在管理页轮换；源代码不保存该 key。
+- Groq 切换后入院路由与 config 单测 85 passed、API 集成 14 passed；触及文件 Ruff check/format 和 admission/config/API strict mypy 通过。全仓 `make all` 未运行。实时 Groq API 用四条不含患者信息的例句分类通过；项目端复用 provider 配置的 API 调用由 fake provider 单测覆盖，未对本地运行实例的 DB provider 记录做真实端到端调用。
+# 2026-10-27：EHR 门诊收费交付中心
+
+- EHR 工作站右侧入口由泛化医学问答改为门诊收费交付中心，展示 `E:\old\pd` 的 PRD 主源与私有仓库 `xdguo-design/ehr-platform` `dev` 分支的真实代码映射，并提供受登录保护的 `/ehr-demo/charging/chargeworkbench` 运行入口。
+- 当前 `ehr-platform` 只完成收费草稿首切片；正式支付、票据、退费与日结不得标记为已完成。PRD `PRD-001` 仍为 `In Review`，其余实现规格展示为 `Partial`。
+- 现有 GitHub 工作台导入只支持公开仓库，不能把私有 `ehr-platform` 伪报为已自动拉取/一键启动；后续需要服务器现有 checkout 路径或私有仓库凭据接入，才能注册真正可启动的工作台项目。
+
+## 2026-10-28：EHR 匿名只读交付入口
+
+- EHR 创作卡保持内部打开 `/ehr`，复制链接改为 `/public/ehr`。公开路由位于 AuthGuard 与 Octop 主布局之外，不加载侧栏、AgentProvider、设置或内部工作台链接。
+- 匿名访问不使用共享/代理账号自动登录；服务端仅豁免 `/api/public/ehr/health` 与 `/api/public/ehr/search`。搜索固定为公开医学类型，按客户端限流，并过滤代码、文档、Agent、workspace、内部路径及非白名单元数据。
+- 公开页只展示门诊收费 PRD/代码文件的只读对应关系，不提供私有仓库、PRD 正文、代码工作区或运行 Demo 的跳转。当前变更尚未部署到 `119.3.216.103`，远端上线必须在恢复部署通道后再验收。
+
+## 2026-10-28：ACP Runner 直聊模型设置
+
+- ACP 直聊模型默认值保存在用户级 Runner 配置的 `default_model`，必须在各自 Runner 编辑面板中选择；来源是该 Runner 的 ACP `config_options`，不能假设 CLI 都使用同一 `--model` 参数。工作台直聊使用该默认值并隐藏通用模型选择器；未暴露模型选项的 Runner 使用 CLI 自身默认值。
+- 直聊与模型发现按 Runner ID 通用化；模型发现仅对已启用 Runner 执行。旧版 per-agent OpenCode `acp.default_model` 作为兼容回退，清空新 Runner 默认值后不再回退到旧字段。
+
+## 2026-10-28：Octop 上的 HIS 证据驱动研发
+
+- 用户要求 HIS 收费等后续工作由 Octop 按 PRD、目标院区证据和现有代码持续生成，并双向同步前端与交互原型。业务基线：现行 020；003/020 冲突保持待决；ehr-auth 本地账号密码、首次启动创建管理员并强制改密；真实医保/支付/票据接口无契约/联调环境时仍为 TODO。
+- Octop 已有项目指令/知识库 Run 快照和只读源码浏览，但 `GET /workbench/projects/{id}/code` 不能写入仓库。EHR 专家模板可规范需求追溯与交付；在隔离可写工作树、差异审阅和验证执行能力落地前，不得宣称 Octop Run 已修改目标仓库。
+
+## 2026-10-28：HIS PRD 文档入口与正式登录路由
+
+- `/ehr/prd` 内展示完整 PRD 正文；`dashboard/src/pages/EhrWorkbench/PRD.md` 是从 `E:\old\pd\prd\经济\门诊收费\PRD-门诊收费-重梳理草案.md` 同步的构建快照，源 PRD 更新后必须同步此文件再构建前端。
+- `/ehr/login` 与首页登录入口应打开 `ehr-platform-console` 的正式 `/login` 页面（本地 Vite 默认 `5190`，部署时通过 `VITE_EHR_CONSOLE_URL` 配置基地址）。不要在 Octop 里模拟认证成功；当前 Console 的 API 仍接旧认证，不能称为 ehr-auth/HIS 认证验收，需待 ehr-auth 实现和接入后升级。

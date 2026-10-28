@@ -1,11 +1,14 @@
-# GitHub repository Docker preview
+# GitHub and CNB repository Docker preview
 
 This extends [the creation preview design from October 16](2026-10-16-creation-project-one-click-launch-design.md).
 
 ## Behavior
 
-- Admins can start any account-owned `service` creation whose URL is a plain HTTPS GitHub repository URL.
-- Octop shallow-clones each repository into its data directory under `projects/github/`, using an item-specific folder and container identity. It keeps that checkout between starts and does not pull later commits automatically.
+- Admins can start any account-owned `service` creation whose URL is a plain HTTPS GitHub or CNB repository URL.
+- Octop shallow-clones each repository into its data directory under `projects/github/` or `projects/cnb/`, using an item-specific folder and container identity. It keeps that checkout between starts and does not pull later commits automatically.
+- Admins can manually clone or update the checkout from the creation card with `git pull --ff-only`. A dirty checkout or origin mismatch fails without changing the running service. A successful update removes the old preview container and image; start the preview again to build and run the updated source.
+- Built-in app cards can bind a GitHub/CNB repository in their edit dialog and pull it manually from the card. This keeps a per-card source checkout; it does not replace the app's bundled static files.
+- GitHub clone/update supports public repositories. CNB clone/update uses the user's encrypted CNB Access Token from Connectors, passed to Git through a temporary credential file that is removed after each operation; the token is not written into the repository URL or Git config.
 - The repository must have a root `Dockerfile` with a numeric TCP `EXPOSE` port. Octop builds that Dockerfile, publishes the container port on loopback only, and returns a random HTTPS preview subdomain after an HTTP connection succeeds.
 - Octop does not execute `docker-compose.yml`, pass host environment variables, mount host paths, or expose the container to the LAN. It drops Linux capabilities, disables privilege escalation, and limits the running container to 1 GiB RAM, 2 CPUs, and 256 processes.
 - Stop leaves the checkout, image, and container data available for the next start. Graceful Octop shutdown stops running preview containers. Deleting or changing the source URL stops the item runtime but retains its files and Docker data.

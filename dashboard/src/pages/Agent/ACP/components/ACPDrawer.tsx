@@ -45,7 +45,6 @@ export function ACPDrawer({
   onDelete,
 }: ACPDrawerProps) {
   const { t } = useTranslation();
-
   return (
     <Drawer
       title={
@@ -121,6 +120,19 @@ export function ACPDrawer({
           <Input.TextArea autoSize={{ minRows: 3, maxRows: 6 }} />
         </Form.Item>
         <Form.Item
+          name="default_model"
+          label={t("acp.defaultModel")}
+          extra={
+            activeKey ? t("acp.defaultModelHint") : t("acp.saveRunnerFirst")
+          }
+        >
+          <Input
+            allowClear
+            disabled={!activeKey}
+            placeholder={t("acp.chooseModel")}
+          />
+        </Form.Item>
+        <Form.Item
           name="trusted"
           label={t("acp.trusted")}
           valuePropName="checked"
@@ -155,6 +167,7 @@ export function formValuesToRunner(
       (values.tool_parse_mode as ACPToolParseMode) || "update_detail",
     stdio_buffer_limit_bytes:
       Number(values.stdio_buffer_limit_bytes) || 50 * 1024 * 1024,
+    default_model: String(values.default_model || "") || null,
   };
 }
 

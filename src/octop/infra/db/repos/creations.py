@@ -134,7 +134,8 @@ class CreationRepo:
     def list_card_meta(self, owner_user_id: int) -> dict[str, dict[str, str | None]]:
         with self._db.connect() as conn:
             rows = conn.execute(
-                "SELECT card_type, card_id, name, description, category FROM creation_card_meta "
+                "SELECT card_type, card_id, name, description, category, repository_url, repository_branch "
+                "FROM creation_card_meta "
                 "WHERE owner_user_id = ?",
                 (owner_user_id,),
             ).fetchall()
@@ -143,6 +144,8 @@ class CreationRepo:
                 "name": row["name"],
                 "description": row["description"],
                 "category": row["category"],
+                "repository_url": row["repository_url"],
+                "repository_branch": row["repository_branch"],
             }
             for row in rows
         }
@@ -156,15 +159,29 @@ class CreationRepo:
         name: str | None,
         description: str | None,
         category: str | None,
+        repository_url: str | None,
+        repository_branch: str | None,
     ) -> bool:
         with self._db.transaction() as conn:
             conn.execute(
-                "INSERT INTO creation_card_meta(owner_user_id, card_type, card_id, name, description, category, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(owner_user_id, card_type, card_id) "
+                "INSERT INTO creation_card_meta(owner_user_id, card_type, card_id, name, description, category, repository_url, repository_branch, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(owner_user_id, card_type, card_id) "
                 "DO UPDATE SET name = excluded.name, description = excluded.description, "
                 "category = COALESCE(excluded.category, creation_card_meta.category), "
+                "repository_url = excluded.repository_url, "
+                "repository_branch = excluded.repository_branch, "
                 "updated_at = excluded.updated_at",
-                (owner_user_id, card_type, card_id, name, description, category, now_ts()),
+                (
+                    owner_user_id,
+                    card_type,
+                    card_id,
+                    name,
+                    description,
+                    category,
+                    repository_url,
+                    repository_branch,
+                    now_ts(),
+                ),
             )
         return True
 

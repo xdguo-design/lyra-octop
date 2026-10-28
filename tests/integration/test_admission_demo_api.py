@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, Mock
 
@@ -67,16 +68,31 @@ async def test_admission_expert_is_provisioned_as_a_shared_system_agent(env: Any
     assert admission_agent["is_owner"] is False
 
 
-async def test_admission_ai_endpoint_rejects_oversized_input(env: Any) -> None:
-    client, _server, auth = env
+async def test_admission_ai_endpoint_reports_context_over_budget(env: Any, monkeypatch) -> None:
+    client, server, auth = env
+    model = SimpleNamespace(
+        bind=Mock(),
+        get_num_tokens_from_messages=Mock(return_value=2100),
+        ainvoke=AsyncMock(return_value=AIMessage(content="{}")),
+    )
+    _bind_test_admission_model(server)
+    server.app_runtime.agent_registry.harness_manager.shared_factory = SimpleNamespace(
+        get_chat_model=Mock(return_value=model)
+    )
+    monkeypatch.setattr(
+        "octop.infra.admission_demo._ensure_admission_agent", AsyncMock(return_value=object())
+    )
 
+    # Stay within the request max_length so the token-budget guard (mocked
+    # tokenizer above counts 2100) is what produces the 413.
     response = await client.post(
         "/api/admission-demo/extract",
         headers=auth,
-        json={"text": "甲" * 2001},
+        json={"text": "甲" * 10},
     )
 
-    assert response.status_code == 422
+    assert response.status_code == 413
+    assert response.json()["detail"]["code"] == "AI_CONTEXT_TOO_LONG"
 
 
 @pytest.mark.parametrize("page", [0, 2])
@@ -84,19 +100,20 @@ async def test_admission_ai_uses_the_bound_expert_model_and_effort(
     env: Any, monkeypatch, page: int
 ) -> None:
     client, server, auth = env
-    factory = Mock()
+    factory = SimpleNamespace(get_chat_model=Mock())
     manager = server.app_runtime.agent_registry.harness_manager
     manager.shared_factory = factory
-    call = AsyncMock(
-        return_value={
-            "messages": [
-                AIMessage(
-                    content=json.dumps({"emergency_contact": "王晓梅", "relationship": "女儿"})
-                )
-            ]
-        }
+    model = SimpleNamespace(
+        bind=Mock(),
+        get_num_tokens_from_messages=Mock(return_value=400),
+        ainvoke=AsyncMock(
+            return_value=AIMessage(
+                content=json.dumps({"emergency_contact": "王晓梅", "relationship": "女儿"})
+            )
+        ),
     )
-    monkeypatch.setattr(server.app_runtime.agent_registry, "call", call)
+    factory.get_chat_model.return_value = model
+    model.bind.return_value = model
     monkeypatch.setattr(
         "octop.infra.admission_demo._ensure_admission_agent", AsyncMock(return_value=object())
     )
@@ -116,25 +133,18 @@ async def test_admission_ai_uses_the_bound_expert_model_and_effort(
         "clarificationChoices": [],
         "uncertainFields": None,
     }
-    assert call.await_args.args[1]["skills"] == []
-    assert call.await_args.args[1]["messages"][0]["role"] == "system"
-    assert "admission-patient-info" in call.await_args.args[1]["messages"][0]["content"]
-    assert call.await_args.args[1]["user"] is not None
-    assert call.await_args.args[1]["model"] == "demo-provider/demo-model"
-    assert call.await_args.args[1]["configurable"]["octop_reasoning_overrides"] == {
-        "model_fields": {"reasoning_effort": "high"}
-    }
+    factory.get_chat_model.assert_called_once_with("demo-provider/demo-model")
+    messages = model.ainvoke.await_args.args[0]
+    assert len(messages) == 2
+    assert "admission-patient-info" in messages[0].content
+    assert "我是王晓梅" in messages[1].content
+    model.bind.assert_called_once_with(temperature=0.2, max_tokens=512, reasoning_effort="high")
 
 
 async def test_admission_ai_reports_active_model_failure(env: Any, monkeypatch) -> None:
     client, server, auth = env
-    factory = Mock()
+    factory = SimpleNamespace(get_chat_model=Mock(side_effect=RuntimeError("model not found")))
     server.app_runtime.agent_registry.harness_manager.shared_factory = factory
-    monkeypatch.setattr(
-        server.app_runtime.agent_registry,
-        "call",
-        AsyncMock(side_effect=RuntimeError("model not found")),
-    )
     monkeypatch.setattr(
         "octop.infra.admission_demo._ensure_admission_agent", AsyncMock(return_value=object())
     )

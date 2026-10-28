@@ -18,7 +18,10 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { MessageSquare } from "lucide-react";
 import type { CronJobSpecOutput } from "../../../../api/types";
-import { octopCronApi, type OctopCronRun } from "../../../../api/modules/cronjob";
+import {
+  octopCronApi,
+  type OctopCronRun,
+} from "../../../../api/modules/cronjob";
 import { setPendingPrefillText } from "../../../Chat/hooks/chatStore";
 import {
   channelFromSessionKey,
@@ -114,7 +117,11 @@ export function JobDetailDrawer({
       const result = await octopCronApi.cancelRun(agentId, cronId, run.run_id);
       await refreshRuns();
       message[result.cancelled ? "success" : "info"](
-        t(result.cancelled ? "cronJobs.runCancelled" : "cronJobs.runCancelUnavailable"),
+        t(
+          result.cancelled
+            ? "cronJobs.runCancelled"
+            : "cronJobs.runCancelUnavailable",
+        ),
       );
     } catch (error) {
       console.error("Failed to cancel cron run", error);
@@ -220,7 +227,10 @@ export function JobDetailDrawer({
       ) : runsLoading && runs.length === 0 ? (
         <Spin />
       ) : runs.length === 0 ? (
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("cronJobs.noRuns")} />
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description={t("cronJobs.noRuns")}
+        />
       ) : (
         <List
           size="small"
@@ -250,23 +260,29 @@ export function JobDetailDrawer({
                       run.status === "ok"
                         ? "success"
                         : run.status === "error"
-                          ? "error"
-                          : run.status === "running"
-                            ? "processing"
-                            : "default"
+                        ? "error"
+                        : run.status === "running"
+                        ? "processing"
+                        : "default"
                     }
                   >
                     {t(`cronJobs.runStatus.${run.status}`, run.status)}
                   </Tag>
                   <Text type="secondary" style={{ fontSize: 12 }}>
-                    {t(`cronJobs.runTrigger.${run.trigger_kind}`, run.trigger_kind)}
+                    {t(
+                      `cronJobs.runTrigger.${run.trigger_kind}`,
+                      run.trigger_kind,
+                    )}
                   </Text>
                   <Text type="secondary" style={{ fontSize: 12 }}>
                     {formatCronTimestamp(run.started_at, timeZone)}
                   </Text>
                 </Space>
                 {run.error ? (
-                  <Text type="danger" style={{ fontSize: 12, whiteSpace: "pre-wrap" }}>
+                  <Text
+                    type="danger"
+                    style={{ fontSize: 12, whiteSpace: "pre-wrap" }}
+                  >
                     {run.error}
                   </Text>
                 ) : null}

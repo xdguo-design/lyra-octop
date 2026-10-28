@@ -245,6 +245,15 @@ export default function LoginPage() {
     }
   };
 
+  const handleLoginRef = useRef(handleLogin);
+  handleLoginRef.current = handleLogin;
+
+  useEffect(() => {
+    if (captcha.provider === "slider" && captchaReady && username && password) {
+      void handleLoginRef.current();
+    }
+  }, [captcha.provider, captchaReady, password, username]);
+
   if (isSsoPopup() && searchParams.get("oidc_error")) {
     return null;
   }
@@ -392,17 +401,19 @@ export default function LoginPage() {
           onEnter={handleLogin}
         />
 
-        <Button
-          type="primary"
-          size="large"
-          block
-          loading={loading}
-          onClick={handleLogin}
-          disabled={!username || !password || !captchaReady}
-          style={{ borderRadius: 10, height: 44, fontWeight: 500 }}
-        >
-          {t("login.submit")}
-        </Button>
+        {captcha.provider !== "slider" && (
+          <Button
+            type="primary"
+            size="large"
+            block
+            loading={loading}
+            onClick={handleLogin}
+            disabled={!username || !password || !captchaReady}
+            style={{ borderRadius: 10, height: 44, fontWeight: 500 }}
+          >
+            {t("login.submit")}
+          </Button>
+        )}
 
         <div
           style={{

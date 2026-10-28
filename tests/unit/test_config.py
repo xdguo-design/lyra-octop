@@ -198,6 +198,17 @@ def test_browser_idle_timeout_defaults_and_can_be_disabled(tmp_path: Path):
     assert load_config(cfg_path).browser_idle_timeout_minutes == 0
 
 
+def test_agent_idle_stop_minutes_env_and_default(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    cfg = load_config(tmp_path / "config.json")
+    assert cfg.agent_idle_stop_minutes == 0
+
+    monkeypatch.setenv("OCTOP_AGENT_IDLE_STOP_MINUTES", "45")
+    assert load_config(tmp_path / "config.json").agent_idle_stop_minutes == 45
+
+    monkeypatch.setenv("OCTOP_AGENT_IDLE_STOP_MINUTES", "-5")
+    assert load_config(tmp_path / "config.json").agent_idle_stop_minutes == 0
+
+
 def test_database_env_sqlite_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("OCTOP_DATABASE_SQLITE_PATH", "/tmp/octop-test.db")
     cfg = load_config(tmp_path / "config.json")
@@ -418,6 +429,12 @@ def test_new_timezone_env_wins_over_legacy_env(tmp_path: Path, monkeypatch: pyte
     monkeypatch.setenv("OCTOP_CRON_TIMEZONE", "Asia/Tokyo")
     cfg = load_config(tmp_path / "config.json")
     assert cfg.default_timezone == "UTC"
+
+
+def test_ehr_rag_url_env_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("OCTOP_EHR_RAG_URL", "http://127.0.0.1:8600/")
+    cfg = load_config(tmp_path / "config.json")
+    assert cfg.ehr_rag_url == "http://127.0.0.1:8600"
 
 
 def test_loads_mobile_capabilities(tmp_path: Path) -> None:

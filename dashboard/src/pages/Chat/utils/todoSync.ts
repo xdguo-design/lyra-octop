@@ -43,7 +43,8 @@ export function buildTodoSyncPrompt(
   context: TodoSyncContext,
 ): string {
   const sourceAgentId = context.sourceAgentId?.trim();
-  const sourceAgentName = context.sourceAgentName?.trim() || sourceAgentId || "";
+  const sourceAgentName =
+    context.sourceAgentName?.trim() || sourceAgentId || "";
   let scopeInstruction: string;
 
   if (isMemberOwnedTodo(context)) {

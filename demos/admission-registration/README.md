@@ -4,7 +4,7 @@
 
 本目录交付 Vue 2 + Element UI 入院流程演示。身份、申请单、地区和提交为演示数据，不接真实医院。办理会话、结构化事实和轮次由 Octop SQLite/PostgreSQL 保存，最多20轮；独立 Demo FastAPI 后端负责 AI 会话上下文、地址拆分、字段校验和轮次门禁。Octop 只提供 Admission Agent、Skill、模型以及登录态和语音服务。页面实现以 [03 页面原型](docs/03-prototype.md) 为准。
 
-入院登记 Agent 固定关闭深度推理，单次最多迭代 3 次、输入 6000 tokens、输出 512 tokens，temperature 为 0.2；Agent 初始化时会把这些参数同步到已有的专用 Agent。Agent 迭代限制单次模型调用；患者整段登记流程最多20轮仍由 Demo 后端会话计数限制。
+入院登记 Agent 固定关闭深度推理，图执行上限为 32 步、输入上限为 20,000 tokens、默认输出上限为 512 tokens，temperature 为 0.2；Agent 初始化时会把这些参数同步到已有的专用 Agent。意图路由和候选确认分别将单次输出上限收紧到 256 和 64 tokens。患者整段登记流程最多 20 轮，由会话服务计数限制；模型抽取负载另有 6,000 UTF-8 字节上限。
 
 ## 文档入口
 

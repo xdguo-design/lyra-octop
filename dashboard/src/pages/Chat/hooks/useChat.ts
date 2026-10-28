@@ -864,6 +864,11 @@ export function useChat(
   const [historyRefreshing, setHistoryRefreshing] = useState(false);
   const loadGenRef = useRef(0);
   const loadMoreInFlightRef = useRef(new Set<string>());
+  // Latest global generation per session: bumped whenever that session's
+  // history window is rewritten (initial load / refresh). A load-more page is
+  // stale only when its OWN session window moved — it may still enrich a
+  // background session while another one is on screen.
+  const sessionGenRef = useRef(new Map<string, number>());
   const refreshInFlightRef = useRef(false);
 
   const attachAfterHistory = useCallback(
@@ -969,6 +974,7 @@ export function useChat(
       // (Weak resume: only the Stop control / cancelStream may send `cancel`.)
 
       const gen = ++loadGenRef.current;
+      sessionGenRef.current.set(key, gen);
       setHistoryLoading(true);
 
       try {
@@ -1025,7 +1031,7 @@ export function useChat(
     loadMoreInFlightRef.current.add(key);
     chatStore.setHistoryLoadingMore(key, true);
     const offset = snap.historyNextOffset;
-    const gen = loadGenRef.current;
+    const sessionGen = sessionGenRef.current.get(key);
 
     try {
       const {
@@ -1037,16 +1043,26 @@ export function useChat(
         offset,
         cursor: snap.historyNextCursor,
       });
-      if (loadGenRef.current !== gen || stableSessionId !== key) return false;
+      // Stale only when this session's window was rewritten while we fetched.
+      // A page landing for a background session enriches that session's cache.
+      if (sessionGenRef.current.get(key) !== sessionGen) return false;
       chatStore.prependHistoryMessages(key, older, {
         hasMore,
         nextOffset,
         nextCursor,
       });
-      if (loadGenRef.current === gen) setHistoryError(false);
+      if (
+        chatStore.getFocusedChatSession() === key &&
+        sessionGenRef.current.get(key) === sessionGen
+      ) {
+        setHistoryError(false);
+      }
       return true;
     } catch {
-      if (loadGenRef.current === gen) {
+      if (
+        chatStore.getFocusedChatSession() === key &&
+        sessionGenRef.current.get(key) === sessionGen
+      ) {
         failedHistoryOperation.current = "older";
         setHistoryError(true);
       }
@@ -1085,6 +1101,7 @@ export function useChat(
       // Separate from loadGenRef: loadHistory may bump loadGen while we fetch.
       // Always clear the refreshing flag in finally so the footer cannot stick.
       const gen = ++loadGenRef.current;
+      sessionGenRef.current.set(key, gen);
       setHistoryRefreshing(true);
 
       try {

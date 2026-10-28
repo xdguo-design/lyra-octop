@@ -17,6 +17,7 @@ import LoginPage from "./pages/Login";
 const HomePage = lazy(() => import("./pages/Home"));
 const SpeechRecognitionPage = lazy(() => import("./pages/SpeechRecognition"));
 const SharedProjectPage = lazy(() => import("./pages/SharedProject"));
+const PublicEhrPage = lazy(() => import("./pages/EhrWorkbench"));
 import RegisterPage from "./pages/Register";
 import OidcComplete from "./pages/Login/OidcComplete";
 import SetupPage from "./pages/Setup";
@@ -31,6 +32,7 @@ import { LayoutModeProvider } from "./context/LayoutModeContext";
 import { VoiceOutputProvider } from "./context/VoiceOutputContext";
 import { useIsMobile } from "./hooks/useIsMobile";
 import { useUnauthorizedRedirect } from "./hooks/useUnauthorizedRedirect";
+import EhrLoginRedirect from "./pages/EhrWorkbench/EhrLoginRedirect";
 import { installDesktopExternalLinks } from "./utils/desktopExternalLinks";
 import { brandTokensFor } from "./styles/themePalettes";
 import { skinAntdTokens } from "./styles/visualSkins";
@@ -170,12 +172,21 @@ function ThemedApp() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/login/oidc/complete" element={<OidcComplete />} />
             <Route path="/setup" element={<SetupPage />} />
+            <Route path="/ehr/login" element={<EhrLoginRedirect />} />
             <Route path="/invite" element={<InvitePage />} />
             <Route
               path="/share/:token"
               element={
                 <Suspense fallback={<OctopSpinner />}>
                   <SharedProjectPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/public/ehr"
+              element={
+                <Suspense fallback={<OctopSpinner />}>
+                  <PublicEhrPage publicMode />
                 </Suspense>
               }
             />

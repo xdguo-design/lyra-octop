@@ -61,6 +61,7 @@ are updating `catalog.json` in the same change.
 | `obsidian-cli` | Obsidian | Obsidian | knowledge | custom_fields | gateway |
 | `weknora` | WeKnora | WeKnora | knowledge | custom_fields | gateway |
 | `dify` | Dify | Dify | self_hosted | custom_fields | remote |
+| `cnb` | CNB Code Repositories | CNB 代码仓库 | self_hosted | personal_token | gateway |
 
 ## MCP modes / MCP 模式
 

@@ -4,6 +4,10 @@ import { Navigate, useLocation } from "react-router-dom";
 // Lazy-loaded pages — Common
 const ExpertsPage = lazy(() => import("../pages/Experts"));
 const CronJobsPage = lazy(() => import("../pages/Control/CronJobs"));
+const RunsPage = lazy(() => import("../pages/Runs"));
+const ProjectDetailPage = lazy(() => import("../pages/ProjectDetail"));
+const AppDirectoryPage = lazy(() => import("../pages/AppDirectory"));
+const AdminOverviewPage = lazy(() => import("../pages/Admin/Overview"));
 const ConnectorsPage = lazy(() => import("../pages/Agent/Connectors"));
 const SkillPackagesPage = lazy(() => import("../pages/SkillPackages"));
 const ResourceMarketplacePage = lazy(
@@ -17,7 +21,13 @@ const PersonalizationPage = lazy(
 const ACPPage = lazy(() => import("../pages/Agent/ACP"));
 const TokenUsagePage = lazy(() => import("../pages/Control/TokenUsage"));
 const CreationsPage = lazy(() => import("../pages/Creations"));
+const PresentationStudioPage = lazy(
+  () => import("../pages/PresentationStudio"),
+);
 const EhrWorkbenchPage = lazy(() => import("../pages/EhrWorkbench"));
+const EhrPrdSummaryPage = lazy(
+  () => import("../pages/EhrWorkbench/PrdSummary"),
+);
 const FeatureOverviewPage = lazy(
   () => import("../pages/ProductDocs/FeatureOverview"),
 );
@@ -59,15 +69,20 @@ export interface RouteConfig {
 }
 
 export const pathToKey: Record<string, string> = {
+  "/ppt-studio": "creations",
   "/chat": "chat",
   // Common
   "/experts": "experts",
   "/tasks": "tasks",
+  "/runs": "runs",
+  "/apps": "apps",
+  "/admin/overview": "admin-overview",
   "/connectors": "connectors",
   "/skill-packages": "skill-packages",
   "/skill-packages/manage": "skill-packages",
   "/knowledge-bases": "knowledge-bases",
   "/ehr": "ehr",
+  "/ehr/prd": "ehr",
   "/features": "feature-overview",
   "/release-notes": "release-notes",
   "/bridge": "bridge",
@@ -115,6 +130,7 @@ export const pathToKey: Record<string, string> = {
  * Pages that should fill the entire content area without padding/scroll wrapper.
  */
 export const FULLSCREEN_PATHS = new Set([
+  "/ppt-studio",
   "/workbench",
   "/workbench/terminal",
   "/workbench/browser",
@@ -154,6 +170,7 @@ export function isPersonalizationPath(pathname: string): boolean {
 export function resolveSelectedKey(pathname: string): string {
   if (pathToKey[pathname]) return pathToKey[pathname];
   if (pathname.startsWith("/chat/")) return "chat";
+  if (pathname.startsWith("/runs/")) return "runs";
   if (pathname.startsWith("/workbench/")) return "workbench";
   if (pathname.startsWith("/remote-desktop/")) return "remote-desktop";
   if (pathname.startsWith("/personalization/")) return "personalization";
@@ -169,14 +186,20 @@ export const routeConfigs: RouteConfig[] = [
   // Common
   { path: "/experts", element: <ExpertsPage /> },
   { path: "/tasks", element: <CronJobsPage /> },
+  { path: "/runs", element: <RunsPage /> },
+  { path: "/runs/:runId", element: <RunsPage /> },
+  { path: "/projects/:projectId", element: <ProjectDetailPage /> },
+  { path: "/apps", element: <AppDirectoryPage /> },
   { path: "/connectors", element: <ConnectorsPage /> },
   { path: "/skill-packages", element: <ResourceMarketplacePage /> },
   { path: "/skill-packages/manage", element: <SkillPackagesPage /> },
   { path: "/knowledge-bases", element: <KnowledgeBasesPage /> },
   { path: "/ehr", element: <EhrWorkbenchPage /> },
+  { path: "/ehr/prd", element: <EhrPrdSummaryPage /> },
   { path: "/features", element: <FeatureOverviewPage /> },
   { path: "/release-notes", element: <ReleaseNotesPage /> },
   { path: "/creations", element: <CreationsPage /> },
+  { path: "/ppt-studio", element: <PresentationStudioPage /> },
   { path: "/bridge", element: <BridgePage /> },
   {
     path: "/personalization/acp",
@@ -238,6 +261,7 @@ export const routeConfigs: RouteConfig[] = [
   { path: "/admin/models", element: <ModelsPage /> },
 
   // Admin (RequirePermission wrapper applied in MainLayout)
+  { path: "/admin/overview", element: <AdminOverviewPage /> },
   { path: "/admin/users", element: <OctopAdminUsersPage /> },
   {
     path: "/admin/sso",

@@ -124,7 +124,7 @@ async def list_threads(
     )
     workspace_dir = _agent_facing_workspace_dir(server, agent_id)
     hub = server.app_runtime.gateway.ws_hub
-    awaiting_ids = server.app_runtime.gateway.processor.hitl_coordinator.store.pending_thread_ids(
+    awaiting_ids = server.app_runtime.gateway.processor.hitl_coordinator.pending_thread_ids(
         agent_id=agent_id, user_id=effective_uid
     )
     return [
@@ -255,10 +255,6 @@ async def create_thread(
         runners = server.app_runtime.agent_registry.acp_settings.load_runners(user.id)
         if body.acp_runner not in runners or not runners[body.acp_runner]["enabled"]:
             raise OctopError(ErrorCode.FORBIDDEN, "ACP runner is not enabled")
-        if body.acp_runner != "opencode":
-            raise OctopError(
-                ErrorCode.SLASH_BAD_ARGS, "Only OpenCode is supported as a direct chat target"
-            )
         if body.acp_model:
             from octop.infra.agents.acp_direct import list_model_options  # noqa: PLC0415
 
@@ -266,9 +262,10 @@ async def create_thread(
                 registry=server.app_runtime.agent_registry,
                 user_id=user.id,
                 agent_id=agent_id,
+                runner_name=body.acp_runner,
             )
             if body.acp_model not in {item["value"] for item in options}:
-                raise OctopError(ErrorCode.SLASH_BAD_ARGS, "Unknown OpenCode model")
+                raise OctopError(ErrorCode.SLASH_BAD_ARGS, "Unknown ACP runner model")
         server.app_runtime.gateway.thread_registry.update_composer(
             tid,
             acp_runner=body.acp_runner,
@@ -416,7 +413,7 @@ async def get_thread_history(
             )
     effective_uid = as_user if as_user is not None else user.id
     hitl_pending = pending_hitl_payload(
-        server.app_runtime.gateway.processor.hitl_coordinator.store,
+        server.app_runtime.gateway.processor.hitl_coordinator,
         thread_id=thread_id,
         agent_id=agent_id,
         user_id=effective_uid,
@@ -620,23 +617,20 @@ async def patch_thread(
             runners = server.app_runtime.agent_registry.acp_settings.load_runners(user.id)
             if acp_runner not in runners or not runners[acp_runner]["enabled"]:
                 raise OctopError(ErrorCode.FORBIDDEN, "ACP runner is not enabled")
-            if acp_runner != "opencode":
-                raise OctopError(
-                    ErrorCode.SLASH_BAD_ARGS, "Only OpenCode is supported as a direct chat target"
-                )
     if "acp_model" in body.model_fields_set:
         acp_model = (body.acp_model or "").strip() or None
         target_runner = acp_runner if acp_runner is not ... else row.acp_runner
-        if acp_model is not None and target_runner == "opencode":
+        if acp_model is not None and target_runner is not ... and target_runner is not None:
             from octop.infra.agents.acp_direct import list_model_options  # noqa: PLC0415
 
             options = await list_model_options(
                 registry=server.app_runtime.agent_registry,
                 user_id=user.id,
                 agent_id=agent_id,
+                runner_name=str(target_runner),
             )
             if acp_model not in {item["value"] for item in options}:
-                raise OctopError(ErrorCode.SLASH_BAD_ARGS, "Unknown OpenCode model")
+                raise OctopError(ErrorCode.SLASH_BAD_ARGS, "Unknown ACP runner model")
     if "reasoning_mode" in body.model_fields_set:
         reasoning_mode = body.reasoning_mode
     if "reasoning_effort" in body.model_fields_set:
@@ -661,10 +655,15 @@ async def patch_thread(
         conversation_mode=conversation_mode,
         pending_plan_path=pending_plan_path,
     )
-    if row.acp_runner == "opencode" and acp_runner is None:
+    if row.acp_runner and (acp_runner is None or acp_runner != row.acp_runner):
         from octop.infra.agents.acp_direct import close_direct_thread  # noqa: PLC0415
 
-        await close_direct_thread(user_id=user.id, agent_id=agent_id, thread_id=thread_id)
+        await close_direct_thread(
+            user_id=user.id,
+            agent_id=agent_id,
+            thread_id=thread_id,
+            runner_name=row.acp_runner,
+        )
     updated = registry.get_thread(thread_id)
     assert updated is not None
     return {
@@ -706,7 +705,14 @@ async def delete_thread(
     registry = server.app_runtime.agent_registry
     from octop.infra.agents.acp_direct import close_direct_thread  # noqa: PLC0415
 
-    await close_direct_thread(user_id=user.id, agent_id=agent_id, thread_id=thread_id)
+    thread_row = server.app_runtime.gateway.thread_registry.get_thread(thread_id)
+    if thread_row is not None and thread_row.acp_runner:
+        await close_direct_thread(
+            user_id=user.id,
+            agent_id=agent_id,
+            thread_id=thread_id,
+            runner_name=thread_row.acp_runner,
+        )
     await registry.delete_thread_checkpoint(agent_id, thread_id)
     server.app_runtime.gateway.thread_registry.delete_thread(thread_id)
     runtime = getattr(server, "app_runtime", None)

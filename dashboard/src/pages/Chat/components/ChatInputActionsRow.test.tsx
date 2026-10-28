@@ -102,6 +102,24 @@ describe("ChatInputActionsRow plus menu", () => {
     expect(onFileSelect).toHaveBeenCalledTimes(1);
   });
 
+  it("opens text artifacts only for an existing thread", () => {
+    const onTextArtifactOpen = vi.fn();
+    render(
+      <MemoryRouter>
+        <ChatInputActionsRow
+          {...baseProps}
+          agentId="agent-1"
+          threadId="thread-1"
+          onTextArtifactOpen={onTextArtifactOpen}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByLabelText("Upload"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Text file" }));
+    expect(onTextArtifactOpen).toHaveBeenCalledTimes(1);
+  });
+
   it("shows a non-interactive Ask/Plan reminder in the toolbar gap", () => {
     render(
       <MemoryRouter>

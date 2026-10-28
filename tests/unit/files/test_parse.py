@@ -54,6 +54,78 @@ def test_pdf_segments_keep_one_based_page_number(tmp_path: Path) -> None:
     assert result.segments == ()
 
 
+def test_pdf_text_segments_keep_page_locations(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import pypdf
+
+    class TextPage:
+        images: list[object] = []
+
+        def __init__(self, text: str) -> None:
+            self.text = text
+
+        def extract_text(self) -> str:
+            return self.text
+
+    class TextPdf:
+        is_encrypted = False
+        pages = [TextPage("first page"), TextPage("second page")]
+
+    path = tmp_path / "text.pdf"
+    path.write_bytes(b"synthetic pdf parser fixture")
+    monkeypatch.setattr(pypdf, "PdfReader", lambda _path: TextPdf())
+
+    result = parse_file(path)
+
+    assert [(segment.text, segment.locator) for segment in result.segments] == [
+        ("first page", {"kind": "pdf_page", "page": 1}),
+        ("second page", {"kind": "pdf_page", "page": 2}),
+    ]
+
+
+def test_docx_paragraph_and_table_rows_keep_locations(tmp_path: Path) -> None:
+    from docx import Document
+
+    path = tmp_path / "report.docx"
+    document = Document()
+    document.add_paragraph("Opening paragraph")
+    table = document.add_table(rows=1, cols=2)
+    table.cell(0, 0).text = "Name"
+    table.cell(0, 1).text = "Value"
+    document.add_paragraph("Closing paragraph")
+    document.save(path)
+
+    result = parse_file(path)
+
+    assert [(segment.text, segment.locator) for segment in result.segments] == [
+        ("Opening paragraph", {"kind": "docx_paragraph", "block": 1}),
+        ("Name\tValue", {"kind": "docx_table_row", "table": 2, "row": 1}),
+        ("Closing paragraph", {"kind": "docx_paragraph", "block": 3}),
+    ]
+
+
+def test_pptx_shapes_keep_slide_and_shape_locations(tmp_path: Path) -> None:
+    from pptx import Presentation
+    from pptx.util import Inches
+
+    path = tmp_path / "briefing.pptx"
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    first = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(4), Inches(1))
+    first.text = "First point"
+    second = slide.shapes.add_textbox(Inches(1), Inches(2), Inches(4), Inches(1))
+    second.text = "Second point"
+    presentation.save(path)
+
+    result = parse_file(path)
+
+    assert [(segment.text, segment.locator) for segment in result.segments] == [
+        ("First point", {"kind": "pptx_shape", "slide": 1, "shape": 1}),
+        ("Second point", {"kind": "pptx_shape", "slide": 1, "shape": 2}),
+    ]
+
+
 def test_pdf_page_with_images_and_no_text_is_marked_for_ocr(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -81,7 +153,7 @@ def test_pdf_page_with_images_and_no_text_is_marked_for_ocr(
     assert result.coverage.empty_units == 1
 
 
-def test_xlsx_segments_keep_sheet_and_row_locations(tmp_path: Path) -> None:
+def test_xlsx_segments_keep_sheet_and_cell_locations(tmp_path: Path) -> None:
     from openpyxl import Workbook
 
     path = tmp_path / "sales.xlsx"
@@ -91,15 +163,31 @@ def test_xlsx_segments_keep_sheet_and_row_locations(tmp_path: Path) -> None:
     sheet.title = "Q1"
     sheet.append(["item", "qty"])
     sheet.append(["apple", 2])
+    second = workbook.create_sheet("Q2")
+    second.append(["item", "qty"])
+    second.append(["pear", 3])
+    third = workbook.create_sheet("Q3")
+    third.append(["item", "qty"])
+    third.append(["plum", 4])
     workbook.save(path)
 
     result = parse_file(path)
 
     assert [(segment.text, segment.locator) for segment in result.segments] == [
-        ("item\tqty", {"kind": "spreadsheet_row", "sheet": "Q1", "row": 1}),
-        ("apple\t2", {"kind": "spreadsheet_row", "sheet": "Q1", "row": 2}),
+        ("item", {"kind": "spreadsheet_cell", "sheet": "Q1", "cell": "A1"}),
+        ("qty", {"kind": "spreadsheet_cell", "sheet": "Q1", "cell": "B1"}),
+        ("apple", {"kind": "spreadsheet_cell", "sheet": "Q1", "cell": "A2"}),
+        ("2", {"kind": "spreadsheet_cell", "sheet": "Q1", "cell": "B2"}),
+        ("item", {"kind": "spreadsheet_cell", "sheet": "Q2", "cell": "A1"}),
+        ("qty", {"kind": "spreadsheet_cell", "sheet": "Q2", "cell": "B1"}),
+        ("pear", {"kind": "spreadsheet_cell", "sheet": "Q2", "cell": "A2"}),
+        ("3", {"kind": "spreadsheet_cell", "sheet": "Q2", "cell": "B2"}),
+        ("item", {"kind": "spreadsheet_cell", "sheet": "Q3", "cell": "A1"}),
+        ("qty", {"kind": "spreadsheet_cell", "sheet": "Q3", "cell": "B1"}),
+        ("plum", {"kind": "spreadsheet_cell", "sheet": "Q3", "cell": "A2"}),
+        ("4", {"kind": "spreadsheet_cell", "sheet": "Q3", "cell": "B2"}),
     ]
-    assert result.coverage.total_units == 2
+    assert result.coverage.total_units == 6
 
 
 def test_xlsx_cell_budget_is_cumulative_across_sheets(tmp_path: Path) -> None:
@@ -116,7 +204,10 @@ def test_xlsx_cell_budget_is_cumulative_across_sheets(tmp_path: Path) -> None:
 
     assert result.coverage.complete is False
     assert result.coverage.total_units is None
-    assert [segment.locator["sheet"] for segment in result.segments] == ["Sheet"]
+    assert [segment.locator for segment in result.segments] == [
+        {"kind": "spreadsheet_cell", "sheet": "Sheet", "cell": "A1"},
+        {"kind": "spreadsheet_cell", "sheet": "Sheet", "cell": "B1"},
+    ]
 
 
 @pytest.mark.parametrize(

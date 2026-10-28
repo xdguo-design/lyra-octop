@@ -87,6 +87,10 @@ def test_run_migrations_idempotent(db: SqlitePool):
             r["name"]
             for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         }
+        run_cols = {r["name"] for r in conn.execute("PRAGMA table_info(runs)").fetchall()}
+        approval_cols = {
+            r["name"] for r in conn.execute("PRAGMA table_info(hitl_approvals)").fetchall()
+        }
         kb_cols = {r["name"] for r in conn.execute("PRAGMA table_info(knowledge_bases)").fetchall()}
         doc_cols = {
             r["name"] for r in conn.execute("PRAGMA table_info(knowledge_documents)").fetchall()
@@ -113,6 +117,8 @@ def test_run_migrations_idempotent(db: SqlitePool):
     assert "kind" in agent_cols
     assert "chat_visible" in agent_cols
     assert {"email", "sso_provider_id", "sso_subject"}.issubset(cols)
+    assert "thread_id" in run_cols
+    assert {"run_id", "step_id"}.issubset(approval_cols)
     assert {"kind", "extra"}.issubset(sso_cols)
     assert "idx_sso_providers_kind" in sso_indexes
     assert "user_invites" in table_names
@@ -202,6 +208,22 @@ def test_run_migrations_repairs_workbench_tables_when_watermark_is_current(
         "workbench_project_imports",
     }.issubset(tables)
     assert "deleted_at" in folder_columns
+
+
+def test_run_migrations_repairs_run_scope_snapshot_when_watermark_is_current(
+    tmp_path: Path,
+) -> None:
+    pool = SqlitePool(tmp_path / "octop.db")
+    run_migrations(pool)
+    with pool.connect() as conn:
+        conn.execute("ALTER TABLE runs DROP COLUMN capability_scopes_json")
+        conn.execute("UPDATE _schema_version SET version = ?", (latest_schema_version(),))
+
+    run_migrations(pool)
+
+    with pool.connect() as conn:
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(runs)").fetchall()}
+    assert "capability_scopes_json" in columns
 
 
 def test_migration_002_idempotent_when_column_already_present(tmp_path: Path) -> None:
@@ -736,6 +758,24 @@ def test_v14_to_v15_adds_sso_provider_kind_without_rebuilding(tmp_path: Path) ->
     assert row["extra"] == "{}"
     assert "idx_sso_providers_kind" in indexes
     assert int(bound) == int(provider_id)
+
+
+def test_v32_repair_recreates_team_dispatch_payload_storage(tmp_path: Path) -> None:
+    pool = SqlitePool(tmp_path / "octop.db")
+    run_migrations(pool)
+    with pool.connect() as conn:
+        conn.execute("DROP TABLE team_dispatch_payloads")
+
+    run_migrations(pool)
+
+    with pool.connect() as conn:
+        columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(team_dispatch_payloads)").fetchall()
+        }
+        version = conn.execute("SELECT version FROM _schema_version").fetchone()[0]
+    assert columns == {"inbox_id", "step_id", "payload_blob", "created_at"}
+    assert version == latest_schema_version()
 
 
 def _scratch(pool: SqlitePool) -> None:

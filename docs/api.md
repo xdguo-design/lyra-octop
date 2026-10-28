@@ -164,7 +164,7 @@ destination synchronized after the request completes.
 | `WS /agents/{id}/chat/ws?token=<jwt>` | owner | Primary dashboard turn endpoint. Send `{"type":"user_turn", ...}` frames (optional `hitl_policy` is a thread-scoped tool-approval bypass); server replies with harness stream chunks ending in `{"type":"done"}` or `{"type":"error","message":"..."}`. `{"type":"ping"}` → `{"type":"pong"}`. `{"type":"subscribe","thread_id"}` → `{"type":"turn_status","thread_id","active"}` (attach to an in-flight turn without cancelling on disconnect). `{"type":"cancel","thread_id"}` stops the active turn (explicit stop; disconnect alone does **not** cancel). |
 | `GET /agents/{id}/chat/welcome` | agent access | `{welcome_message, quick_prompts, task_examples}`; `task_examples` is `null` when the workspace field is absent |
 | `POST /agents/{id}/chat/polish` | owner | body `{text, default_model?}` → `{text}` (one-shot prompt refinement) |
-| `POST /agents/{id}/chat/hitl/resume` | owner | body `{thread_id, decisions: [...], hitl_policy?}` → SSE chunk stream; finishes with `{"type":"done"}`. Optional `hitl_policy` (`ask` / `allow_all` / `allow_tools`) is a thread-scoped bypass and does not change global tool-approval settings. |
+| `POST /agents/{id}/chat/hitl/resume` | owner + own thread + pending approval | body `{thread_id, decisions: [...], pending_id?, hitl_policy?}` → SSE chunk stream; `pending_id` is required when multiple pauses are pending, and missing/expired/ambiguous state is rejected before Harness resume. Pending state is encrypted at rest and survives Coordinator restart. A persisted approval decision is not evidence that its external side effect completed. Optional `hitl_policy` (`ask` / `allow_all` / `allow_tools`) is a thread-scoped bypass and does not change global tool-approval settings. |
 
 ### Legacy SSE
 
@@ -224,7 +224,7 @@ plugin returns a large `octop_ui` payload, the backend offloads the envelope's
 |--------|------|------|-------|
 | `GET`    | `/settings/timezone` | user | process-level `{timezone}` from `default_timezone` |
 | `GET`    | `/settings/upload` | user | `{max_upload_mb, max_upload_bytes}` from `max_upload_mb` |
-| `GET`    | `/settings/hitl` | user | `{enabled, tool_guard_require_approval, show_approval_ui}` — `show_approval_ui` is true when tool HITL is on or command guard is `require_approval` |
+| `GET`    | `/settings/hitl` | user | `{enabled, tool_guard_require_approval, show_approval_ui}` — approval UI is available because risky writes always require approval; the global HITL switch and command guard can add further pauses |
 | `GET`    | `/settings/captcha` | `captcha` | `{active, available, providers, source, v3_min_score}`; secrets omitted |
 | `PUT`    | `/settings/captcha` | `captcha` | merge `{active?, providers?}`; empty secret keeps ciphertext; `null` removes a pair |
 | `GET`    | `/cron/settings` | user | compat alias of `/settings/timezone` |
@@ -316,6 +316,37 @@ Bundled experts live in `src/octop/infra/agents/experts/library/`
 (en/zh divisions); the catalog is locale-aware via
 `Accept-Language` / user preference.
 
+## Durable runs
+
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| `POST` | `/runs` | agent access | Creates a durable `created` record; `Idempotency-Key` retries return the original Run. The response pins `agent_version_id`; creation does not start an executor. |
+| `GET` | `/runs` | owner | List the current user's Runs; optional `project_id`, `status`, `limit`, and `offset`. |
+| `GET` | `/runs/{run_id}` | owner | Read one Run. Input references and stored context/source snapshots are not exposed. |
+| `GET` | `/runs/{run_id}/children` | owner | List owner-scoped Team dispatch child Runs; returns `404` when the parent is not owned by the caller. |
+| `POST` | `/runs/{run_id}/artifacts` | owner | Body `{file_id, revision_id}` registers an immutable revision from the Run's owner/Agent/Thread; `artifact_id` is the stable `revision_id`, and repeated registration returns the same Artifact with `200`. |
+| `GET` | `/runs/{run_id}/artifacts` | owner | List linked Artifact metadata and authenticated content URLs; workspace paths are not returned. |
+| `GET` | `/runs/projects/{project_id}/artifacts` | owner | List project Run artifacts, deduplicated by immutable revision ID; supports `limit` and `offset`. |
+| `GET` | `/runs/{run_id}/effects` | owner | Read external effect ledger metadata (scope, approval reference, SHA-256 hashes, and reconciliation status); request/resource bodies and provider idempotency keys are not returned. |
+| `POST` | `/runs/{run_id}/cancel` | owner | Cancels a not-yet-started Run or records `cancel_requested`; Team Inbox jobs receive a cancellation signal, while non-interruptible work may finish before the final state is known. |
+| `GET` | `/runs/{run_id}/steps` | owner | Read sanitized Step fields. |
+| `GET` | `/runs/{run_id}/events` | owner | Read ordered events with `after_sequence` and bounded `limit`; payloads are restricted to status transitions, fixed error codes, and known static fields. |
+
+Each newly created Run captures an encrypted, content-addressed Agent configuration snapshot. The `current` AgentVersion alias may move when configuration changes; existing Runs keep their original `agent_version_id`. Executors must re-check resource and capability access before reading inputs.
+
+## Mock application capabilities
+
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| `POST` | `/apps` | user | Register a catalog-supported mock app; duplicate owner/app pairs return `APP_REGISTRATION_EXISTS`. |
+| `GET` | `/apps` | owner | List the current user's app registrations. |
+| `PATCH` | `/apps/{registration_id}` | owner | Enable or disable the registration; disabled registrations deny future scope checks. |
+| `POST` | `/apps/{registration_id}/grants` | owner | Grant an owned Agent separate read/write scopes and optional future expiry. |
+| `GET` | `/apps/{registration_id}/grants` | owner | List grants for an owned registration. |
+| `DELETE` | `/apps/grants/{grant_id}` | owner | Revoke a grant; repeated revocation is idempotent. |
+
+Only the built-in `admission-registration` mock contract is supported. The Run effect ledger is available for approved, capability-checked executor calls, but no Harness executor or external EHR/Provider adapter is connected. Live integration checks remain **BLOCKED** pending an isolated test environment.
+
 ## Workspace, skills, subagents, memory, files
 
 | Method | Path | Auth | Notes |
@@ -330,6 +361,14 @@ Bundled experts live in `src/octop/infra/agents/experts/library/`
 | `GET`    | `/agents/{aid}/workspace/glob` | owner | glob backend paths |
 | `GET`    | `/agents/{aid}/workspace/grep` | owner | grep backend files |
 | `GET`    | `/agents/{aid}/workspace/...` | owner | see `api/routers/workspace.py` |
+| `GET`/`POST` | `/agents/{aid}/threads/{tid}/files` | owner | list files (includes `origin_kind`) / create thread-bound TXT, MD, CSV or generated DOCX (`POST` body `{filename, content}`; DOCX content is Markdown and bounded to 200,000 characters/10,000 lines, otherwise `413 DOCUMENT_CONVERSION_LIMIT`) |
+| `GET` | `/agents/{aid}/files/{fid}` | owner | file metadata and immutable revision list, each with an owner-checked content URL |
+| `GET` | `/agents/{aid}/files/{fid}/revisions/{rid}/content` | owner | download one owner-checked, SHA256-verified immutable revision |
+| `GET` | `/agents/{aid}/files/{fid}/revisions/{rid}/text?thread_id=…` | owner + thread | read exact UTF-8 TXT/MD/CSV revision or generated DOCX converted to Markdown after user, Agent, Thread and hash checks; uploaded DOCX is not passed to the editor converter |
+| `POST` | `/agents/{aid}/files/{fid}/revisions` | owner | append TXT/MD/CSV or generated DOCX revision with `{thread_id, base_revision_id, content}`; stale concurrent edits return `409` with `error.details.revision_id` and remain readable as branch revisions |
+| `POST` | `/agents/{aid}/files/{fid}/read` | owner | parse one revision with body `{thread_id, revision_id}` |
+| `GET` | `/agents/{aid}/files/{fid}/segments` | owner | bounded page of revision-pinned parsed segments |
+| `POST` | `/agents/{aid}/files/{fid}/search` | owner | keyword search over one parsed revision |
 | `GET`    | `/agents/{aid}/skills` | owner | list installed skills |
 | `PUT`    | `/agents/{aid}/skills/{slug}` | owner | enable / disable a skill |
 | `GET`    | `/agents/{aid}/skills/hub/search` | user | Skill Hub search |
@@ -358,6 +397,7 @@ Bundled experts live in `src/octop/infra/agents/experts/library/`
 | `DELETE` | `/acp/{runner_name}` | user | delete a custom runner (built-ins are protected) |
 | `GET`    | `/agents/{aid}/acp` | owner | global runners + this agent's `tool_enabled` flag |
 | `PUT`    | `/agents/{aid}/acp` | owner | update `tool_enabled` and optionally the global list |
+| `GET`    | `/agents/{aid}/acp/{runner_name}/models` | owner | list model choices exposed by the runner's ACP session |
 | `PUT`    | `/agents/{aid}/acp/tool` | owner | toggle the `acp_runner` tool only |
 
 See [ACP integration](./acp.md) for the runner object schema and the
@@ -514,6 +554,11 @@ dashboard mirrors every code under `apiErrors.*` in
 | `SETUP_REQUIRED` | 409 | Initial admin not yet created (or wizard not finished) |
 | `FORBIDDEN` | 403 | Authenticated but not allowed |
 | `NOT_FOUND` | 404 | No such row / route |
+| `APP_UNSUPPORTED` | 422 | App is not in the mock catalog |
+| `APP_REGISTRATION_EXISTS` | 409 | Owner already registered this app |
+| `APP_SCOPE_INVALID` | 422 | Scope is unsupported or no capability was requested |
+| `APP_GRANT_EXPIRY_INVALID` | 422 | Grant expiry is not in the future |
+| `APP_DISPLAY_NAME_INVALID` | 422 | App display name is blank |
 | `USER_DISABLED` | 403 | Account flag flipped off |
 | `USERNAME_TAKEN` | 409 | Conflict on `users.username` |
 | `AGENT_NOT_FOUND` | 404 | Agent row missing or owned by another user |

@@ -76,6 +76,7 @@ import {
   type KnowledgeOnnxModel,
 } from "../../api/modules/knowledgeBases";
 import { OctopEmptyMascot } from "../../components/EmptyState";
+import DocumentStatusTag from "./DocumentStatusTag";
 import DocumentPreviewCore from "../../components/DocumentPreviewCore";
 import DocumentPreviewLoading from "../../components/DocumentPreviewLoading";
 import Markdown from "../../components/Markdown";
@@ -140,13 +141,6 @@ const OCR_DOCUMENT_TYPES = ".png,.jpg,.jpeg,.webp";
 function loadDocsViewMode(): DocsViewMode {
   const stored = localStorage.getItem(DOCS_VIEW_STORAGE_KEY);
   return stored === "table" ? "table" : "card";
-}
-
-function documentStatusColor(status: KnowledgeDocument["status"]) {
-  if (status === "ready") return "success";
-  if (status === "failed") return "error";
-  if (status === "processing") return "processing";
-  return "default";
 }
 
 function fileExtensionLabel(filename: string): string {
@@ -2442,25 +2436,11 @@ export default function KnowledgeBasesPage() {
                               </div>
                               {document.is_dir ? null : (
                                 <div className={styles.docCardFooter}>
-                                  <Tooltip
-                                    title={
-                                      document.error_message ||
-                                      t(
-                                        `knowledgeBases.statuses.${document.status}`,
-                                      )
-                                    }
-                                  >
-                                    <Tag
-                                      className={styles.docStatusTag}
-                                      color={documentStatusColor(
-                                        document.status,
-                                      )}
-                                    >
-                                      {t(
-                                        `knowledgeBases.statusesShort.${document.status}`,
-                                      )}
-                                    </Tag>
-                                  </Tooltip>
+                                  <DocumentStatusTag
+                                    className={styles.docStatusTag}
+                                    status={document.status}
+                                    errorMessage={document.error_message}
+                                  />
                                   <span
                                     className={styles.docUpdatedAt}
                                     title={formatServerDateTime(
@@ -2549,17 +2529,10 @@ export default function KnowledgeBasesPage() {
                               document.is_dir ? (
                                 "—"
                               ) : (
-                                <Tooltip
-                                  title={document.error_message || undefined}
-                                >
-                                  <Tag
-                                    color={documentStatusColor(document.status)}
-                                  >
-                                    {t(
-                                      `knowledgeBases.statusesShort.${document.status}`,
-                                    )}
-                                  </Tag>
-                                </Tooltip>
+                                <DocumentStatusTag
+                                  status={document.status}
+                                  errorMessage={document.error_message}
+                                />
                               ),
                           },
                           {

@@ -36,7 +36,7 @@ Public endpoints (no token): `/api/docs`, `/api/openapi.json`, `/api/health`,
 `/api/auth/ldap/status`,
 `/api/auth/invite/validate`,
 `/api/auth/invite/redeem`, `/api/connectors/oauth/callback`,
-and `/api/internal/mcp/*`.
+`/api/public/ehr/health`, `/api/public/ehr/search`, and `/api/internal/mcp/*`.
 
 ## Agent scope
 
@@ -58,6 +58,10 @@ HITL resume still uses `POST /api/agents/{agent_id}/chat/hitl/resume` (SSE).
 """
 
 OPENAPI_TAGS: list[dict[str, str]] = [
+    {
+        "name": "presentations",
+        "description": "Account-owned PPT briefs, outlines, slide creation, revision and native PPTX export.",
+    },
     {
         "name": "setup",
         "description": "First-run wizard: create the admin user and optional LLM provider.",
@@ -82,6 +86,10 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         "description": "Authenticated mock identity, region, validation, and submission API for the Vue admission-registration prototype.",
     },
     {
+        "name": "apps",
+        "description": "Owner-scoped mock application registrations and expiring, revocable Agent capability grants.",
+    },
+    {
         "name": "slash",
         "description": "Slash command metadata for composer menus and inline help.",
     },
@@ -103,7 +111,7 @@ OPENAPI_TAGS: list[dict[str, str]] = [
     },
     {
         "name": "knowledge",
-        "description": "Private, shareable document knowledge bases and their indexing capability.",
+        "description": "Private document knowledge bases and EHR reference search, plus the isolated public medical-search surface.",
     },
     {
         "name": "files",
@@ -120,6 +128,10 @@ OPENAPI_TAGS: list[dict[str, str]] = [
     {
         "name": "cron",
         "description": "Scheduled prompts that run against an agent on a cron trigger.",
+    },
+    {
+        "name": "runs",
+        "description": "Durable user-owned runs, steps, and ordered lifecycle events.",
     },
     {
         "name": "settings",

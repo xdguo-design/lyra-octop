@@ -1,0 +1,2409 @@
+<!doctype html>
+<!-- PROTOTYPE: A 三栏制作 / B 故事总览 / C 沉浸画布。仅内存示例，无模型与生产写入。 -->
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>PPT 工作室 · Octop 页面原型</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #242724;
+        --muted: #8a8e88;
+        --line: #e8e9e5;
+        --green: #254f41;
+        --soft: #edf3ee;
+        --surface: #fff;
+        --canvas: #f3f4f1;
+        font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: var(--ink);
+        font-size: 13px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f7f7f5;
+      }
+      button,
+      input,
+      textarea,
+      select {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+        color: inherit;
+      }
+      button:disabled {
+        cursor: default;
+        opacity: 0.4;
+      }
+      button:focus-visible,
+      a:focus-visible {
+        outline: 3px solid #91b8a1;
+        outline-offset: 3px;
+      }
+      button {
+        border: 0;
+        background: none;
+      }
+      input,
+      textarea,
+      select {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px 11px;
+        background: var(--surface);
+        color: var(--ink);
+        width: 100%;
+        outline: none;
+      }
+      input:focus,
+      textarea:focus {
+        border-color: #769c82;
+        box-shadow: 0 0 0 2px #e8f0e9;
+      }
+      textarea {
+        resize: vertical;
+        line-height: 1.8;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      svg.icon {
+        width: 17px;
+        height: 17px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.65;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        flex-shrink: 0;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .grow {
+        flex: 1;
+        min-width: 0;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .small {
+        font-size: 11px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        padding: 8px 13px;
+        border-radius: 8px;
+        white-space: nowrap;
+        min-height: 34px;
+      }
+      .btn:hover {
+        background: #f4f6f2;
+      }
+      .btn.primary {
+        background: var(--green);
+        border-color: var(--green);
+        color: #fff;
+      }
+      .btn.primary:hover {
+        background: #376450;
+      }
+      .icon-btn {
+        width: 30px;
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+      }
+      .icon-btn:hover {
+        background: #eef0ec;
+      }
+      .chip {
+        padding: 4px 8px;
+        background: #f3f4f1;
+        border-radius: 5px;
+        color: #697367;
+        font-size: 10px;
+        letter-spacing: 0.03em;
+      }
+      .pill {
+        font-size: 10px;
+        padding: 4px 7px;
+        border-radius: 4px;
+        background: #edf3ee;
+        color: #4b6d56;
+      }
+      .divider {
+        height: 16px;
+        width: 1px;
+        background: var(--line);
+        margin: 0 5px;
+      }
+      .shell {
+        height: calc(100dvh - 65px);
+        min-height: 640px;
+        display: grid;
+        grid-template-columns: 62px 1fr;
+      }
+      .app-rail {
+        background: #fafbf9;
+        border-right: 1px solid var(--line);
+        padding: 20px 9px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 17px;
+      }
+      .rail-mark {
+        height: 30px;
+        font:
+          italic 26px Georgia,
+          serif;
+        color: var(--green);
+      }
+      .rail-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        color: #92978d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .rail-btn.active {
+        color: var(--green);
+        background: #e7eee6;
+      }
+      .rail-btn .icon {
+        width: 20px;
+        height: 20px;
+      }
+      .avatar {
+        border-radius: 50%;
+        background: #dfe7d9;
+        width: 30px;
+        height: 30px;
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+        color: #506247;
+      }
+      .app {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+      }
+      .header {
+        height: 66px;
+        min-height: 66px;
+        padding: 0 25px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        border-bottom: 1px solid var(--line);
+        background: #fff;
+      }
+      .logo {
+        width: 82px;
+        height: 29px;
+        object-fit: contain;
+      }
+      .crumb {
+        color: #91958f;
+        font-size: 12px;
+      }
+      .crumb b {
+        font-weight: 500;
+        color: #40473e;
+      }
+      .doc-head {
+        height: 78px;
+        min-height: 78px;
+        padding: 0 25px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        background: #fff;
+        border-bottom: 1px solid var(--line);
+      }
+      .doc-head h1 {
+        font-size: 17px;
+        letter-spacing: -0.04em;
+        font-weight: 650;
+        margin-bottom: 7px;
+      }
+      .doc-sub {
+        font-size: 11px;
+        color: #90958c;
+        gap: 10px;
+      }
+      .doc-sub .dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 100%;
+        background: #83a589;
+      }
+      .doc-name {
+        border: 0;
+        padding: 0;
+        background: none;
+        font-size: 17px;
+        font-weight: 650;
+        width: 310px;
+        max-width: 100%;
+        box-shadow: none !important;
+      }
+      .flow {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-right: 12px;
+        font-size: 11px;
+        color: #a0a49c;
+      }
+      .flow span {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .flow i {
+        font-style: normal;
+        width: 18px;
+        height: 18px;
+        border: 1px solid #dfe4da;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        font-size: 9px;
+      }
+      .flow .done {
+        color: #667c64;
+      }
+      .flow .current {
+        color: var(--green);
+        font-weight: 600;
+      }
+      .flow .current i {
+        background: var(--green);
+        color: white;
+        border-color: var(--green);
+      }
+      .workspace {
+        display: grid;
+        grid-template-columns: 206px minmax(360px, 1fr) 300px;
+        min-height: 0;
+        flex: 1;
+      }
+      .pages {
+        display: flex;
+        flex-direction: column;
+        background: #fafbf9;
+        border-right: 1px solid var(--line);
+        min-height: 0;
+      }
+      .panel-top {
+        height: 53px;
+        min-height: 53px;
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        gap: 10px;
+        border-bottom: 1px solid var(--line);
+      }
+      .panel-top strong {
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .tabs {
+        display: flex;
+        gap: 17px;
+        height: 100%;
+        align-items: center;
+      }
+      .tabs button {
+        font-size: 12px;
+        padding: 0;
+        height: 100%;
+        color: #94998e;
+        position: relative;
+      }
+      .tabs button.active {
+        color: #354f39;
+        font-weight: 600;
+      }
+      .tabs button.active:after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        height: 2px;
+        background: #506e50;
+        left: 0;
+        right: 0;
+      }
+      .page-list {
+        overflow: auto;
+        flex: 1;
+        padding: 15px 15px 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 17px;
+        scrollbar-width: thin;
+      }
+      .page-card {
+        width: 100%;
+        padding: 0;
+        text-align: left;
+        flex-shrink: 0;
+        display: block;
+      }
+      .thumb-frame {
+        aspect-ratio: 16/9;
+        border: 1px solid #dfe2d9;
+        border-radius: 5px;
+        background: #fff;
+        overflow: hidden;
+        position: relative;
+      }
+      .page-card.selected .thumb-frame {
+        outline: 2px solid #668060;
+        outline-offset: 3px;
+      }
+      .page-card .caption {
+        margin-top: 9px;
+        font-size: 10px;
+        color: #8b9185;
+        display: flex;
+        gap: 9px;
+        align-items: center;
+      }
+      .page-card.selected .caption {
+        color: #36523c;
+      }
+      .caption .number {
+        font-size: 10px;
+        font-family: Consolas, monospace;
+        color: #a0a59a;
+      }
+      .caption .tick {
+        margin-left: auto;
+        color: #628060;
+        font-size: 11px;
+      }
+      .add-page {
+        margin: 12px 15px;
+        justify-content: center;
+        color: #737e6b;
+        background: transparent;
+        border-style: dashed;
+      }
+      .outline-item {
+        display: flex;
+        gap: 9px;
+        align-items: flex-start;
+        margin-bottom: 12px;
+      }
+      .outline-item span {
+        padding-top: 9px;
+        font:
+          11px Consolas,
+          monospace;
+        color: #9ba293;
+      }
+      .outline-item input {
+        padding: 8px;
+        font-size: 11px;
+      }
+      .outline-note {
+        font-size: 11px;
+        color: #929b8a;
+        line-height: 1.8;
+        padding: 0 2px 12px;
+      }
+      .editor {
+        background: var(--canvas);
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+      }
+      .editor-toolbar {
+        height: 53px;
+        min-height: 53px;
+        padding: 0 20px;
+        border-bottom: 1px solid #e6e8e0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #828b79;
+      }
+      .editor-toolbar .btn {
+        padding: 5px 9px;
+        font-size: 11px;
+        min-height: 28px;
+        background: transparent;
+        border-color: #dfe3d8;
+      }
+      .page-kind {
+        font-size: 11px;
+        color: #77816f;
+      }
+      .stage {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 36px 32px 22px;
+        min-height: 0;
+        overflow: auto;
+        position: relative;
+      }
+      .stage-label {
+        width: 100%;
+        max-width: 1080px;
+        display: flex;
+        justify-content: space-between;
+        color: #929a89;
+        font-size: 10px;
+        letter-spacing: 0.03em;
+        margin-bottom: 13px;
+      }
+      .slide-wrap {
+        width: 100%;
+        max-width: 1080px;
+        position: relative;
+        box-shadow:
+          0 9px 30px #24341f0d,
+          0 1px 3px #24341f12;
+      }
+      .slide {
+        aspect-ratio: 16/9;
+        background: #f9f8f2;
+        color: #234b3c;
+        position: relative;
+        overflow: hidden;
+        container-type: inline-size;
+        width: 100%;
+        text-align: left;
+      }
+      .slide-in {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 6.1% 6.3%;
+      }
+      .slide-kicker {
+        font-size: 1.05cqw;
+        letter-spacing: 0.16em;
+        display: flex;
+        gap: 1cqw;
+        align-items: center;
+        color: #7b8b76;
+      }
+      .slide-kicker:before {
+        content: "";
+        width: 0.6cqw;
+        height: 0.6cqw;
+        background: #6d8a5d;
+        border-radius: 50%;
+      }
+      .slide h2 {
+        font-size: 5.1cqw;
+        font-weight: 550;
+        letter-spacing: -0.05em;
+        line-height: 1.27;
+        white-space: pre-line;
+        max-width: 88%;
+        margin-top: 3.3cqw;
+        text-wrap: pretty;
+      }
+      .slide .slide-sub {
+        font-size: 1.45cqw;
+        line-height: 1.8;
+        color: #809078;
+        white-space: pre-line;
+        margin-top: 1.9cqw;
+      }
+      .slide-footer {
+        position: absolute;
+        bottom: 5%;
+        left: 6.3%;
+        right: 6.3%;
+        display: flex;
+        justify-content: space-between;
+        font:
+          0.9cqw Consolas,
+          monospace;
+        letter-spacing: 0.1em;
+        color: #8c9781;
+      }
+      .slide.cover h2 {
+        font-family: Georgia, "Songti SC", "SimSun", serif;
+        font-size: 6.9cqw;
+        margin-top: 4.9cqw;
+        line-height: 1.25;
+        max-width: 58%;
+        font-weight: 500;
+      }
+      .slide.cover .slide-sub {
+        font-size: 1.6cqw;
+        margin-top: 2.2cqw;
+      }
+      .cover-art {
+        position: absolute;
+        right: 6%;
+        top: 22%;
+        width: 31%;
+        height: 56%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .paper {
+        background: #e7ebdf;
+        border: 1px solid #d7dfcd;
+        padding: 2.4cqw 2.2cqw;
+        transform: rotate(9deg);
+        position: absolute;
+        width: 100%;
+        height: 62%;
+        top: 23%;
+        left: 1.1cqw;
+      }
+      .paper.back {
+        transform: rotate(-9deg);
+        background: #d8e1ce;
+        left: -0.4cqw;
+        top: 17%;
+      }
+      .paper.front {
+        transform: rotate(0);
+        top: 9%;
+        left: -1cqw;
+        background: #fffef7;
+        box-shadow: 0 1cqw 2cqw #29432d0b;
+        height: 73%;
+      }
+      .paper-label {
+        font:
+          1cqw Georgia,
+          serif;
+        letter-spacing: 0.14em;
+        color: #97a58a;
+      }
+      .paper-big {
+        font:
+          4.8cqw Georgia,
+          serif;
+        margin-top: 1.5cqw;
+        color: #6d825f;
+        line-height: 1;
+      }
+      .paper-line {
+        height: 0.45cqw;
+        background: #e6eadf;
+        margin-top: 1.7cqw;
+        width: 85%;
+      }
+      .paper-line.short {
+        width: 55%;
+        margin-top: 0.7cqw;
+      }
+      .paper-bottom {
+        font-size: 0.85cqw;
+        margin-top: 2cqw;
+        color: #9aa38e;
+      }
+      .slide-blocks {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 2.7cqw;
+        margin-top: 4cqw;
+      }
+      .slide-block {
+        border-top: 0.12cqw solid #cdd7c2;
+        padding-top: 1.5cqw;
+      }
+      .slide-block b {
+        font-size: 1cqw;
+        color: #8c9b7e;
+        font-weight: 400;
+        font-family: Consolas, monospace;
+      }
+      .slide-block h3 {
+        font-size: 2.25cqw;
+        font-weight: 500;
+        line-height: 1.4;
+        margin: 1.4cqw 0 0.8cqw;
+      }
+      .slide-block p {
+        font-size: 1.2cqw;
+        line-height: 1.8;
+        color: #86917c;
+        white-space: pre-line;
+      }
+      .slide.compare .slide-blocks {
+        grid-template-columns: 1fr 1fr;
+        gap: 3cqw;
+      }
+      .slide.compare .slide-block {
+        background: #e9eee1;
+        border: 0;
+        padding: 2.4cqw;
+      }
+      .slide.compare .slide-block:last-child {
+        background: #34553e;
+        color: #f1f5e9;
+      }
+      .slide.compare .slide-block:last-child p,
+      .slide.compare .slide-block:last-child b {
+        color: #bdcbb0;
+      }
+      .slide.dark-slide {
+        background: #294938;
+        color: #f3f5e8;
+      }
+      .slide.dark-slide .slide-sub,
+      .slide.dark-slide .slide-kicker,
+      .slide.dark-slide .slide-footer {
+        color: #b3c0a6;
+      }
+      .slide.dark-slide .slide-block h3 {
+        color: #ecf0de;
+      }
+      .slide.dark-slide .slide-block p,
+      .slide.dark-slide .slide-block b {
+        color: #b2c1a4;
+      }
+      .slide.dark-slide .slide-block {
+        border-color: #71846a;
+      }
+      .slide.closing h2 {
+        font-family: Georgia, "Songti SC", "SimSun", serif;
+        font-size: 6.6cqw;
+        max-width: 90%;
+        margin-top: 8cqw;
+      }
+      .slide.focus .slide-blocks {
+        grid-template-columns: 1fr;
+      }
+      .slide.focus .slide-block {
+        display: flex;
+        align-items: center;
+        gap: 2cqw;
+        padding-top: 1cqw;
+      }
+      .slide.focus .slide-block h3 {
+        font-size: 1.8cqw;
+        min-width: 17cqw;
+        margin: 0.2cqw;
+      }
+      .slide.focus .slide-block p {
+        font-size: 1.1cqw;
+      }
+      .canvas-help {
+        margin-top: 20px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        color: #a1a795;
+        font-size: 11px;
+      }
+      .canvas-footer {
+        height: 47px;
+        min-height: 47px;
+        border-top: 1px solid #e1e5d9;
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        gap: 8px;
+        color: #8d9680;
+        font-size: 11px;
+      }
+      .canvas-footer .btn {
+        min-height: 26px;
+        padding: 4px 8px;
+        background: none;
+        font-size: 10px;
+      }
+      .notes-input {
+        display: none;
+        padding: 16px 22px;
+        background: #fff;
+        border-top: 1px solid var(--line);
+      }
+      .notes-input.visible {
+        display: block;
+      }
+      .notes-input textarea {
+        height: 70px;
+        font-size: 11px;
+      }
+      .story-intro,
+      .story-grid {
+        display: none;
+      }
+      .inspector {
+        background: #fff;
+        border-left: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .assistant-title {
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .assistant-dot {
+        width: 24px;
+        height: 24px;
+        border-radius: 7px;
+        background: #edf2e8;
+        display: grid;
+        place-items: center;
+        color: #55754b;
+      }
+      .inspector-body {
+        overflow: auto;
+        flex: 1;
+        padding: 20px 18px;
+        scrollbar-width: thin;
+      }
+      .inspector h3 {
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+      .notice {
+        line-height: 1.9;
+        font-size: 11px;
+        color: #8a9380;
+      }
+      .info-block {
+        border: 1px solid #e4e9df;
+        background: #f6f8f3;
+        border-radius: 10px;
+        padding: 13px;
+        margin: 16px 0 21px;
+      }
+      .info-block h3 {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: #52664b;
+        font-size: 11px;
+      }
+      .info-block p {
+        font-size: 11px;
+        line-height: 1.9;
+        color: #859077;
+      }
+      .info-block .mini-list {
+        padding-top: 9px;
+        margin-top: 8px;
+        border-top: 1px solid #e4e9de;
+        font-size: 11px;
+        line-height: 2;
+        color: #6c7f5e;
+      }
+      .inspector-tabs {
+        display: flex;
+        gap: 19px;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 18px;
+      }
+      .inspector-tabs button {
+        padding: 0 0 11px;
+        color: #939c8a;
+        font-size: 11px;
+        position: relative;
+      }
+      .inspector-tabs button.active {
+        color: #344f39;
+        font-weight: 600;
+        border-bottom: 2px solid #526d4d;
+      }
+      .field {
+        display: block;
+        font-size: 11px;
+        color: #8a9481;
+        margin-top: 15px;
+      }
+      .field input,
+      .field textarea,
+      .field select {
+        margin-top: 8px;
+        font-size: 11px;
+      }
+      .field textarea {
+        height: 102px;
+      }
+      .layout-options {
+        display: flex;
+        gap: 7px;
+        margin-top: 8px;
+      }
+      .layout-option {
+        width: 53px;
+        height: 34px;
+        border: 1px solid #e2e7dc;
+        border-radius: 5px;
+        display: flex;
+        gap: 3px;
+        padding: 7px;
+      }
+      .layout-option i {
+        background: #d9e1d0;
+        flex: 1;
+        border-radius: 1px;
+      }
+      .layout-option.active {
+        border-color: #76936a;
+        background: #f2f5ed;
+      }
+      .inspector-bottom {
+        padding: 15px 16px;
+        border-top: 1px solid var(--line);
+      }
+      .prompt-box {
+        border: 1px solid #dfe5d7;
+        border-radius: 10px;
+        background: #fbfcf8;
+        padding: 10px 11px;
+      }
+      .prompt-box textarea {
+        padding: 0;
+        border: 0;
+        box-shadow: none;
+        background: none;
+        height: 62px;
+        min-height: 48px;
+        font-size: 11px;
+        resize: none;
+      }
+      .prompt-actions {
+        font-size: 9px;
+        color: #9aa38e;
+        margin-top: 7px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .send-btn {
+        width: 27px;
+        height: 27px;
+        border-radius: 7px;
+        background: var(--green);
+        color: white;
+        display: grid;
+        place-items: center;
+      }
+      .scope-hint {
+        text-align: center;
+        font-size: 9px;
+        color: #a2aa98;
+        margin-top: 9px;
+      }
+      .quick-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin: 15px 0;
+      }
+      .quick-chips button {
+        border: 1px solid #e7ebdf;
+        border-radius: 6px;
+        padding: 6px 8px;
+        font-size: 10px;
+        color: #7b886e;
+      }
+      .quick-chips button:hover {
+        background: #f0f4e9;
+      }
+      .edit-log {
+        margin-top: 14px;
+        font-size: 11px;
+        line-height: 1.8;
+        color: #6e8062;
+        border-top: 1px solid var(--line);
+        padding-top: 12px;
+      }
+      .variant-dock {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 65px;
+        background: #fff;
+        border-top: 1px solid #e7e9e2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        z-index: 8;
+      }
+      .prototype-label {
+        font:
+          10px Consolas,
+          monospace;
+        color: #92988a;
+        letter-spacing: 0.1em;
+      }
+      .variant-options {
+        display: flex;
+        gap: 4px;
+        padding: 4px;
+        background: #f0f2ec;
+        border-radius: 9px;
+      }
+      .variant-options button {
+        padding: 8px 15px;
+        border-radius: 6px;
+        font-size: 11px;
+        color: #8b9480;
+      }
+      .variant-options button.active {
+        background: white;
+        box-shadow: 0 1px 4px #22391b12;
+        color: #354d31;
+      }
+      .variant-options button b {
+        font-family: Consolas, monospace;
+        margin-right: 7px;
+        font-weight: 400;
+      }
+      .variant-info {
+        font-size: 10px;
+        color: #9aa18e;
+      }
+      .demo-badge {
+        font-size: 10px;
+        background: #f5f0e4;
+        color: #a28c56;
+        border: 1px solid #eae0c5;
+        padding: 4px 7px;
+        border-radius: 4px;
+      }
+      .toast {
+        position: fixed;
+        top: 18px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 30;
+        background: #294d3b;
+        color: white;
+        padding: 12px 19px;
+        border-radius: 9px;
+        box-shadow: 0 6px 24px #18341e22;
+        font-size: 12px;
+        max-width: 90vw;
+        display: none;
+      }
+      .toast.visible {
+        display: block;
+      }
+      dialog {
+        border: 1px solid #e3e7dc;
+        border-radius: 15px;
+        padding: 27px;
+        width: 500px;
+        max-width: 90vw;
+        box-shadow: 0 24px 90px #16381a33;
+        color: var(--ink);
+      }
+      dialog::backdrop {
+        background: #22301d66;
+        backdrop-filter: blur(3px);
+      }
+      dialog h2 {
+        font-size: 18px;
+        line-height: 1.5;
+        margin-bottom: 10px;
+      }
+      dialog p {
+        font-size: 12px;
+        color: #929b86;
+        line-height: 1.9;
+      }
+      dialog .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 24px;
+      }
+      .modal-close {
+        float: right;
+      }
+      dialog.present-dialog {
+        width: min(1300px, 95vw);
+        padding: 12px;
+        background: #f2f3ee;
+      }
+      .present-dialog .slide {
+        width: 100%;
+      }
+      .present-controls {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        padding: 10px 0 0;
+        font-size: 12px;
+      }
+      .present-controls .close-present {
+        position: absolute;
+        right: 14px;
+        bottom: 15px;
+      }
+      .present-dialog::backdrop {
+        background: #141b14ed;
+      }
+      body[data-variant="B"] .workspace {
+        grid-template-columns: minmax(500px, 1fr) 300px;
+      }
+      body[data-variant="B"] .pages {
+        display: none;
+      }
+      body[data-variant="B"] .stage,
+      body[data-variant="B"] .editor-toolbar {
+        display: none;
+      }
+      body[data-variant="B"] .story-intro {
+        display: flex;
+        align-items: end;
+        gap: 20px;
+        padding: 28px 30px 23px;
+        background: #f8f9f4;
+      }
+      body[data-variant="B"] .story-intro h2 {
+        font-size: 24px;
+        font-weight: 550;
+        letter-spacing: -0.05em;
+        margin-bottom: 9px;
+      }
+      body[data-variant="B"] .story-intro p {
+        font-size: 11px;
+        color: #949d89;
+        line-height: 1.9;
+      }
+      body[data-variant="B"] .story-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 24px;
+        padding: 4px 30px 25px;
+        overflow: auto;
+        flex: 1;
+        align-content: start;
+        background: #f8f9f4;
+      }
+      body[data-variant="B"] .story-card {
+        text-align: left;
+        padding: 0;
+        border: 1px solid #e5e9dd;
+        border-radius: 7px;
+        background: #fff;
+        overflow: hidden;
+      }
+      body[data-variant="B"] .story-card.selected {
+        border-color: #809a71;
+        box-shadow: 0 0 0 2px #809a7122;
+      }
+      body[data-variant="B"] .story-card .story-caption {
+        display: flex;
+        align-items: center;
+        padding: 12px 13px;
+        gap: 9px;
+        font-size: 11px;
+      }
+      body[data-variant="B"] .story-caption span {
+        font:
+          10px Consolas,
+          monospace;
+        color: #a1aa93;
+      }
+      body[data-variant="B"] .story-caption .pill {
+        margin-left: auto;
+        font:
+          9px "Microsoft YaHei",
+          sans-serif;
+      }
+      body[data-variant="B"] .canvas-footer {
+        background: #f8f9f4;
+      }
+      body[data-variant="C"] .workspace {
+        grid-template-columns: minmax(360px, 1fr) 294px;
+        grid-template-rows: minmax(0, 1fr) 150px;
+        background: #222921;
+      }
+      body[data-variant="C"] .editor {
+        grid-column: 1;
+        grid-row: 1;
+        background: #262d25;
+      }
+      body[data-variant="C"] .pages {
+        grid-column: 1;
+        grid-row: 2;
+        background: #20271f;
+        border-right: 0;
+        border-top: 1px solid #394135;
+      }
+      body[data-variant="C"] .pages .panel-top,
+      body[data-variant="C"] .add-page {
+        display: none;
+      }
+      body[data-variant="C"] .page-list {
+        flex-direction: row;
+        padding: 17px 23px;
+        gap: 17px;
+      }
+      body[data-variant="C"] .page-card {
+        width: 150px;
+      }
+      body[data-variant="C"] .page-card .caption {
+        color: #a7b39b;
+      }
+      body[data-variant="C"] .page-card.selected .thumb-frame {
+        outline-color: #a6bd8f;
+      }
+      body[data-variant="C"] .inspector {
+        grid-column: 2;
+        grid-row: 1/3;
+      }
+      body[data-variant="C"] .editor-toolbar {
+        border-color: #3b4335;
+        color: #bac4b0;
+      }
+      body[data-variant="C"] .editor-toolbar .btn {
+        color: #c2ccb7;
+        border-color: #4d5844;
+      }
+      body[data-variant="C"] .canvas-footer {
+        border-color: #3b4335;
+      }
+      body[data-variant="C"] .canvas-footer button {
+        color: #bdc8b1;
+      }
+      body[data-variant="C"] .stage {
+        padding: 22px 45px 12px;
+      }
+      body[data-variant="C"] .canvas-help {
+        color: #79876d;
+      }
+      body[data-variant="C"] .stage-label {
+        color: #839075;
+      }
+      body[data-variant="C"] .slide-wrap {
+        max-width: 950px;
+        box-shadow: 0 12px 35px #0e170d33;
+      }
+      @media (min-width: 1600px) {
+        .workspace {
+          grid-template-columns: 230px minmax(360px, 1fr) 330px;
+        }
+        .page-list {
+          padding: 20px;
+        }
+        .stage {
+          padding: 40px 55px;
+        }
+        .inspector-body {
+          padding: 25px;
+        }
+      }
+      @media (max-width: 1150px) {
+        .workspace {
+          grid-template-columns: 170px minmax(330px, 1fr) 270px;
+        }
+        .flow {
+          display: none;
+        }
+        .header,
+        .doc-head {
+          padding-left: 18px;
+          padding-right: 18px;
+        }
+        .stage {
+          padding: 22px 22px;
+        }
+        .variant-info {
+          display: none;
+        }
+        .doc-name {
+          width: 275px;
+        }
+        .inspector-body {
+          padding: 18px 14px;
+        }
+        .page-list {
+          padding: 14px;
+        }
+        .variant-options button {
+          padding: 8px 12px;
+        }
+      }
+      @media (max-width: 900px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+        .app-rail {
+          display: none;
+        }
+        .workspace {
+          grid-template-columns: 150px minmax(280px, 1fr);
+        }
+        .inspector {
+          display: none;
+        }
+        .flow,
+        .header .demo-badge {
+          display: none;
+        }
+        .doc-name {
+          width: 240px;
+        }
+        .variant-dock {
+          gap: 7px;
+        }
+        .prototype-label {
+          display: none;
+        }
+        body[data-variant="B"] .workspace {
+          grid-template-columns: 1fr;
+        }
+        body[data-variant="C"] .workspace {
+          grid-template-columns: 1fr;
+        }
+        .header {
+          height: 55px;
+          min-height: 55px;
+        }
+        .doc-head {
+          gap: 7px;
+        }
+        .crumb {
+          font-size: 11px;
+        }
+        .doc-head .btn {
+          font-size: 11px;
+          padding: 7px;
+        }
+        .stage {
+          padding: 22px 18px;
+        }
+        .doc-sub {
+          font-size: 10px;
+        }
+        .variant-options button {
+          padding: 8px 10px;
+        }
+        .variant-dock .icon-btn {
+          display: none;
+        }
+      }
+      @media (max-width: 520px) {
+        .shell {
+          min-height: 600px;
+        }
+        .header {
+          padding: 0 13px;
+          gap: 9px;
+        }
+        .logo {
+          width: 66px;
+        }
+        .doc-head {
+          padding: 12px;
+          flex-wrap: wrap;
+          height: auto;
+          min-height: 105px;
+        }
+        .doc-head > .grow {
+          flex-basis: 100%;
+        }
+        .doc-head > .btn {
+          flex: 1;
+        }
+        .workspace {
+          grid-template-columns: 90px minmax(0, 1fr);
+        }
+        .page-list {
+          padding: 13px 9px;
+        }
+        .page-card .caption {
+          font-size: 9px;
+          gap: 3px;
+          overflow: hidden;
+          white-space: nowrap;
+        }
+        .pages .panel-top {
+          padding: 0 9px;
+        }
+        .tabs {
+          gap: 10px;
+        }
+        .page-list {
+          gap: 14px;
+        }
+        .pages .add-page {
+          font-size: 10px;
+          padding: 5px;
+          margin: 9px;
+        }
+        .stage {
+          padding: 18px 12px;
+        }
+        .canvas-help {
+          display: none;
+        }
+        .editor-toolbar {
+          padding: 0 9px;
+          font-size: 10px;
+        }
+        .canvas-footer {
+          padding: 0 10px;
+          font-size: 10px;
+        }
+        .stage-label {
+          font-size: 9px;
+        }
+        .variant-options button {
+          font-size: 10px;
+          padding: 8px;
+        }
+        .variant-dock {
+          height: 60px;
+        }
+        .variant-options button b {
+          margin-right: 4px;
+        }
+        .story-intro {
+          padding: 20px !important;
+        }
+        .story-intro h2 {
+          font-size: 20px !important;
+        }
+        .story-grid {
+          padding: 0 17px 20px !important;
+          gap: 14px !important;
+          grid-template-columns: 1fr !important;
+        }
+        body[data-variant="C"] .stage {
+          padding: 15px;
+        }
+        body[data-variant="C"] .page-card {
+          width: 120px;
+        }
+        body[data-variant="C"] .workspace {
+          grid-template-rows: minmax(0, 1fr) 130px;
+        }
+        .canvas-footer > .small {
+          display: none;
+        }
+      }
+      .stage {
+        container-type: size;
+      }
+      .slide-wrap,
+      .stage-label {
+        width: min(100%, calc((100cqh - 70px) * 1.777778));
+      }
+      .inspector-body > h3,
+      .inspector-body > .notice {
+        display: none;
+      }
+      .inspector-body > .info-block {
+        margin: 0 0 16px;
+        padding: 10px 12px;
+      }
+      .inspector-body > .info-block .mini-list {
+        display: none;
+      }
+      .inspector-bottom > .quick-chips {
+        display: none;
+      }
+      .prompt-box textarea {
+        height: 46px;
+      }
+      .inspector-bottom {
+        padding: 12px 16px;
+      }
+      .field {
+        margin-top: 12px;
+      }
+      .slide.cover.compare h2,
+      .slide.cover.focus h2 {
+        font-family: inherit;
+        font-size: 4cqw;
+        margin-top: 2cqw;
+        max-width: 100%;
+      }
+      .slide.cover.compare .slide-sub,
+      .slide.cover.focus .slide-sub {
+        font-size: 1.3cqw;
+        margin-top: 1cqw;
+      }
+      .slide.cover.compare .slide-blocks,
+      .slide.cover.focus .slide-blocks {
+        margin-top: 2cqw;
+      }
+      body[data-variant="B"] .story-grid {
+        min-height: 0;
+        grid-auto-rows: max-content;
+      }
+      body[data-variant="B"] .story-card {
+        align-self: start;
+      }
+      body[data-variant="C"] .stage {
+        padding: 10px 28px;
+      }
+      body[data-variant="C"] .slide-wrap,
+      body[data-variant="C"] .stage-label {
+        width: min(100%, calc((100cqh - 30px) * 1.777778));
+      }
+      body[data-variant="C"] .canvas-help {
+        display: none;
+      }
+      @media (max-width: 520px) {
+        .stage {
+          container-type: normal;
+        }
+        .slide-wrap,
+        .stage-label,
+        body[data-variant="C"] .slide-wrap,
+        body[data-variant="C"] .stage-label {
+          width: 100%;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
+  </head>
+  <body data-variant="A">
+    <svg style="display: none" aria-hidden="true">
+      <defs>
+        <symbol id="i-grid" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="7" height="7" rx="1.5" />
+          <rect x="14" y="3" width="7" height="7" rx="1.5" />
+          <rect x="3" y="14" width="7" height="7" rx="1.5" />
+          <rect x="14" y="14" width="7" height="7" rx="1.5" />
+        </symbol>
+        <symbol id="i-slide" viewBox="0 0 24 24">
+          <rect x="3" y="4" width="18" height="13" rx="2" />
+          <path d="M12 17v4m-4 0 4-4 4 4M8 9h8m-8 3h5" />
+        </symbol>
+        <symbol id="i-chat" viewBox="0 0 24 24">
+          <path
+            d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-2 2v-9.5A8.5 8.5 0 1 1 21 11.5Z"
+          />
+          <path d="M7 9h9m-9 4h5" />
+        </symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24">
+          <path d="M12 5v14M5 12h14" />
+        </symbol>
+        <symbol id="i-arrow" viewBox="0 0 24 24">
+          <path d="m9 5 7 7-7 7" />
+        </symbol>
+        <symbol id="i-spark" viewBox="0 0 24 24">
+          <path
+            d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4L12 3Zm7-1v5m-2.5-2.5h5"
+          />
+        </symbol>
+        <symbol id="i-play" viewBox="0 0 24 24">
+          <path d="m8 4 12 8-12 8V4Z" />
+        </symbol>
+        <symbol id="i-down" viewBox="0 0 24 24">
+          <path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" />
+        </symbol>
+        <symbol id="i-send" viewBox="0 0 24 24">
+          <path d="M12 19V5m-6 6 6-6 6 6" />
+        </symbol>
+        <symbol id="i-note" viewBox="0 0 24 24">
+          <path d="M4 4h16v13H9l-5 4V4Zm4 5h8m-8 4h5" />
+        </symbol>
+        <symbol id="i-close" viewBox="0 0 24 24">
+          <path d="m6 6 12 12M6 18 18 6" />
+        </symbol>
+        <symbol id="i-file" viewBox="0 0 24 24">
+          <path d="M5 3h9l5 5v13H5V3Zm9 0v6h5M8 13h8m-8 4h5" />
+        </symbol>
+      </defs>
+    </svg>
+    <div class="shell">
+      <nav class="app-rail" aria-label="平台导航示意">
+        <div class="rail-mark">o.</div>
+        <button class="rail-btn" data-action="platform" aria-label="工作台">
+          <svg class="icon"><use href="#i-grid" /></svg></button
+        ><button class="rail-btn" data-action="platform" aria-label="对话">
+          <svg class="icon"><use href="#i-chat" /></svg></button
+        ><button
+          class="rail-btn active"
+          data-action="platform"
+          aria-label="创作"
+        >
+          <svg class="icon"><use href="#i-slide" /></svg>
+        </button>
+        <div class="grow"></div>
+        <div class="avatar" title="示例用户">我</div>
+      </nav>
+      <main class="app">
+        <header class="header">
+          <img
+            class="logo"
+            alt="Octop"
+            src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAvEAAAEhCAYAAAD27v9TAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAASbhJREFUeAHt3W+QJOd9H/bv0zOzd8ABxDGkKNlRhIbLqTJkRziIKMkFK8ZcqlJM+II4OFV0krKCvUq5IhdN4sBYoFSq5OZsq2yKjnEITamSvLg9VxImSlVwiFNxKi9yg6gipZLYOESORbriXJ9IWgRJEYt/h72bP4+fXz/9zDzzbPfOzG73zHTP9wP0dU93z0zP7Ozst5/+9dMAEREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREREVHDKNBKaZw9CxyYYRibW2YMM0Rns+mMejS41x1v2T4wNgP27bQMZxKF/X0QERER0VZgiK+ADervdU04j81NE8i1Getz5u3OQnslJMQndqxumbEJ/tqMH7rFgE9ERETULAzxJ6RxOgYGJqBHz9igDhmqCurHJSH+lg3349eBjgn2BwmIiIiIqJYY4pdkQ/vogpl8wgTirnkLY9SSSmxLvXrN3DChfnALRERERFQLDPFz2NKY96UU5lkT2i/UN7TPI6EeffMaTah/uM8SHCIiIqLNxRCfI6tpv5CVyEir+6aVx6zCDdtKf+YGAz0RERHRZmGI92i0u+YteX6Lg3sRE+j1dYXRDRARERHR2m19iM/KZV4wk5fA4D6HK7lpXeGJsURERETrs7Uh3ra647IZuqDj6JuPj2mdH+yBiIiIiFZqq0K8bXX/YNdMvmD7bqeTS1vnr5jW+T5b54mIiIhWYytCPEtmViHtsvIG0H6FYZ6IiIioWo0O8Qzv66L2WDdPREREVJ1GhniG902Q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"
+          />
+          <div class="divider"></div>
+          <div class="crumb">
+            创作 <span style="padding: 0 10px; color: #c5c9c0">/</span>
+            <b>PPT 工作室</b>
+          </div>
+          <span class="grow"></span
+          ><span class="demo-badge">交互原型 · 示例内容</span
+          ><button class="btn small" data-action="new">
+            <svg class="icon"><use href="#i-plus" /></svg>新建演示稿
+          </button>
+        </header>
+        <section class="doc-head">
+          <div class="grow">
+            <input
+              id="doc-name"
+              class="doc-name"
+              aria-label="演示稿名称"
+              value="团队 AI 工作方式提案"
+            />
+            <div class="row doc-sub" style="margin-top: 6px">
+              <span class="dot"></span
+              ><span id="memory-status">仅在本次预览中编辑</span><span>·</span
+              ><span id="page-count">7 页</span><span>·</span
+              ><span>16:9 宽屏</span>
+            </div>
+          </div>
+          <div class="flow">
+            <span class="done"><i>✓</i>内容大纲</span
+            ><span class="done"><i>✓</i>视觉风格</span
+            ><span class="current"><i>3</i>制作与修改</span>
+          </div>
+          <button class="btn" data-action="present">
+            <svg class="icon"><use href="#i-play" /></svg>放映预览</button
+          ><button class="btn primary" data-action="export">
+            <svg class="icon"><use href="#i-down" /></svg>导出 PPTX
+          </button>
+        </section>
+        <div class="workspace">
+          <aside class="pages">
+            <div class="panel-top">
+              <div class="tabs">
+                <button data-view="pages" class="active">页面</button
+                ><button data-view="outline">大纲</button>
+              </div>
+              <span class="grow"></span
+              ><span class="small muted" id="rail-count">7</span>
+            </div>
+            <div class="page-list" id="page-list"></div>
+            <button class="btn add-page" data-action="add">
+              <svg class="icon"><use href="#i-plus" /></svg>添加页面
+            </button>
+          </aside>
+          <section class="editor" aria-label="演示稿画布">
+            <div class="editor-toolbar">
+              <span class="page-kind" id="page-kind">01 / 封面</span
+              ><span class="grow"></span
+              ><span class="small">纸感 · 森林绿</span>
+              <div class="divider"></div>
+              <button class="btn" data-action="style">切换风格</button>
+            </div>
+            <div class="story-intro">
+              <div class="grow">
+                <div
+                  class="small muted"
+                  style="letter-spacing: 0.12em; margin-bottom: 10px"
+                >
+                  STORY FIRST
+                </div>
+                <h2>先讲好故事，再打磨每一页。</h2>
+                <p>从全局梳理内容节奏，点击任意页面开始编辑。</p>
+              </div>
+              <button class="btn" data-action="add">
+                <svg class="icon"><use href="#i-plus" /></svg>添加页面
+              </button>
+            </div>
+            <div class="story-grid" id="story-grid"></div>
+            <div class="stage">
+              <div class="stage-label">
+                <span id="stage-caption">封面 · 开场与核心主张</span
+                ><span>SLIDE <span id="stage-index">01</span></span>
+              </div>
+              <div class="slide-wrap" id="main-slide"></div>
+              <div class="canvas-help">
+                <svg class="icon" style="width: 13px; height: 13px">
+                  <use href="#i-spark" /></svg
+                >在右侧编辑内容，或描述你想如何修改这一页
+              </div>
+            </div>
+            <div class="notes-input" id="notes-panel">
+              <textarea
+                id="notes"
+                aria-label="演讲备注"
+                placeholder="为这一页写下演讲备注…"
+              ></textarea>
+            </div>
+            <footer class="canvas-footer">
+              <button class="icon-btn" data-action="prev" aria-label="上一页">
+                <svg class="icon" style="transform: rotate(180deg)">
+                  <use href="#i-arrow" />
+                </svg></button
+              ><span id="current-label">1 / 7</span
+              ><button class="icon-btn" data-action="next" aria-label="下一页">
+                <svg class="icon"><use href="#i-arrow" /></svg></button
+              ><span class="grow"></span
+              ><button class="btn" data-action="notes">
+                <svg class="icon" style="width: 13px; height: 13px">
+                  <use href="#i-note" /></svg
+                >演讲备注</button
+              ><span class="small" style="margin-left: 8px">适应窗口</span>
+            </footer>
+          </section>
+          <aside class="inspector">
+            <div class="panel-top">
+              <div class="assistant-dot">
+                <svg class="icon" style="width: 14px; height: 14px">
+                  <use href="#i-spark" />
+                </svg>
+              </div>
+              <span class="assistant-title">AI 制作助手</span
+              ><span class="grow"></span><span class="pill">单页修改</span>
+            </div>
+            <div class="inspector-body">
+              <h3>让每一页，都更接近你的想法。</h3>
+              <p class="notice">
+                编辑内容或给出修改方向，<br />修改范围始终清楚可控。
+              </p>
+              <div class="info-block">
+                <h3>
+                  <svg class="icon" style="width: 13px; height: 13px">
+                    <use href="#i-file" /></svg
+                  >本次演示稿
+                </h3>
+                <p>产品方案 · 面向团队成员<br />纸感极简 · 森林绿 · 16:9</p>
+                <div class="mini-list">
+                  ✓ 内容结构已就绪（示例）<br />✓ 全稿视觉风格保持一致
+                </div>
+              </div>
+              <div class="inspector-tabs">
+                <button class="active" data-tab="content">页面内容</button
+                ><button data-tab="ai">AI 修改</button>
+              </div>
+              <div id="content-panel">
+                <div class="row">
+                  <strong style="font-size: 11px" id="inspector-page"
+                    >第 1 页 · 封面</strong
+                  ><span class="grow"></span
+                  ><span class="small muted">即时预览</span>
+                </div>
+                <label class="field"
+                  >页面标题<textarea
+                    id="title-input"
+                    style="height: 77px"
+                    maxlength="100"
+                  ></textarea></label
+                ><label class="field"
+                  >正文 / 说明<textarea
+                    id="body-input"
+                    maxlength="1000"
+                  ></textarea></label
+                ><label class="field">版式</label>
+                <div class="layout-options">
+                  <button
+                    class="layout-option active"
+                    data-layout="default"
+                    aria-label="默认版式"
+                  >
+                    <i style="flex: 2"></i><i></i></button
+                  ><button
+                    class="layout-option"
+                    data-layout="compare"
+                    aria-label="左右对比版式"
+                  >
+                    <i></i><i></i></button
+                  ><button
+                    class="layout-option"
+                    data-layout="focus"
+                    aria-label="纵向条目版式"
+                  >
+                    <i
+                      style="
+                        flex: none;
+                        width: 100%;
+                        height: 5px;
+                        box-shadow:
+                          0 7px #d9e1d0,
+                          0 14px #d9e1d0;
+                      "
+                    ></i>
+                  </button>
+                </div>
+              </div>
+              <div id="ai-panel" hidden>
+                <h3>只修改当前页</h3>
+                <p class="notice">
+                  选择一个方向，体验修改前后的变化。这里使用本地规则演示，不会调用模型。
+                </p>
+                <div class="quick-chips">
+                  <button data-prompt="精简这一页的文案">精简文案</button
+                  ><button data-prompt="改为左右对比版式">左右对比</button
+                  ><button data-prompt="改为纵向条目版式">纵向条目</button>
+                </div>
+                <div class="edit-log" id="edit-log">
+                  选择下面的快捷指令，预览单页修改效果。
+                </div>
+              </div>
+            </div>
+            <div class="inspector-bottom">
+              <div class="quick-chips" style="margin: 0 0 10px">
+                <button data-prompt="精简这一页的文案">精简文案</button
+                ><button data-prompt="改为左右对比版式">换个版式</button>
+              </div>
+              <div class="prompt-box">
+                <textarea
+                  id="prompt-input"
+                  aria-label="描述页面修改"
+                  placeholder="例如：改成左右对比，重点更突出…"
+                ></textarea>
+                <div class="prompt-actions">
+                  <span id="scope-label">仅修改第 1 页 · 模拟 AI</span
+                  ><button
+                    class="send-btn"
+                    data-action="apply"
+                    aria-label="应用模拟修改"
+                  >
+                    <svg class="icon"><use href="#i-send" /></svg>
+                  </button>
+                </div>
+              </div>
+              <p class="scope-hint">未连接模型 · 不消耗 Token · 刷新后重置</p>
+            </div>
+          </aside>
+        </div>
+      </main>
+    </div>
+    <nav class="variant-dock" aria-label="原型方向切换">
+      <span class="prototype-label">DESIGN EXPLORATION</span
+      ><button
+        class="icon-btn"
+        data-action="variant-prev"
+        aria-label="上一个方向"
+      >
+        <svg class="icon" style="transform: rotate(180deg)">
+          <use href="#i-arrow" />
+        </svg>
+      </button>
+      <div class="variant-options">
+        <button data-variant="A"><b>A</b>制作工作台</button
+        ><button data-variant="B"><b>B</b>大纲与总览</button
+        ><button data-variant="C"><b>C</b>沉浸画布</button>
+      </div>
+      <button
+        class="icon-btn"
+        data-action="variant-next"
+        aria-label="下一个方向"
+      >
+        <svg class="icon"><use href="#i-arrow" /></svg></button
+      ><span class="variant-info" id="variant-info"
+        >三栏布局，适合逐页精修</span
+      >
+    </nav>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <dialog id="export-dialog">
+      <button
+        class="icon-btn modal-close"
+        data-close="export-dialog"
+        aria-label="关闭"
+      >
+        <svg class="icon"><use href="#i-close" /></svg></button
+      ><span class="chip">功能预览</span>
+      <h2 style="margin-top: 17px">把作品带走，继续创作。</h2>
+      <p>正式版将在这里导出可编辑的 PPTX，包含当前版本的页面与演讲备注。</p>
+      <div class="info-block">
+        <h3>当前为页面原型</h3>
+        <p>
+          尚未接入 ppt-master 和导出服务，因此不会下载一个伪装成 PPTX
+          的文件。可以先体验页面内容编辑、布局切换和放映预览。
+        </p>
+      </div>
+      <div class="actions">
+        <button class="btn primary" data-close="export-dialog">继续体验</button>
+      </div>
+    </dialog>
+    <dialog id="new-dialog">
+      <button
+        class="icon-btn modal-close"
+        data-close="new-dialog"
+        aria-label="关闭"
+      >
+        <svg class="icon"><use href="#i-close" /></svg></button
+      ><span class="chip">新建演示稿</span>
+      <h2 style="margin-top: 17px">这一次，你想讲什么？</h2>
+      <p>
+        试着填一个主题，体验从大纲开始的创作流程。当前草稿会被替换，所有内容仅保存在本次预览中。
+      </p>
+      <form id="new-form">
+        <label class="field"
+          >演示稿主题<input
+            id="new-title"
+            required
+            maxlength="60"
+            placeholder="例如：下一季度产品规划" /></label
+        ><label class="field"
+          >面向谁讲述？<select id="new-audience">
+            <option>团队成员</option>
+            <option>客户与合作伙伴</option>
+            <option>管理层</option>
+            <option>课堂学员</option>
+          </select></label
+        >
+        <div class="actions">
+          <button type="button" class="btn" data-close="new-dialog">取消</button
+          ><button class="btn primary" type="submit">创建示例大纲</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="present-dialog" class="present-dialog">
+      <div id="present-slide"></div>
+      <div class="present-controls">
+        <button class="icon-btn" data-action="prev" aria-label="放映上一页">
+          <svg class="icon" style="transform: rotate(180deg)">
+            <use href="#i-arrow" />
+          </svg></button
+        ><span id="present-count"></span
+        ><button class="icon-btn" data-action="next" aria-label="放映下一页">
+          <svg class="icon"><use href="#i-arrow" /></svg></button
+        ><button class="btn close-present" data-close="present-dialog">
+          退出放映
+        </button>
+      </div>
+    </dialog>
+    <script>
+      "use strict";
+      const $ = (id) => document.getElementById(id);
+      const esc = (s) =>
+        String(s).replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[c],
+        );
+      const initialSlides = [
+        {
+          kind: "封面",
+          title: "把想法，\n变成下一步。",
+          body: "团队 AI 工作方式提案\n从零散对话，走向持续创作。",
+          type: "cover",
+          blocks: [],
+        },
+        {
+          kind: "现状与机会",
+          title: "好想法，不应该\n停留在聊天记录里。",
+          body: "让资料、讨论与成果，沿着同一条线持续推进。",
+          type: "compare",
+          blocks: [
+            ["零散对话", "资料散落在不同窗口\n每次修改都要重新交代背景"],
+            ["持续协作", "围绕项目组织资料和任务\n让成果与上下文一起积累"],
+          ],
+        },
+        {
+          kind: "核心方案",
+          title: "一个工作台，\n串起完整工作流。",
+          body: "从内容输入到成品交付，保留每一步的上下文。",
+          type: "normal",
+          blocks: [
+            ["整理资料", "把文档与想法\n组织为清晰的内容结构"],
+            ["生成成果", "让内容形成\n可预览、可继续编辑的作品"],
+            ["持续修改", "从具体反馈出发\n逐步完善每一次表达"],
+          ],
+        },
+        {
+          kind: "工作方式",
+          title: "你把握方向，\nAI 帮你推进。",
+          body: "关键节点由你确认，重复工作交给助手。",
+          type: "dark-slide",
+          blocks: [
+            ["明确目标", "先确定受众与核心信息"],
+            ["共同创作", "先确认大纲，再逐页展开"],
+            ["打磨表达", "保留好的部分，修改具体页面"],
+          ],
+        },
+        {
+          kind: "应用场景",
+          title: "从一次提案，\n到日常工作的每一面。",
+          body: "同一套创作方法，适配不同的表达任务。",
+          type: "normal",
+          blocks: [
+            ["产品介绍", "把能力整理成\n客户听得懂的价值"],
+            ["工作汇报", "从过程与结果中\n提炼真正重要的进展"],
+            ["方案提案", "说明问题与路径\n推动下一步决策"],
+          ],
+        },
+        {
+          kind: "推进步骤",
+          title: "从一个真实任务开始。",
+          body: "小步验证，保留反馈，再扩展到更多场景。",
+          type: "normal",
+          blocks: [
+            ["01  选择任务", "选一份正在准备的演示稿"],
+            ["02  完成闭环", "从资料整理走到实际讲述"],
+            ["03  沉淀方法", "保留有效的结构与风格"],
+          ],
+        },
+        {
+          kind: "结束页",
+          title: "让下一次表达，\n从这里开始。",
+          body: "把时间留给思考，把想法交付为作品。",
+          type: "closing dark-slide",
+          blocks: [],
+        },
+      ];
+      let slides = structuredClone(initialSlides),
+        selected = 0,
+        view = "pages",
+        variant = "A",
+        inspectorTab = "content",
+        toastTimer;
+      function slideMarkup(s, i) {
+        const layout = s.layout || "default";
+        const cls = [
+          "slide",
+          s.type,
+          layout === "compare" ? "compare" : "",
+          layout === "focus" ? "focus" : "",
+        ].join(" ");
+        const blocks = s.blocks.length
+          ? s.blocks
+          : [
+              ["核心主张", s.body],
+              ["下一步", "明确目标，继续完善表达。"],
+            ];
+        return `<div class="${cls}"><div class="slide-in"><div class="slide-kicker">OCTOP · PRODUCT BRIEF</div><h2>${esc(
+          s.title,
+        )}</h2><p class="slide-sub">${esc(s.body)}</p>${
+          s.type === "cover" && layout === "default"
+            ? '<div class="cover-art"><div class="paper back"></div><div class="paper"></div><div class="paper front"><div class="paper-label">FROM IDEA TO IMPACT</div><div class="paper-big">Aa.</div><div class="paper-line"></div><div class="paper-line short"></div><div class="paper-bottom">灵感 / 结构 / 表达</div></div></div>'
+            : ""
+        }${
+          (!s.type.includes("cover") && !s.type.includes("closing")) ||
+          layout !== "default"
+            ? `<div class="slide-blocks">${blocks
+                .map(
+                  (b, j) =>
+                    `<div class="slide-block"><b>0${j + 1}</b><h3>${esc(
+                      b[0],
+                    )}</h3><p>${esc(b[1])}</p></div>`,
+                )
+                .join("")}</div>`
+            : ""
+        }<div class="slide-footer"><span>TEAM AI WORKFLOW · 示例演示稿</span><span>${String(
+          i + 1,
+        ).padStart(2, "0")} / ${String(slides.length).padStart(
+          2,
+          "0",
+        )}</span></div></div></div>`;
+      }
+      function renderRail() {
+        $("page-list").innerHTML =
+          view === "outline"
+            ? `<p class="outline-note">先整理每页要讲什么。修改标题会同步到页面。</p>${slides
+                .map(
+                  (s, i) =>
+                    `<label class="outline-item"><span>${String(i + 1).padStart(
+                      2,
+                      "0",
+                    )}</span><input aria-label="第 ${
+                      i + 1
+                    } 页大纲标题" data-outline="${i}" value="${esc(
+                      s.title.replace(/\n/g, " "),
+                    )}" maxlength="100"></label>`,
+                )
+                .join("")}`
+            : slides
+                .map(
+                  (s, i) =>
+                    `<button class="page-card ${
+                      selected === i ? "selected" : ""
+                    }" data-page="${i}" aria-label="选择第 ${i + 1} 页：${esc(
+                      s.kind,
+                    )}" aria-pressed="${
+                      selected === i
+                    }"><div class="thumb-frame">${slideMarkup(
+                      s,
+                      i,
+                    )}</div><div class="caption"><span class="number">${String(
+                      i + 1,
+                    ).padStart(2, "0")}</span><span>${esc(
+                      s.kind,
+                    )}</span><span class="tick">✓</span></div></button>`,
+                )
+                .join("");
+      }
+      function renderStage() {
+        const s = slides[selected];
+        $("main-slide").innerHTML = slideMarkup(s, selected);
+        $("story-grid").innerHTML = slides
+          .map(
+            (s, i) =>
+              `<button class="story-card ${
+                i === selected ? "selected" : ""
+              }" data-page="${i}" aria-label="总览中选择第 ${
+                i + 1
+              } 页"><div>${slideMarkup(
+                s,
+                i,
+              )}</div><div class="story-caption"><span>${String(i + 1).padStart(
+                2,
+                "0",
+              )}</span>${esc(s.kind)}${
+                i === selected ? '<b class="pill">正在编辑</b>' : ""
+              }</div></button>`,
+          )
+          .join("");
+        $("page-count").textContent = slides.length + " 页";
+        $("rail-count").textContent = slides.length;
+        $("stage-caption").textContent =
+          s.kind + " · " + (selected === 0 ? "开场与核心主张" : "内容与表达");
+        $("stage-index").textContent = String(selected + 1).padStart(2, "0");
+        $("page-kind").textContent =
+          String(selected + 1).padStart(2, "0") + " / " + s.kind;
+        $("current-label").textContent = `${selected + 1} / ${slides.length}`;
+        $("inspector-page").textContent = `第 ${selected + 1} 页 · ${s.kind}`;
+        $("scope-label").textContent = `仅修改第 ${selected + 1} 页 · 模拟 AI`;
+        document.querySelectorAll("[data-layout]").forEach((b) => {
+          b.classList.toggle(
+            "active",
+            b.dataset.layout === (s.layout || "default"),
+          );
+          b.setAttribute(
+            "aria-pressed",
+            String(b.dataset.layout === (s.layout || "default")),
+          );
+        });
+        document
+          .querySelectorAll('[data-action="prev"]')
+          .forEach((b) => (b.disabled = selected === 0));
+        document
+          .querySelectorAll('[data-action="next"]')
+          .forEach((b) => (b.disabled = selected === slides.length - 1));
+        if ($("present-dialog").open) {
+          $("present-slide").innerHTML = slideMarkup(s, selected);
+          $("present-count").textContent = `${selected + 1} / ${slides.length}`;
+        }
+      }
+      function syncInputs() {
+        const s = slides[selected];
+        $("title-input").value = s.title;
+        $("body-input").value = s.body;
+        $("notes").value = s.notes || "";
+      }
+      function render() {
+        renderRail();
+        renderStage();
+        syncInputs();
+      }
+      function selectPage(i) {
+        selected = Math.max(0, Math.min(slides.length - 1, i));
+        render();
+      }
+      function notify(text) {
+        $("toast").textContent = text;
+        $("toast").classList.add("visible");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(
+          () => $("toast").classList.remove("visible"),
+          3500,
+        );
+      }
+      function markEdited() {
+        $("memory-status").textContent = "本次预览已修改 · 刷新后重置";
+      }
+      function setVariant(v) {
+        variant = ["A", "B", "C"].includes(v) ? v : "A";
+        document.body.dataset.variant = variant;
+        document.querySelectorAll(".variant-options button").forEach((b) => {
+          b.classList.toggle("active", b.dataset.variant === variant);
+          b.setAttribute("aria-pressed", String(b.dataset.variant === variant));
+        });
+        $("variant-info").textContent = {
+          A: "三栏布局，适合逐页精修",
+          B: "先看全局，梳理内容和讲述节奏",
+          C: "聚焦画布，底部切换页面",
+        }[variant];
+        const u = new URL(location.href);
+        u.searchParams.set("variant", variant);
+        history.replaceState(null, "", u);
+        render();
+      }
+      function setTab(t) {
+        inspectorTab = t;
+        document
+          .querySelectorAll("[data-tab]")
+          .forEach((b) => b.classList.toggle("active", b.dataset.tab === t));
+        $("content-panel").hidden = t !== "content";
+        $("ai-panel").hidden = t !== "ai";
+      }
+      function applyEdit() {
+        const p = $("prompt-input").value.trim();
+        if (!p) {
+          notify("先输入修改方向，或选择一个快捷指令。");
+          return;
+        }
+        const s = slides[selected];
+        let message;
+        if (/对比/.test(p)) {
+          s.layout = "compare";
+          message = "已切换为左右对比版式。";
+        } else if (/条目|纵向/.test(p)) {
+          s.layout = "focus";
+          message = "已切换为纵向条目版式。";
+        } else if (/精简/.test(p)) {
+          s.body =
+            s.body
+              .split(/[。\n]/)
+              .map((x) => x.trim())
+              .filter(Boolean)[0] || s.body;
+          message = "已保留第一句核心说明。";
+        } else {
+          notify(
+            "此原型支持“精简文案”“左右对比”“纵向条目”三种本地演示；自由指令待接入模型。",
+          );
+          return;
+        }
+        markEdited();
+        render();
+        setTab("ai");
+        $("edit-log").textContent = `模拟修改 · 第 ${
+          selected + 1
+        } 页：${message}其他页面保持不变。`;
+        $("prompt-input").value = "";
+        notify("本地演示：" + message);
+      }
+      document.addEventListener("click", (e) => {
+        const b = e.target.closest("button");
+        if (!b) return;
+        if (b.dataset.page !== undefined) {
+          selectPage(Number(b.dataset.page));
+          return;
+        }
+        if (b.dataset.variant) {
+          setVariant(b.dataset.variant);
+          return;
+        }
+        if (b.dataset.close) {
+          $(b.dataset.close).close();
+          return;
+        }
+        if (b.dataset.view) {
+          view = b.dataset.view;
+          document
+            .querySelectorAll("[data-view]")
+            .forEach((x) =>
+              x.classList.toggle("active", x.dataset.view === view),
+            );
+          renderRail();
+          return;
+        }
+        if (b.dataset.tab) {
+          setTab(b.dataset.tab);
+          return;
+        }
+        if (b.dataset.layout) {
+          slides[selected].layout = b.dataset.layout;
+          markEdited();
+          renderRail();
+          renderStage();
+          return;
+        }
+        if (b.dataset.prompt) {
+          $("prompt-input").value = b.dataset.prompt;
+          $("prompt-input").focus();
+          return;
+        }
+        switch (b.dataset.action) {
+          case "prev":
+            selectPage(selected - 1);
+            break;
+          case "next":
+            selectPage(selected + 1);
+            break;
+          case "present":
+            $("present-dialog").showModal();
+            renderStage();
+            break;
+          case "export":
+            $("export-dialog").showModal();
+            break;
+          case "new":
+            $("new-dialog").showModal();
+            $("new-title").focus();
+            break;
+          case "add":
+            if (slides.length >= 30) {
+              notify("原型最多展示 30 页。");
+              break;
+            }
+            slides.splice(selected + 1, 0, {
+              kind: "新增内容",
+              title: "给这一页，一个清晰的主张。",
+              body: "在右侧填写你想表达的内容。",
+              type: "normal",
+              blocks: [
+                ["关键观点", "说明最重要的信息。"],
+                ["支撑内容", "补充事实或具体示例。"],
+                ["下一步", "让读者知道如何行动。"],
+              ],
+            });
+            selected++;
+            markEdited();
+            render();
+            notify("已添加一页，可以编辑标题与正文。");
+            break;
+          case "notes":
+            $("notes-panel").classList.toggle("visible");
+            break;
+          case "apply":
+            applyEdit();
+            break;
+          case "style":
+            slides[selected].type = slides[selected].type.includes("dark-slide")
+              ? slides[selected].type.replace("dark-slide", "").trim()
+              : slides[selected].type + " dark-slide";
+            markEdited();
+            render();
+            notify("已演示当前页的深浅色切换。");
+            break;
+          case "platform":
+            notify("这是独立页面原型，平台导航尚未连接。");
+            break;
+          case "variant-prev":
+            setVariant(
+              ["A", "B", "C"][(["A", "B", "C"].indexOf(variant) + 2) % 3],
+            );
+            break;
+          case "variant-next":
+            setVariant(
+              ["A", "B", "C"][(["A", "B", "C"].indexOf(variant) + 1) % 3],
+            );
+            break;
+        }
+      });
+      $("title-input").addEventListener("input", (e) => {
+        slides[selected].title = e.target.value;
+        markEdited();
+        renderRail();
+        renderStage();
+      });
+      $("body-input").addEventListener("input", (e) => {
+        slides[selected].body = e.target.value;
+        markEdited();
+        renderRail();
+        renderStage();
+      });
+      $("notes").addEventListener("input", (e) => {
+        slides[selected].notes = e.target.value;
+        markEdited();
+      });
+      $("doc-name").addEventListener("input", markEdited);
+      $("page-list").addEventListener("input", (e) => {
+        if (e.target.dataset.outline !== undefined) {
+          const i = Number(e.target.dataset.outline);
+          slides[i].title = e.target.value;
+          markEdited();
+          renderStage();
+          if (i === selected) $("title-input").value = e.target.value;
+        }
+      });
+      $("new-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const title = $("new-title").value.trim();
+        if (!title) {
+          $("new-title").focus();
+          return;
+        }
+        slides = structuredClone(initialSlides.slice(0, 5));
+        slides[0].title = title;
+        slides[0].body =
+          "面向" + $("new-audience").value + "的演示稿\n此为可编辑的示例大纲";
+        slides[1].title = "我们要解决什么问题？";
+        slides[2].title = "核心思路与方案";
+        slides[3].title = "如何落地执行？";
+        slides[4].title = "下一步行动";
+        slides.forEach((s, i) => {
+          if (i > 0) {
+            s.body = "这里是示例内容，请替换为你的实际材料。";
+            s.blocks = [
+              ["核心信息", "填写这一页要表达的观点。"],
+              ["具体说明", "补充你的事实与资料。"],
+            ];
+          }
+        });
+        selected = 0;
+        $("doc-name").value = title;
+        $("new-dialog").close();
+        setVariant("B");
+        markEdited();
+        notify("示例大纲已创建，点击页面即可继续编辑。");
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.target.matches("input,textarea,select,[contenteditable]")) return;
+        if (document.querySelector("dialog[open]") && !$("present-dialog").open)
+          return;
+        if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+          e.preventDefault();
+          if ($("present-dialog").open) {
+            selectPage(selected + (e.key === "ArrowRight" ? 1 : -1));
+          } else {
+            const n = ["A", "B", "C"].indexOf(variant);
+            setVariant(
+              ["A", "B", "C"][(n + (e.key === "ArrowRight" ? 1 : 2)) % 3],
+            );
+          }
+        }
+      });
+      // Small self-check for shared prototype rendering and the text boundary.
+      console.assert(
+        esc('<img onerror="x">').includes("&lt;img"),
+        "text must be escaped",
+      );
+      console.assert(
+        initialSlides.length === 7 &&
+          initialSlides.every(
+            (s) => typeof s.title === "string" && Array.isArray(s.blocks),
+          ),
+        "example deck must be valid",
+      );
+      setVariant(new URL(location.href).searchParams.get("variant") || "A");
+    </script>
+  </body>
+</html>

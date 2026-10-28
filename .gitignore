@@ -140,3 +140,15 @@ demos/*/frontend/probe_dom*.html
 
 # Root-level one-off capture screenshots (not for upstream)
 /biz_t1_*.png
+
+# Local agent credentials
+.insta/agent-session.json
+
+# Local: the control plane this machine linked against
+.insta/link-plane.json
+
+.insta/.agent-session-*.tmp
+
+# InstaCloud: local observe-hook state (regenerated per machine, not source)
+.insta/observe/
+.insta/audit.jsonl

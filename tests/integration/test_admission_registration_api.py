@@ -5,8 +5,6 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, Mock
 
-from langchain_core.messages import AIMessage
-
 from octop.infra.admission_registration_demo import demo_store
 from tests.support.auth import create_user
 
@@ -58,10 +56,44 @@ async def test_reverification_clears_previous_patient_conversation_and_starts_cl
             "response": "已记录联系电话。",
             "action": "voice_turn",
             "fields": {"phone": "13800138000"},
-            "pendingProposal": {"phone": "13900139000"},
+            "pendingProposal": {
+                "phone": "13900139000",
+                "occupation": {"currentValue": "", "proposedValue": "学生"},
+            },
         },
     )
     assert saved.status_code == 200, saved.text
+    accepted = await client.post(
+        f"/api/admission-registration/v1/sessions/{session_id}/turns",
+        headers=alice_auth,
+        json={
+            "identityToken": token,
+            "expectedRevision": 1,
+            "turnId": "resume-accept-0001",
+            "previousTurnId": "resume-turn-0001",
+            "utterance": "确认修改联系电话",
+            "response": "联系电话已更新。",
+            "action": "candidate_accept",
+            "fields": {"phone": "13900139000"},
+            "pendingProposal": {
+                "field": "phone",
+                "currentValue": "13800138000",
+                "proposedValue": "13900139000",
+                "decision": "accepted",
+            },
+        },
+    )
+    assert accepted.status_code == 200, accepted.text
+    still_pending = await client.get(
+        f"/api/admission-registration/v1/sessions/{session_id}",
+        headers=alice_auth,
+        params={"identityToken": token},
+    )
+    assert still_pending.json()["pendingProposal"] == {
+        "occupation": {"currentValue": "", "proposedValue": "学生"}
+    }
+    assert still_pending.json()["facts"]["phone"]["value"] == "13900139000"
+    assert still_pending.json()["summary"]["application"]["department"]
 
     failed_reverify = await client.post(
         "/api/admission-registration/v1/identity/verify",
@@ -343,6 +375,20 @@ async def test_selected_application_creates_a_persistent_linked_session(
     assert fetched.json()["facts"]["phone"]["value"] == "13800138000"
     assert fetched.json()["turns"][0]["previousTurnId"] is None
 
+    invalid_turn = await client.post(
+        f"/api/admission-registration/v1/sessions/{session_id}/turns",
+        headers=alice_auth,
+        json={
+            **turn,
+            "expectedRevision": 1,
+            "turnId": "turn-demo-invalid",
+            "previousTurnId": "turn-demo-001",
+            "fields": {"phone": {"invalid": "x"}},
+        },
+    )
+    assert invalid_turn.status_code == 422
+    assert "VALIDATION_FAILED" in invalid_turn.text
+
     bypass = await client.post(
         "/api/admission-registration/v1/submissions",
         headers=alice_auth,
@@ -404,19 +450,19 @@ async def test_ai_candidates_use_active_model_and_accept_only_grounded_phone(
             "pendingProposal": None,
         },
     )
-    call_agent = AsyncMock(
-        return_value={"messages": [AIMessage(content=json.dumps({"contact_phone": "13800138000"}))]}
+    call_model = AsyncMock(
+        return_value=(json.dumps({"contact_phone": "13800138000"}), "demo-model")
     )
     monkeypatch.setattr("octop.infra.admission_demo._ensure_admission_agent", AsyncMock())
-    monkeypatch.setattr(server.app_runtime.agent_registry, "call", call_agent)
-    server.app_runtime.agent_registry.harness_manager.shared_factory = Mock()
-    _use_test_admission_model(server, monkeypatch)
+    monkeypatch.setattr(
+        "octop.infra.admission_demo._call_admission_extraction_with_model", call_model
+    )
 
     response = await client.post(
         "/api/admission-registration/v1/ai/candidates",
         headers=auth,
         json={
-            "text": "联系电话是13800138000",
+            "text": "联系电话是13800138000，谢谢",
             "page": 1,
             "identityToken": token,
             "sessionId": session_id,
@@ -429,15 +475,12 @@ async def test_ai_candidates_use_active_model_and_accept_only_grounded_phone(
         "errors": {},
         "modelName": "demo-model",
     }
-    request = call_agent.await_args.args[1]
-    assert request["model"] == "demo-provider/demo-model"
-    assert request["skills"] == []
-    assert "admission-patient-info" in request["messages"][0]["content"]
-    model_input = json.loads(request["messages"][1]["content"])
+    request = call_model.await_args.kwargs
+    model_input = request["payload"]
     assert model_input["context"]["application"]["department"] == "心内科"
     assert model_input["context"]["facts"]["phone"]["value"] == "13800138000"
     assert model_input["context"]["recent_turns"][0]["utterance"] == "我电话是13800138000"
-    assert model_input["current_utterance"] == "联系电话是13800138000"
+    assert model_input["current_utterance"] == "联系电话是13800138000，谢谢"
 
 
 async def test_ai_candidates_recover_a_labeled_phone_omitted_by_agent(
@@ -451,17 +494,17 @@ async def test_ai_candidates_recover_a_labeled_phone_omitted_by_agent(
     )
     token = verified.json()["identityToken"]
     session_id = await _select_admission_session(client, auth, token)
-    call_agent = AsyncMock(return_value={"messages": [AIMessage(content="{} ")]})
+    call_model = AsyncMock(return_value=("{} ", "demo-model"))
     monkeypatch.setattr("octop.infra.admission_demo._ensure_admission_agent", AsyncMock())
-    monkeypatch.setattr(server.app_runtime.agent_registry, "call", call_agent)
-    server.app_runtime.agent_registry.harness_manager.shared_factory = Mock()
-    _use_test_admission_model(server, monkeypatch)
+    monkeypatch.setattr(
+        "octop.infra.admission_demo._call_admission_extraction_with_model", call_model
+    )
 
     response = await client.post(
         "/api/admission-registration/v1/ai/candidates",
         headers=auth,
         json={
-            "text": "我的电话是13800138000",
+            "text": "我的电话是13800138000，谢谢",
             "page": 1,
             "identityToken": token,
             "sessionId": session_id,
@@ -474,9 +517,10 @@ async def test_ai_candidates_recover_a_labeled_phone_omitted_by_agent(
         "errors": {},
         "modelName": "demo-model",
     }
-    request = call_agent.await_args.args[1]
-    assert request["source"] == "admission_demo"
-    assert request["skills"] == []
+    assert (
+        call_model.await_args.kwargs["payload"]["current_utterance"]
+        == "我的电话是13800138000，谢谢"
+    )
 
 
 async def test_ai_candidates_serialize_model_clarification_without_500(
@@ -490,32 +534,29 @@ async def test_ai_candidates_serialize_model_clarification_without_500(
     )
     token = verified.json()["identityToken"]
     session_id = await _select_admission_session(client, auth, token)
-    call_agent = AsyncMock(
-        return_value={
-            "messages": [
-                AIMessage(
-                    content=json.dumps(
-                        {
-                            "fields": {"contact_phone": "13800138000"},
-                            "uncertain_fields": ["contact_phone"],
-                            "clarification": "请您完整说出11位手机号码，刚才听到的号码不完整。",
-                            "clarification_choices": ["重新提供手机号", "跳过"],
-                        }
-                    )
-                )
-            ]
-        }
+    call_model = AsyncMock(
+        return_value=(
+            json.dumps(
+                {
+                    "fields": {"contact_phone": "13800138000"},
+                    "uncertain_fields": ["contact_phone"],
+                    "clarification": "请您完整说出11位手机号码，刚才听到的号码不完整。",
+                    "clarification_choices": ["重新提供手机号", "跳过"],
+                }
+            ),
+            "demo-model",
+        )
     )
     monkeypatch.setattr("octop.infra.admission_demo._ensure_admission_agent", AsyncMock())
-    monkeypatch.setattr(server.app_runtime.agent_registry, "call", call_agent)
-    server.app_runtime.agent_registry.harness_manager.shared_factory = Mock()
-    _use_test_admission_model(server, monkeypatch)
+    monkeypatch.setattr(
+        "octop.infra.admission_demo._call_admission_extraction_with_model", call_model
+    )
 
     response = await client.post(
         "/api/admission-registration/v1/ai/candidates",
         headers=auth,
         json={
-            "text": "联系电话是13800138000",
+            "text": "联系电话是13800138000，谢谢",
             "page": 0,
             "identityToken": token,
             "sessionId": session_id,
@@ -525,13 +566,47 @@ async def test_ai_candidates_serialize_model_clarification_without_500(
 
     assert response.status_code == 200, response.text
     assert response.json() == {
-        "fields": {},
+        "fields": {"phone": "13800138000"},
         "errors": {},
         "modelName": "demo-model",
         "clarification": "请您完整说出11位手机号码，刚才听到的号码不完整。",
         "clarificationChoices": ["重新提供手机号", "跳过"],
         "uncertainFields": ["contact_phone"],
     }
+
+
+async def test_ai_candidates_skips_model_for_phone_only_input(env: Any, monkeypatch: Any) -> None:
+    client, _server, auth = env
+    verified = await client.post(
+        "/api/admission-registration/v1/identity/verify",
+        headers=auth,
+        json={"method": "id_card"},
+    )
+    token = verified.json()["identityToken"]
+    session_id = await _select_admission_session(client, auth, token)
+    call_agent = AsyncMock(side_effect=AssertionError("phone-only input must not call the model"))
+    monkeypatch.setattr("octop.infra.admission_demo._ensure_admission_agent", AsyncMock())
+    monkeypatch.setattr(
+        "octop.api.routers.admission_registration.extract_active_registration_result_with_model",
+        call_agent,
+    )
+
+    response = await client.post(
+        "/api/admission-registration/v1/ai/candidates",
+        headers=auth,
+        json={
+            "text": "我的手机号是13900001234",
+            "page": 1,
+            "identityToken": token,
+            "sessionId": session_id,
+            "turnId": "turn-phone-fastpath-0001",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["fields"] == {"phone": "13900001234"}
+    assert "modelName" not in response.json()
+    call_agent.assert_not_awaited()
 
 
 async def test_ai_candidates_return_specific_reasons_for_rejected_fields(
@@ -545,13 +620,11 @@ async def test_ai_candidates_return_specific_reasons_for_rejected_fields(
     )
     token = verified.json()["identityToken"]
     session_id = await _select_admission_session(client, auth, token)
-    call_agent = AsyncMock(
-        return_value={"messages": [AIMessage(content=json.dumps({"occupation": "学生"}))]}
-    )
+    call_model = AsyncMock(return_value=(json.dumps({"occupation": "学生"}), "demo-model"))
     monkeypatch.setattr("octop.infra.admission_demo._ensure_admission_agent", AsyncMock())
-    monkeypatch.setattr(server.app_runtime.agent_registry, "call", call_agent)
-    server.app_runtime.agent_registry.harness_manager.shared_factory = Mock()
-    _use_test_admission_model(server, monkeypatch)
+    monkeypatch.setattr(
+        "octop.infra.admission_demo._call_admission_extraction_with_model", call_model
+    )
 
     response = await client.post(
         "/api/admission-registration/v1/ai/candidates",
@@ -583,21 +656,16 @@ async def test_ai_candidates_split_labeled_regions_from_a_multi_field_utterance(
     )
     token = verified.json()["identityToken"]
     session_id = await _select_admission_session(client, auth, token)
-    call_agent = AsyncMock(
-        return_value={
-            "messages": [
-                AIMessage(
-                    content=json.dumps(
-                        {"contact_phone": "13800138000", "address": "辽宁省沈阳市沈河区"}
-                    )
-                )
-            ]
-        }
+    call_model = AsyncMock(
+        return_value=(
+            json.dumps({"contact_phone": "13800138000", "address": "辽宁省沈阳市沈河区"}),
+            "demo-model",
+        )
     )
     monkeypatch.setattr("octop.infra.admission_demo._ensure_admission_agent", AsyncMock())
-    monkeypatch.setattr(server.app_runtime.agent_registry, "call", call_agent)
-    server.app_runtime.agent_registry.harness_manager.shared_factory = Mock()
-    _use_test_admission_model(server, monkeypatch)
+    monkeypatch.setattr(
+        "octop.infra.admission_demo._call_admission_extraction_with_model", call_model
+    )
 
     response = await client.post(
         "/api/admission-registration/v1/ai/candidates",
@@ -662,8 +730,7 @@ async def test_ai_model_failure_is_reported_as_unavailable_not_empty_candidates(
         ainvoke=AsyncMock(side_effect=TimeoutError("model timeout")),
         get_num_tokens_from_messages=Mock(return_value=50),
     )
-    factory = Mock()
-    factory.get.return_value = fake_model
+    factory = SimpleNamespace(get_chat_model=Mock(return_value=fake_model))
     server.app_runtime.agent_registry.harness_manager.shared_factory = factory
     server.services.settings_repo.set_active_model("demo-provider", "demo-model")
 
@@ -671,7 +738,7 @@ async def test_ai_model_failure_is_reported_as_unavailable_not_empty_candidates(
         "/api/admission-registration/v1/ai/candidates",
         headers=auth,
         json={
-            "text": "联系电话13800138000",
+            "text": "联系电话13800138000，谢谢",
             "page": 1,
             "identityToken": token,
             "sessionId": session_id,
@@ -697,17 +764,17 @@ async def test_ai_rate_limit_is_reported_explicitly_and_preserves_transcript(
     class ProviderRateLimitError(Exception):
         status_code = 429
 
-    call_agent = AsyncMock(side_effect=ProviderRateLimitError("rate limit"))
+    call_model = AsyncMock(side_effect=ProviderRateLimitError("rate limit"))
     monkeypatch.setattr("octop.infra.admission_demo._ensure_admission_agent", AsyncMock())
-    monkeypatch.setattr(server.app_runtime.agent_registry, "call", call_agent)
-    server.app_runtime.agent_registry.harness_manager.shared_factory = Mock()
-    _use_test_admission_model(server, monkeypatch)
+    monkeypatch.setattr(
+        "octop.infra.admission_demo._call_admission_extraction_with_model", call_model
+    )
 
     response = await client.post(
         "/api/admission-registration/v1/ai/candidates",
         headers=auth,
         json={
-            "text": "联系电话13800138000",
+            "text": "联系电话13800138000，谢谢",
             "page": 1,
             "identityToken": token,
             "sessionId": session_id,
@@ -719,3 +786,68 @@ async def test_ai_rate_limit_is_reported_explicitly_and_preserves_transcript(
         "code": "AI_RATE_LIMITED",
         "message": "AI 服务请求过于频繁，请稍后重试；转写内容已保留。",
     }
+
+
+async def test_native_session_enforces_twenty_dialog_turns_but_allows_manual_edit(
+    env_admin_alice: Any,
+) -> None:
+    client, _server, _admin_auth, auth = env_admin_alice
+    verified = await client.post(
+        "/api/admission-registration/v1/identity/verify",
+        headers=auth,
+        json={"method": "id_card"},
+    )
+    token = verified.json()["identityToken"]
+    session_id = await _select_admission_session(client, auth, token)
+    previous_turn_id = None
+    for index in range(20):
+        turn_id = f"limit-turn-{index:04d}"
+        saved = await client.post(
+            f"/api/admission-registration/v1/sessions/{session_id}/turns",
+            headers=auth,
+            json={
+                "identityToken": token,
+                "expectedRevision": index,
+                "turnId": turn_id,
+                "previousTurnId": previous_turn_id,
+                "utterance": "继续",
+                "response": "请继续。",
+                "action": "manual_turn",
+                "fields": {},
+            },
+        )
+        assert saved.status_code == 200, saved.text
+        previous_turn_id = turn_id
+
+    capped = await client.post(
+        f"/api/admission-registration/v1/sessions/{session_id}/turns",
+        headers=auth,
+        json={
+            "identityToken": token,
+            "expectedRevision": 20,
+            "turnId": "limit-turn-0020",
+            "previousTurnId": previous_turn_id,
+            "utterance": "继续",
+            "response": "请继续。",
+            "action": "manual_turn",
+            "fields": {},
+        },
+    )
+    manual_edit = await client.post(
+        f"/api/admission-registration/v1/sessions/{session_id}/turns",
+        headers=auth,
+        json={
+            "identityToken": token,
+            "expectedRevision": 20,
+            "turnId": "limit-edit-0020",
+            "previousTurnId": previous_turn_id,
+            "utterance": "手动修改",
+            "response": "已保存。",
+            "action": "manual_edit",
+            "fields": {},
+        },
+    )
+
+    assert capped.status_code == 429
+    assert capped.json()["detail"]["code"] == "ADMISSION_TURN_LIMIT"
+    assert manual_edit.status_code == 200, manual_edit.text

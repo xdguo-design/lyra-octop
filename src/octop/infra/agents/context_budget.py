@@ -69,7 +69,11 @@ def resolve_context_budget(
 
     configured_cap = _positive_int(configured_input_cap_tokens)
     provider_input_cap = max(1, model_limit - output_reserve - safety_margin)
-    effective_cap = min(provider_input_cap, configured_cap) if configured_cap is not None else provider_input_cap
+    effective_cap = (
+        min(provider_input_cap, configured_cap)
+        if configured_cap is not None
+        else provider_input_cap
+    )
 
     return ContextBudget(
         model_context_tokens=model_limit,
@@ -102,7 +106,9 @@ class ContextPacketValidation:
     estimated_tokens: int
 
 
-def validate_context_items(items: Any, *, max_items: int = MAX_CONTEXT_ITEMS) -> ContextPacketValidation:
+def validate_context_items(
+    items: Any, *, max_items: int = MAX_CONTEXT_ITEMS
+) -> ContextPacketValidation:
     """Validate provenance and boundedness; this does not grant access.
 
     Authorization must be checked before retrieval/assembly. This validator

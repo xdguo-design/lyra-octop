@@ -9,6 +9,20 @@ import styles from "../index.module.less";
 
 export const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 const AVATAR_ACCEPT = "image/png,image/jpeg,image/webp,image/gif";
+const PAINTING_PRESETS = [
+  "painting-mona-lisa",
+  "painting-girl-with-pearl",
+  "painting-van-gogh",
+  "painting-rembrandt",
+  "painting-venus",
+  "painting-klimt",
+  "painting-ophelia",
+  "painting-renaissance-scholar",
+  "painting-baroque-astronomer",
+  "painting-classical-physician",
+  "painting-garden-painter",
+  "painting-botanist",
+] as const;
 
 export function validateAvatarFile(
   file: File,
@@ -50,6 +64,7 @@ interface ExpertAvatarPickerProps {
   color?: string | null;
   disabled?: boolean;
   onPick: (file: File) => void | Promise<void>;
+  onSelectIcon?: (iconName: string | null) => void | Promise<void>;
   onRemove?: () => void | Promise<void>;
 }
 
@@ -59,13 +74,15 @@ export default function ExpertAvatarPicker({
   color,
   disabled = false,
   onPick,
+  onSelectIcon,
   onRemove,
 }: ExpertAvatarPickerProps) {
   const { t } = useTranslation();
   const [localPreview, setLocalPreview] = useState<string | null>(null);
+  const [presetSelected, setPresetSelected] = useState(false);
   const localPreviewRef = useRef<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const displayUrl = localPreview ?? iconUrl;
+  const displayUrl = localPreview ?? (presetSelected ? null : iconUrl);
   const hasPhoto = Boolean(displayUrl?.trim());
 
   useEffect(() => {
@@ -93,6 +110,7 @@ export default function ExpertAvatarPicker({
         return;
       }
       replaceLocalPreview(URL.createObjectURL(file));
+      setPresetSelected(false);
       try {
         await onPick(file);
       } catch {
@@ -158,6 +176,46 @@ export default function ExpertAvatarPicker({
           {t("experts.avatarHint")}
         </span>
       </div>
+      {onSelectIcon ? (
+        <div className={styles.avatarPresetPicker}>
+          <span className={styles.avatarPresetPickerLabel}>
+            {t("experts.avatarPaintings")}
+          </span>
+          <div className={styles.avatarPresetPickerGrid}>
+            {PAINTING_PRESETS.map((preset) => {
+              const label = t(`experts.avatarPreset.${preset}`);
+              const selected = !hasPhoto && (iconName ?? null) === preset;
+              return (
+                <button
+                  key={preset}
+                  type="button"
+                  className={`${styles.avatarPresetOption} ${
+                    selected ? styles.avatarPresetOptionActive : ""
+                  }`}
+                  aria-label={label}
+                  aria-pressed={selected}
+                  title={label}
+                  disabled={disabled}
+                  onClick={() => {
+                    setPresetSelected(true);
+                    replaceLocalPreview(null);
+                    void Promise.resolve(onSelectIcon(preset)).catch(
+                      () => undefined,
+                    );
+                  }}
+                >
+                  <ExpertAgentAvatar
+                    iconName={preset}
+                    color={color}
+                    size={32}
+                    iconSize={17}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

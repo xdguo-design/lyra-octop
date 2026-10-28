@@ -47,9 +47,9 @@ export const acpApi = {
   /** Combined view: global runners + per-agent tool toggle. */
   getConfig: (agentId: string) => request<ACPConfig>(agentPath(agentId)),
 
-  getOpenCodeModels: (agentId: string) =>
+  getRunnerModels: (agentId: string, runnerName: string) =>
     request<{ models: ACPModelOption[] }>(
-      `${agentPath(agentId)}/opencode/models`,
+      `${agentPath(agentId)}/${encodeURIComponent(runnerName)}/models`,
     ),
 
   installOpenCode: () =>

@@ -77,6 +77,15 @@ class ThreadMessageRepo:
             ).fetchall()
         return [ThreadMessageRow.from_row(row) for row in rows]
 
+    def get_by_message_id(self, thread_id: str, message_id: str) -> ThreadMessageRow | None:
+        with self._db.connect() as conn:
+            row = conn.execute(
+                "SELECT seq,message_id,role,message_json,created_at FROM thread_messages "
+                "WHERE thread_id=? AND message_id=?",
+                (thread_id, message_id),
+            ).fetchone()
+        return ThreadMessageRow.from_row(row) if row is not None else None
+
     def range_page(
         self, thread_id: str, start: int, end: int, limit: int
     ) -> list[ThreadMessageRow]:

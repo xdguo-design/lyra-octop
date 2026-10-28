@@ -147,11 +147,17 @@ def _runners_response(raw_runners: dict[str, Any]) -> dict[str, Any]:
         if name not in harness_names and name not in merged_raw:
             merged_raw[name] = spec
     merged = ACPConfig.from_dict({"runners": merged_raw})
-    return {
-        name: runner.to_dict()
-        for name, runner in merged.runners.items()
-        if name not in _HIDDEN_RUNNERS
-    }
+    response: dict[str, Any] = {}
+    for name, runner in merged.runners.items():
+        if name in _HIDDEN_RUNNERS:
+            continue
+        config = runner.to_dict()
+        raw = merged_raw.get(name)
+        if isinstance(raw, dict) and "default_model" in raw:
+            default_model = raw["default_model"]
+            config["default_model"] = default_model if isinstance(default_model, str) else None
+        response[name] = config
+    return response
 
 
 def _parse_config_json(raw: str | None) -> dict[str, Any]:

@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, Field, field_validator
 
 from octop.api.deps import current_user, get_server
+from octop.infra.db.repos.workbench import WorkbenchContextConflict
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.workbench.code_browser import (
     CodeBrowseError,
@@ -52,6 +53,19 @@ class WorkbenchProject(BaseModel):
     knowledge_base_ids: list[str] = Field(default_factory=list)
     created_at: int
     updated_at: int
+
+
+class ProjectContextResponse(BaseModel):
+    project_id: str
+    instructions: str
+    instructions_revision: int
+    knowledge_base_ids: list[str]
+    updated_at: int
+
+
+class ProjectInstructionsBody(BaseModel):
+    instructions: str = Field(max_length=20_000, description="Project instructions for new runs.")
+    expected_revision: int = Field(ge=1, description="Revision returned by the context read.")
 
 
 class WorkbenchFolder(BaseModel):
@@ -380,6 +394,57 @@ async def update_project(
         raise _not_found("workbench project not found")
     _audit_project_action(server, user, "workbench.project.update", project_id, payload=row["name"])
     return cast(dict[str, Any], row)
+
+
+@router.get(
+    "/workbench/projects/{project_id}/context",
+    summary="Read project instructions and knowledge bindings",
+    response_model=ProjectContextResponse,
+)
+async def get_project_context(
+    project_id: str,
+    user: Any = Depends(current_user),
+    server: Any = Depends(get_server),
+) -> dict[str, Any]:
+    context = server.services.workbench_repo.get_project_context(
+        owner_user_id=user.id, project_id=project_id
+    )
+    if context is None:
+        raise _not_found("workbench project not found")
+    return cast(dict[str, Any], context)
+
+
+@router.put(
+    "/workbench/projects/{project_id}/context",
+    summary="Update project instructions using a revision check",
+    response_model=ProjectContextResponse,
+    description="A stale expected_revision is rejected without overwriting newer instructions.",
+)
+async def update_project_context(
+    project_id: str,
+    body: ProjectInstructionsBody,
+    user: Any = Depends(current_user),
+    server: Any = Depends(get_server),
+) -> dict[str, Any]:
+    try:
+        context = server.services.workbench_repo.update_project_instructions(
+            owner_user_id=user.id,
+            project_id=project_id,
+            instructions=body.instructions,
+            expected_revision=body.expected_revision,
+        )
+    except WorkbenchContextConflict as exc:
+        raise OctopError.localized(ErrorCode.WORKBENCH_CONTEXT_CONFLICT) from exc
+    if context is None:
+        raise _not_found("workbench project not found")
+    _audit_project_action(
+        server,
+        user,
+        "workbench.project.context.update",
+        project_id,
+        payload=f"revision={context['instructions_revision']}",
+    )
+    return cast(dict[str, Any], context)
 
 
 @router.put(

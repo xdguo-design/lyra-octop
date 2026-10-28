@@ -16,6 +16,8 @@ DEFAULT_MAX_UPLOAD_MB = 100
 MIN_MAX_UPLOAD_MB = 1
 MAX_MAX_UPLOAD_MB = 1024
 DEFAULT_BROWSER_IDLE_TIMEOUT_MINUTES = 30
+# 0 disables agent idle auto-stop entirely (default keeps current behavior).
+DEFAULT_AGENT_IDLE_STOP_MINUTES = 0
 
 _VALID_DRIVERS = frozenset({"sqlite", "postgresql"})
 
@@ -131,6 +133,7 @@ class OctopConfig:
     login_lockout_seconds: int = 900
     cors_origins: list[str] = field(default_factory=list)
     default_timezone: str = "Asia/Shanghai"
+    ehr_rag_url: str = "http://127.0.0.1:8600"
     enable_dashboard: bool = True
     enable_api_docs: bool = False
     history_v2_enabled: bool = False
@@ -143,6 +146,7 @@ class OctopConfig:
     capabilities: CapabilitiesConfig = field(default_factory=CapabilitiesConfig)
     max_upload_mb: int = DEFAULT_MAX_UPLOAD_MB
     browser_idle_timeout_minutes: int = DEFAULT_BROWSER_IDLE_TIMEOUT_MINUTES
+    agent_idle_stop_minutes: int = DEFAULT_AGENT_IDLE_STOP_MINUTES
     workbench_code_root: str | None = None
     workbench_launch_root: str | None = None
     workbench_launch_profiles: list[dict[str, Any]] = field(default_factory=list)
@@ -518,6 +522,17 @@ def load_config(path: Path) -> OctopConfig:
                 )
             ),
         )
+    if v := os.environ.get("OCTOP_AGENT_IDLE_STOP_MINUTES"):
+        merged["agent_idle_stop_minutes"] = _coerce_int(
+            "OCTOP_AGENT_IDLE_STOP_MINUTES",
+            v,
+            int(
+                merged.get(
+                    "agent_idle_stop_minutes",
+                    DEFAULT_AGENT_IDLE_STOP_MINUTES,
+                )
+            ),
+        )
     if v := os.environ.get("OCTOP_WORKBENCH_CODE_ROOT"):
         merged["workbench_code_root"] = v.strip() or None
     if v := os.environ.get("OCTOP_WORKBENCH_LAUNCH_ROOT"):
@@ -615,6 +630,10 @@ def load_config(path: Path) -> OctopConfig:
         login_lockout_seconds=int(merged.get("login_lockout_seconds", 900)),
         cors_origins=list(merged.get("cors_origins") or []),
         default_timezone=str(merged.get("default_timezone") or "Asia/Shanghai"),
+        ehr_rag_url=(
+            os.environ.get("OCTOP_EHR_RAG_URL")
+            or str(merged.get("ehr_rag_url") or "http://127.0.0.1:8600")
+        ).rstrip("/"),
         enable_dashboard=bool(merged["enable_dashboard"]),
         enable_api_docs=bool(merged["enable_api_docs"]),
         history_v2_enabled=_coerce_bool(
@@ -637,6 +656,15 @@ def load_config(path: Path) -> OctopConfig:
                 merged.get(
                     "browser_idle_timeout_minutes",
                     DEFAULT_BROWSER_IDLE_TIMEOUT_MINUTES,
+                )
+            ),
+        ),
+        agent_idle_stop_minutes=max(
+            0,
+            int(
+                merged.get(
+                    "agent_idle_stop_minutes",
+                    DEFAULT_AGENT_IDLE_STOP_MINUTES,
                 )
             ),
         ),

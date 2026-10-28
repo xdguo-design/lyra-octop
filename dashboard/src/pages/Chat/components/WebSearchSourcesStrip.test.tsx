@@ -4,7 +4,9 @@ import type { WebSearchSource } from "../../../utils/parseWebSearchSources";
 import { WebSearchSourcesStrip } from "./WebSearchSourcesStrip";
 
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => (key === "chat.webSources.label" ? "Web sources" : key) }),
+  useTranslation: () => ({
+    t: (key: string) => (key === "chat.webSources.label" ? "Web sources" : key),
+  }),
 }));
 
 const sources: WebSearchSource[] = [

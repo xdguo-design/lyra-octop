@@ -42,6 +42,7 @@ import CreationsPage from "./index";
 beforeEach(() => {
   Object.assign(mocks.translations, {
     creationsPage: zh.creationsPage,
+    pptStudio: zh.pptStudio,
     common: zh.common,
   });
   window.localStorage.clear();
@@ -53,6 +54,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
 });
 
 function renderPage() {
@@ -107,6 +109,57 @@ describe("CreationsPage", () => {
     expect(screen.queryByTitle("住院登记 Demo · 作品")).toBeNull();
   });
 
+  it("lists the EHR knowledge workbench under platforms and opens it in Octop", async () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("tab", { name: "平台" }));
+    const card = await screen
+      .findByText("EHR 知识工作站")
+      .then((node) => node.closest(".cr-card") as HTMLElement);
+
+    expect(
+      within(card).getByText(
+        "检索医疗知识与项目资料，查看知识图谱，并使用 Octop Agent 协作。",
+      ),
+    ).toBeTruthy();
+    expect(card.querySelector(".cr-thumb img")).toHaveAttribute(
+      "src",
+      "/ehr-knowledge-cover.svg",
+    );
+    fireEvent.click(
+      within(card).getByRole("button", { name: "打开 EHR 知识工作站" }),
+    );
+
+    expect(screen.getByTestId("current-path").textContent).toBe("/ehr");
+  });
+
+  it("copies the isolated public EHR link", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("isSecureContext", true);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    renderPage();
+    fireEvent.click(screen.getByRole("tab", { name: "平台" }));
+    const card = await screen
+      .findByText("EHR 知识工作站")
+      .then((node) => node.closest(".cr-card") as HTMLElement);
+
+    fireEvent.click(within(card).getByRole("button", { name: "复制链接" }));
+
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(
+        `${window.location.origin}/public/ehr`,
+      ),
+    );
+  });
+
+  it("lists the PPT workbench under platforms", async () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("tab", { name: "平台" }));
+    expect(await screen.findByText("PPT 工作台")).toBeTruthy();
+  });
+
   it("opens the Vue admission-registration app in the same-origin preview", async () => {
     renderPage();
     const card = await screen
@@ -141,6 +194,27 @@ describe("CreationsPage", () => {
       );
     });
     expect(screen.queryByTitle("智能入院登记 · 作品")).toBeNull();
+  });
+
+  it("copies the admission-registration app as an absolute URL", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("isSecureContext", true);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    renderPage();
+    const card = await screen
+      .findByText("智能入院登记")
+      .then((node) => node.closest(".cr-card") as HTMLElement);
+
+    fireEvent.click(within(card).getByRole("button", { name: "复制链接" }));
+
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(
+        `${window.location.origin}/admission-registration/index.html`,
+      ),
+    );
   });
 
   it("embeds a registered GitHub project preview and returns to Creations", async () => {
@@ -243,6 +317,112 @@ describe("CreationsPage", () => {
       ),
     );
     openSpy.mockRestore();
+  });
+
+  it("offers manual code updates for CNB repositories", async () => {
+    const itemId = "cnb-project";
+    mocks.request.mockImplementation((path: string, _options?: RequestInit) => {
+      if (path === "/auth/me") return Promise.resolve({ role: "admin" });
+      if (path === "/creations") {
+        return Promise.resolve({
+          folders: [],
+          items: [
+            {
+              item_id: itemId,
+              kind: "service",
+              name: "CNB 项目",
+              description: "",
+              url: "https://cnb.cool/example/project",
+              folder_id: null,
+              created_at: 1,
+              updated_at: 1,
+              thumbnail_url: null,
+            },
+          ],
+          card_folders: {},
+          card_meta: {},
+        });
+      }
+      if (path.endsWith(`/creations/items/${itemId}/launch`)) {
+        return Promise.resolve({ status: "stopped", url: null, logs: null });
+      }
+      if (path.endsWith(`/creations/items/${itemId}/update`)) {
+        return Promise.resolve({ updated: true });
+      }
+      return Promise.resolve({});
+    });
+
+    renderPage();
+    fireEvent.click(screen.getByRole("tab", { name: "代码仓库" }));
+    const card = await screen
+      .findByText("CNB 项目")
+      .then((node) => node.closest(".cr-card") as HTMLElement);
+    fireEvent.click(within(card).getByRole("button", { name: "更新代码" }));
+
+    await waitFor(() =>
+      expect(mocks.request).toHaveBeenCalledWith(
+        `/creations/items/${itemId}/update`,
+        { method: "POST" },
+      ),
+    );
+  });
+
+  it("binds and pulls a repository from the built-in app card", async () => {
+    mocks.request.mockImplementation((path: string) => {
+      if (path === "/auth/me") return Promise.resolve({ role: "admin" });
+      if (path === "/creations") {
+        return Promise.resolve({
+          folders: [],
+          items: [],
+          card_folders: {},
+          card_meta: {
+            "app:admission-registration": {
+              name: null,
+              description: null,
+              category: null,
+              repository_url: "https://cnb.cool/group/admission-registration",
+              repository_branch: "dev",
+            },
+          },
+        });
+      }
+      if (path === "/creations/cards/app/admission-registration/update") {
+        return Promise.resolve({ updated: true });
+      }
+      return Promise.resolve({});
+    });
+
+    renderPage();
+    const card = await screen
+      .findByText("智能入院登记")
+      .then((node) => node.closest(".cr-card") as HTMLElement);
+    fireEvent.click(within(card).getByRole("button", { name: "更新代码" }));
+    await waitFor(() =>
+      expect(mocks.request).toHaveBeenCalledWith(
+        "/creations/cards/app/admission-registration/update",
+        { method: "POST" },
+      ),
+    );
+
+    fireEvent.click(
+      within(card).getByRole("button", { name: "编辑 智能入院登记" }),
+    );
+    expect(
+      screen.getByLabelText("代码仓库地址（GitHub / CNB）"),
+    ).toHaveProperty("value", "https://cnb.cool/group/admission-registration");
+    const branchInput = screen.getByLabelText("分支（可选）");
+    expect(branchInput).toHaveProperty("value", "dev");
+    fireEvent.change(branchInput, { target: { value: "release/2026" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() =>
+      expect(mocks.request).toHaveBeenCalledWith(
+        "/creations/cards/app/admission-registration/meta",
+        expect.objectContaining({
+          method: "PUT",
+          body: expect.stringContaining('"repository_branch":"release/2026"'),
+        }),
+      ),
+    );
   });
 
   it("lists creations without loading agents", async () => {
@@ -393,11 +573,13 @@ describe("CreationsPage", () => {
 
   it("saves a GitHub project when the repository URL ends in .git", async () => {
     renderPage();
-    fireEvent.click(screen.getByRole("button", { name: "添加 GitHub 项目" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "添加 GitHub / CNB 项目" }),
+    );
     fireEvent.change(screen.getByLabelText("名称"), {
       target: { value: "数据转换平台" },
     });
-    fireEvent.change(screen.getByLabelText("GitHub 仓库链接"), {
+    fireEvent.change(screen.getByLabelText("GitHub / CNB 仓库链接"), {
       target: {
         value: "https://github.com/xdguo-design/data-upload-product.git",
       },

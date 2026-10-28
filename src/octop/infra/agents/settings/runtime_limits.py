@@ -138,6 +138,7 @@ def apply_agent_runtime_to_stream_request(
 ) -> dict[str, Any]:
     """Merge agent runtime knobs into a harness ``stream`` request dict."""
     out = dict(req)
+    allow_request_model_settings = out.pop("_octop_allow_model_settings_override", False)
 
     recursion_limit = agent_recursion_limit(agent_cfg)
     if recursion_limit is not None and out.get("recursion_limit") is None:
@@ -152,8 +153,13 @@ def apply_agent_runtime_to_stream_request(
             if isinstance(existing_cfg, dict)
             else None
         )
-        merged_settings = dict(existing_settings) if isinstance(existing_settings, dict) else {}
-        merged_settings.update(model_settings)
+        if allow_request_model_settings:
+            merged_settings = dict(model_settings)
+            if isinstance(existing_settings, dict):
+                merged_settings.update(existing_settings)
+        else:
+            merged_settings = dict(existing_settings) if isinstance(existing_settings, dict) else {}
+            merged_settings.update(model_settings)
         configurable_updates[CONFIGURABLE_MODEL_SETTINGS] = merged_settings
 
     max_input_tokens = agent_max_input_tokens(agent_cfg)

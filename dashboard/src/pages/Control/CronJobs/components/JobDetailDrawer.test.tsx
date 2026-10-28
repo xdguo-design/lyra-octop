@@ -61,11 +61,15 @@ describe("JobDetailDrawer run history", () => {
       />,
     );
 
-    expect(await screen.findByText("cronJobs.runStatus.running")).toBeInTheDocument();
+    expect(
+      await screen.findByText("cronJobs.runStatus.running"),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "cronJobs.cancelRun" }));
     await waitFor(() =>
       expect(api.cancelRun).toHaveBeenCalledWith("agent-1", "cron-1", "run-1"),
     );
-    expect(await screen.findByText("cronJobs.runCancelled")).toBeInTheDocument();
+    expect(
+      await screen.findByText("cronJobs.runCancelled"),
+    ).toBeInTheDocument();
   });
 });

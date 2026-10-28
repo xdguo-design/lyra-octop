@@ -39,7 +39,10 @@ class HitlSettingsResponse(BaseModel):
         description="Whether command guard pauses risky shell calls for approval."
     )
     show_approval_ui: bool = Field(
-        description="Whether composer, slash help, and CLI should show tool-approval surfaces."
+        description=(
+            "Whether composer, slash help, and CLI should show tool-approval surfaces; risky "
+            "writes always require approval."
+        )
     )
 
 

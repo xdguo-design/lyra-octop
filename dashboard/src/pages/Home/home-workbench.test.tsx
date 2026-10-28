@@ -156,6 +156,44 @@ beforeEach(() => {
             adapter: "thinking",
           },
         },
+        {
+          provider_id: 1,
+          provider_name: "Zhipu Coding Plan",
+          provider_kind: "openai",
+          model: "glm-5.3",
+          name: "glm-5.3",
+          reasoning_config: {
+            supported: true,
+            toggle: true,
+            default_mode: "disabled",
+            efforts: [],
+            effort_type: "enum",
+            adapter: "thinking",
+          },
+        },
+        {
+          provider_id: 2,
+          provider_name: "ModelScope",
+          provider_kind: "openai",
+          model: "qwen3.5",
+          name: "Qwen 3.5",
+        },
+        {
+          provider_id: 3,
+          provider_name: "Anthropic",
+          provider_kind: "anthropic",
+          model: "claude-sonnet-4",
+          name: "Claude Sonnet 4",
+          reasoning_config: {
+            supported: true,
+            toggle: true,
+            default_mode: "enabled",
+            default_effort: "4096",
+            efforts: ["1024", "4096", "8192", "16384"],
+            effort_type: "token_budget",
+            adapter: "anthropic_budget",
+          },
+        },
       ]);
     }
     return Promise.reject(new Error("Unexpected request: " + path));
@@ -319,19 +357,47 @@ describe("LYRA workbench page integration", () => {
     ).toBeNull();
   });
 
-  it("toggles deep thinking and sends the selected reasoning settings", async () => {
+  it("selects reasoning strength and sends the selected reasoning settings", async () => {
     renderHome();
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "选择模型" })).toBeTruthy(),
     );
     fireEvent.click(screen.getByRole("button", { name: "选择模型" }));
-    fireEvent.click(
+    expect(
       await screen.findByText("Zhipu Coding Plan / glm-5.3-flash"),
+    ).toBeTruthy();
+    expect(screen.getByText("Zhipu Coding Plan / glm-5.3")).toBeTruthy();
+    expect(screen.queryByText("ModelScope / Qwen 3.5")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "切换模型提供商" }));
+    expect(
+      screen.getByRole("button", { name: "切换模型提供商" }),
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.getByRole("menuitem", { name: "chat.modelPickerManage" }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByText("ModelScope"));
+    expect(await screen.findByText("ModelScope / Qwen 3.5")).toBeTruthy();
+    expect(screen.queryByText("Zhipu Coding Plan / glm-5.3-flash")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "切换模型提供商" }));
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: "Zhipu Coding Plan" }),
     );
-    const reasoning = await screen.findByRole("button", { name: "深度思考" });
-    expect(reasoning.getAttribute("aria-pressed")).toBe("false");
-    fireEvent.click(reasoning);
-    expect(reasoning.getAttribute("aria-pressed")).toBe("true");
+    expect(
+      await screen.findByText("Zhipu Coding Plan / glm-5.3-flash"),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByText("Zhipu Coding Plan / glm-5.3-flash"));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "选择模型" }),
+      ).toHaveTextContent("Zhipu Coding Plan / glm-5.3-flash"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "选择模型" }));
+    const effortSlider = screen.getByRole("slider", { name: "思考强度" });
+    expect(screen.getByText("Ctrl+T")).toBeTruthy();
+    fireEvent.change(effortSlider, {
+      target: { value: "2" },
+    });
+    expect(effortSlider.getAttribute("style")).toContain("100%");
 
     fireEvent.change(
       screen.getByRole("textbox", { name: "给主 Agent 发消息" }),
@@ -353,9 +419,41 @@ describe("LYRA workbench page integration", () => {
         undefined,
         undefined,
         "enabled",
-        "medium",
+        "high",
       ),
     );
+  });
+
+  it("shows every configured token budget as a selectable effort level", async () => {
+    renderHome();
+    fireEvent.click(await screen.findByRole("button", { name: "选择模型" }));
+    fireEvent.click(screen.getByRole("button", { name: "切换模型提供商" }));
+    fireEvent.click(await screen.findByText("Anthropic"));
+    fireEvent.click(await screen.findByText("Anthropic / Claude Sonnet 4"));
+
+    fireEvent.click(screen.getByRole("button", { name: "选择模型" }));
+    const effortSlider = await screen.findByRole("slider", {
+      name: "思考强度",
+    });
+    expect(effortSlider.getAttribute("max")).toBe("3");
+    expect((effortSlider as HTMLInputElement).value).toBe("1");
+    fireEvent.change(effortSlider, { target: { value: "3" } });
+    expect((effortSlider as HTMLInputElement).value).toBe("3");
+  });
+
+  it("shows a two-stop slider when reasoning only supports on or off", async () => {
+    renderHome();
+    fireEvent.click(await screen.findByRole("button", { name: "选择模型" }));
+    fireEvent.click(await screen.findByText("Zhipu Coding Plan / glm-5.3"));
+
+    fireEvent.click(screen.getByRole("button", { name: "选择模型" }));
+    const effortSlider = await screen.findByRole("slider", {
+      name: "思考强度",
+    });
+    expect(effortSlider.getAttribute("max")).toBe("1");
+    expect((effortSlider as HTMLInputElement).value).toBe("0");
+    fireEvent.change(effortSlider, { target: { value: "1" } });
+    expect((effortSlider as HTMLInputElement).value).toBe("1");
   });
 
   it("pastes and sends an image from the home composer", async () => {
@@ -724,8 +822,10 @@ describe("LYRA workbench page integration", () => {
     expect(content).not.toHaveAttribute("hidden");
   });
 
-  it("keeps ACP runners out of the chat agent selector", async () => {
-    mocks.acpConfig.mockResolvedValueOnce({
+  it("shows enabled ACP runners in the chat agent selector", async () => {
+    // The selector re-fetches runner state every time it opens; every call
+    // must see the same catalog or the refresh wipes the entries.
+    mocks.acpConfig.mockResolvedValue({
       tool_enabled: true,
       runners: { "Z-Code": { enabled: true }, Disabled: { enabled: false } },
     });
@@ -740,7 +840,8 @@ describe("LYRA workbench page integration", () => {
     await waitFor(() => expect(agentSelector).toHaveTextContent("主 Agent"));
     fireEvent.click(agentSelector);
     const menu = await screen.findByRole("menu");
-    expect(within(menu).queryByText("Z-Code")).toBeNull();
+    await waitFor(() => expect(within(menu).getByText("Z-Code")).toBeTruthy());
+    expect(within(menu).queryByText("Disabled")).toBeNull();
     expect(within(menu).queryByText("仅平台使用")).toBeNull();
     expect(within(menu).getByText("研究 Agent")).toBeTruthy();
   });

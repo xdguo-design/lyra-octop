@@ -116,12 +116,108 @@ async def test_creation_data_is_account_scoped_and_service_urls_are_validated(
     ).status_code == 422
 
 
+async def test_builtin_app_can_bind_and_pull_cnb_repository(env: Any) -> None:
+    client, server, admin_auth = env
+    repository_url = "https://cnb.cool/group/subgroup/admission-registration"
+    bound = await client.put(
+        "/api/creations/cards/app/admission-registration/meta",
+        headers=admin_auth,
+        json={
+            "name": "智能入院登记",
+            "description": "Vue 原型演示",
+            "category": "applet",
+            "repository_url": repository_url,
+            "repository_branch": "dev",
+        },
+    )
+    assert bound.status_code == 200
+    assert bound.json()["repository_url"] == repository_url
+    assert bound.json()["repository_branch"] == "dev"
+    index = await client.get("/api/creations", headers=admin_auth)
+    assert index.json()["card_meta"]["app:admission-registration"]["repository_url"] == (
+        repository_url
+    )
+    assert index.json()["card_meta"]["app:admission-registration"]["repository_branch"] == "dev"
+
+    connector = await client.post(
+        "/api/connector-instances",
+        headers=admin_auth,
+        json={
+            "kind": "cnb",
+            "display_name": "CNB",
+            "credentials": {"token": "repo-read-token"},
+        },
+    )
+    assert connector.status_code == 201
+
+    class ManagerStub:
+        call: tuple[str, str, str | None, bool, str | None] | None = None
+
+        async def update(
+            self,
+            url: str,
+            project_id: str,
+            *,
+            access_token: str | None = None,
+            source_only: bool = False,
+            repository_branch: str | None = None,
+        ) -> None:
+            self.call = (url, project_id, access_token, source_only, repository_branch)
+
+        async def close(self) -> None:
+            return None
+
+    manager = ManagerStub()
+    server.project_service_manager = manager
+    result = await client.post(
+        "/api/creations/cards/app/admission-registration/update", headers=admin_auth
+    )
+    assert result.status_code == 200
+    assert result.json() == {"updated": True}
+    assert manager.call is not None
+    assert manager.call[0] == repository_url
+    assert manager.call[1].startswith("app:")
+    assert manager.call[1].endswith(":admission-registration")
+    assert manager.call[2:] == ("repo-read-token", True, "dev")
+
+    invalid = await client.put(
+        "/api/creations/cards/app/admission-registration/meta",
+        headers=admin_auth,
+        json={"repository_url": "https://evil.example/repo"},
+    )
+    assert invalid.status_code == 422
+    invalid_branch = await client.put(
+        "/api/creations/cards/app/admission-registration/meta",
+        headers=admin_auth,
+        json={"repository_url": repository_url, "repository_branch": "--upload-pack=evil"},
+    )
+    assert invalid_branch.status_code == 422
+
+
 async def test_trusted_project_launch_requires_admin_and_owned_profile(
     env: Any,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client, server, admin_auth = env
     repo_url = "https://github.com/xdguo-design/data-upload-product"
+    cnb_url = "https://cnb.cool/group/private-project"
+    connector = await client.post(
+        "/api/connector-instances",
+        headers=admin_auth,
+        json={
+            "kind": "cnb",
+            "display_name": "CNB",
+            "credentials": {"token": "repo-read-token"},
+        },
+    )
+    assert connector.status_code == 201
+    cnb_item = (
+        await client.post(
+            "/api/creations/items",
+            headers=admin_auth,
+            json={"kind": "service", "name": "CNB 项目", "url": cnb_url},
+        )
+    ).json()
     item = (
         await client.post(
             "/api/creations/items",
@@ -133,8 +229,11 @@ async def test_trusted_project_launch_requires_admin_and_owned_profile(
     class ManagerStub:
         running = {"status": "running", "url": "http://127.0.0.1:49152", "logs": None}
 
+        def __init__(self) -> None:
+            self.tokens: list[str | None] = []
+
         def has_profile(self, url: str) -> bool:
-            return url == repo_url
+            return url in {repo_url, cnb_url}
 
         def status(self, url: str, _item_id: str | None = None) -> dict[str, str | None]:
             return self.running
@@ -142,12 +241,24 @@ async def test_trusted_project_launch_requires_admin_and_owned_profile(
         def thumbnail_origins(self, _url: str, _item_id: str | None = None) -> tuple[str, ...]:
             return ("http://127.0.0.1:49152", "http://127.0.0.1:49153")
 
-        async def start(self, _url: str, _item_id: str | None = None) -> dict[str, str | None]:
+        async def start(
+            self,
+            _url: str,
+            _item_id: str | None = None,
+            *,
+            access_token: str | None = None,
+        ) -> dict[str, str | None]:
+            self.tokens.append(access_token)
             return self.running
 
         async def stop(self, _url: str, _item_id: str | None = None) -> dict[str, str | None]:
             self.running = {"status": "stopped", "url": None, "logs": None}
             return self.running
+
+        async def update(
+            self, _url: str, _item_id: str, *, access_token: str | None = None
+        ) -> None:
+            self.tokens.append(access_token)
 
         async def close(self) -> None:
             return None
@@ -169,6 +280,16 @@ async def test_trusted_project_launch_requires_admin_and_owned_profile(
     assert (
         await client.delete(f"/api/creations/items/{item['item_id']}/launch", headers=admin_auth)
     ).json()["status"] == "stopped"
+    assert (
+        await client.post(f"/api/creations/items/{item['item_id']}/update", headers=admin_auth)
+    ).json() == {"updated": True}
+    assert (
+        await client.post(f"/api/creations/items/{cnb_item['item_id']}/launch", headers=admin_auth)
+    ).status_code == 200
+    assert (
+        await client.post(f"/api/creations/items/{cnb_item['item_id']}/update", headers=admin_auth)
+    ).json() == {"updated": True}
+    assert manager.tokens == [None, None, "repo-read-token", "repo-read-token"]
 
     user_auth = await create_user(client, admin_auth, username="launch-user")
     assert (
@@ -184,6 +305,9 @@ async def test_trusted_project_launch_requires_admin_and_owned_profile(
     ).json()
     assert (
         await client.post(f"/api/creations/items/{other_item['item_id']}/launch", headers=user_auth)
+    ).status_code == 403
+    assert (
+        await client.post(f"/api/creations/items/{other_item['item_id']}/update", headers=user_auth)
     ).status_code == 403
 
     unknown = (

@@ -26,6 +26,14 @@ export interface WorkbenchAssignment {
   folder_id: string | null;
 }
 
+export interface ProjectContext {
+  project_id: string;
+  instructions: string;
+  instructions_revision: number;
+  knowledge_base_ids: string[];
+  updated_at: number;
+}
+
 export interface WorkbenchIndex {
   projects: WorkbenchProject[];
   folders: WorkbenchFolder[];
@@ -115,6 +123,25 @@ export const workbenchApi = {
             ? { name, icon }
             : { name, icon, parent_id: parentId },
         ),
+      },
+    ),
+  getProjectContext: (projectId: string) =>
+    request<ProjectContext>(
+      `/workbench/projects/${encodeURIComponent(projectId)}/context`,
+    ),
+  updateProjectContext: (
+    projectId: string,
+    instructions: string,
+    expectedRevision: number,
+  ) =>
+    request<ProjectContext>(
+      `/workbench/projects/${encodeURIComponent(projectId)}/context`,
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          instructions,
+          expected_revision: expectedRevision,
+        }),
       },
     ),
   setProjectKnowledgeBases: (projectId: string, knowledgeBaseIds: string[]) =>

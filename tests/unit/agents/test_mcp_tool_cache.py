@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from langchain_core.tools import BaseTool, StructuredTool
+from octop_harness.security.models import SecurityPolicy
 
 from octop.infra.connectors.mcp_tool_cache import (
     fingerprint_mcp_spec,
@@ -143,6 +144,9 @@ async def test_prepare_chat_mcp_injects_custom_from_cache() -> None:
     from octop.infra.agents.manager import AgentManager
 
     mgr = object.__new__(AgentManager)
+    mgr._security = MagicMock()
+    mgr._security.harness_policy.return_value = SecurityPolicy.defaults()
+    mgr._hitl_session_store = None
     mgr._mcp_tool_cache = {}
     mgr._mcp_tool_cache_locks = {}
     mgr._mcp_tool_cache_guard = asyncio.Lock()
@@ -227,6 +231,9 @@ async def test_prepare_chat_mcp_attaches_gateway_tools_without_reload() -> None:
     agent.inject_mcp_tools = MagicMock(side_effect=_inject)
 
     mgr = object.__new__(AgentManager)
+    mgr._security = MagicMock()
+    mgr._security.harness_policy.return_value = SecurityPolicy.defaults()
+    mgr._hitl_session_store = None
     mgr._repos = MagicMock()
     mgr._repos.connector_repo.list_visible.return_value = [inst]
     mgr._connector_svc = MagicMock()

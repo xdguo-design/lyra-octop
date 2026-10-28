@@ -3,6 +3,7 @@ import {
   Monitor,
   MessageSquareText,
   Timer,
+  ListChecks,
   SlidersHorizontal,
   Waypoints,
   Link2,
@@ -56,6 +57,8 @@ export const SIDEBAR_NAV_KEYS = [
   "ehr",
   "experts",
   "tasks",
+  "runs",
+  "apps",
   "token-usage",
   "personalization",
   "channels",
@@ -66,6 +69,7 @@ export const SIDEBAR_NAV_KEYS = [
   "workbench",
   "remote-desktop",
   "acp",
+  "admin-overview",
   "admin-users",
   "models",
   "admin-storage",
@@ -121,6 +125,7 @@ export const SIDEBAR_GROUPED_NAV_KEYS = [
   "workbench",
   "remote-desktop",
   "acp",
+  "admin-overview",
   "admin-users",
   "models",
   "admin-storage",
@@ -177,6 +182,18 @@ export function buildNavSections(
       labelKey: "nav.tasks",
     });
   }
+  topItems.push({
+    key: "runs",
+    path: "/runs",
+    icon: <ListChecks size={iconSize} strokeWidth={iconStroke} />,
+    labelKey: "nav.runs",
+  });
+  topItems.push({
+    key: "apps",
+    path: "/apps",
+    icon: <Package size={iconSize} strokeWidth={iconStroke} />,
+    labelKey: "nav.apps",
+  });
   if (navAllowed(user, "token-usage")) {
     topItems.push({
       key: "token-usage",
@@ -282,6 +299,14 @@ export function buildNavSections(
   }
 
   const adminItems: NavItem[] = [];
+  if (navAllowed(user, "admin-overview")) {
+    adminItems.push({
+      key: "admin-overview",
+      path: "/admin/overview",
+      icon: <PanelsTopLeft size={iconSize} strokeWidth={iconStroke} />,
+      labelKey: "nav.adminOverview",
+    });
+  }
   if (navAllowed(user, "admin-users")) {
     adminItems.push({
       key: "admin-users",

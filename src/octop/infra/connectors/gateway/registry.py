@@ -7,6 +7,7 @@ from typing import Any, Protocol
 from octop.infra.connectors.gateway.adapters import (
     agently_cli,
     baidu_map,
+    cnb,
     ctrip_wendao,
     feishu_cli,
     fliggy,
@@ -32,6 +33,7 @@ class GatewayAdapter(Protocol):
 
 
 _ADAPTERS: dict[str, GatewayAdapter] = {
+    "cnb": cnb,
     "agently-cli": agently_cli,
     "qq-mail": qq_mail,
     "qq-music": qq_music,

@@ -28,6 +28,24 @@ class SettingsRepo:
         with self._db.transaction() as conn:
             conn.execute("DELETE FROM settings WHERE key = ?", (key,))
 
+    def list_prefix(self, prefix: str) -> dict[str, str]:
+        """Read a bounded namespace without interpreting SQL wildcard characters."""
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT key, value FROM settings WHERE substr(key, 1, ?) = ? ORDER BY key",
+                (len(prefix), prefix),
+            ).fetchall()
+        return {row["key"]: row["value"] for row in rows}
+
+    def compare_and_set(self, key: str, expected: str, value: str) -> bool:
+        """Replace one document only when its persisted version is unchanged."""
+        with self._db.transaction() as conn:
+            result = conn.execute(
+                "UPDATE settings SET value = ? WHERE key = ? AND value = ?",
+                (value, key, expected),
+            )
+            return bool(result.rowcount == 1)
+
     def get_active_model(self) -> tuple[str, str]:
         """Return (provider_name, model_id); empty strings if not set."""
         raw = self.get(self._KEY_ACTIVE_MODEL) or ""

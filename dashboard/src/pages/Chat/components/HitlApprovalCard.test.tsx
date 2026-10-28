@@ -25,11 +25,29 @@ describe("HitlApprovalCard", () => {
     expect(document.querySelector("svg")).toBeTruthy();
   });
 
+  it("hides sensitive argument values in the confirmation card", () => {
+    render(
+      <HitlApprovalCard
+        actions={[
+          {
+            name: "custom_tool",
+            args: { api_key: "sk-live-secret-value" },
+          },
+        ]}
+        status="pending"
+        onDecision={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Hidden sensitive value")).toBeInTheDocument();
+    expect(screen.queryByText("sk-live-secret-value")).not.toBeInTheDocument();
+  });
+
   it("approves and rejects through the decision callback", async () => {
     const onDecision = vi.fn();
     render(
       <HitlApprovalCard
-        actions={[{ name: "execute", args: { command: "ls" } }]}
+        actions={[{ name: "read_file", args: { file_path: "notes.md" } }]}
         status="pending"
         onDecision={onDecision}
       />,
@@ -42,7 +60,7 @@ describe("HitlApprovalCard", () => {
     fireEvent.click(await screen.findByText("Allow this tool for this chat"));
     expect(onDecision).toHaveBeenCalledWith([{ type: "approve" }], {
       mode: "allow_tools",
-      tools: ["execute"],
+      tools: ["read_file"],
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Allow" }));
@@ -57,7 +75,7 @@ describe("HitlApprovalCard", () => {
     ]);
   });
 
-  it("uses plural allow copy when several tools are waiting", async () => {
+  it("hides session allow controls for high-risk tools", () => {
     render(
       <HitlApprovalCard
         actions={[
@@ -69,10 +87,10 @@ describe("HitlApprovalCard", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Allow" }));
+    expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
     expect(
-      await screen.findByText("Allow these tools for this chat"),
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: "Allow" }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows the session policy after approval", () => {

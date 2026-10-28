@@ -155,6 +155,9 @@ class GlobalProcessor:
         dispatcher: SlashDispatcher,
         usage_repo: Any | None = None,
         thread_message_repo: Any | None = None,
+        run_repo: Any | None = None,
+        hitl_approval_repo: Any | None = None,
+        secret_repo: Any | None = None,
         gateway: Any | None = None,
         hitl: HitlChannelCoordinator | None = None,
         trajectory_service: Any | None = None,
@@ -180,7 +183,11 @@ class GlobalProcessor:
         self._usage_repo = usage_repo
         self._thread_message_repo = thread_message_repo
         self._gateway = gateway
-        self._hitl = hitl or HitlChannelCoordinator()
+        self._hitl = hitl or HitlChannelCoordinator(
+            audit_repo=audit_repo,
+            approval_repo=hitl_approval_repo,
+            secret_repo=secret_repo,
+        )
         self._trajectory_service = trajectory_service
         self._history_archive = history_archive
         self.teams = TeamManager(
@@ -190,6 +197,8 @@ class GlobalProcessor:
             thread_message_repo=thread_message_repo,
             gateway=gateway,
             hitl_coordinator=self._hitl,
+            run_repo=run_repo,
+            secret_repo=secret_repo,
         )
 
     async def _begin_history(
@@ -263,6 +272,13 @@ class GlobalProcessor:
         """Rebind projection writes after a control-plane restore."""
         self._thread_message_repo = repo
         self.teams.replace_thread_message_repo(repo)
+
+    def replace_audit_repo(self, repo: Any) -> None:
+        self._audit_repo = repo
+        self._hitl.set_audit_repo(repo)
+
+    def replace_hitl_repos(self, approval_repo: Any, secret_repo: Any) -> None:
+        self._hitl.set_persistence(approval_repo, secret_repo)
 
     def _agent_trajectory_enabled(self, agent_id: str, row: Any | None = None) -> bool:
         if self._trajectory_service is None:
@@ -864,6 +880,8 @@ class GlobalProcessor:
                     user_id=user_id,
                     session_key=session_key,
                     channel_type=channel_type,
+                    run_id=str((msg.metadata or {}).get("run_id") or "") or None,
+                    step_id=str((msg.metadata or {}).get("run_step_id") or "") or None,
                 ),
             ):
                 yield ev
@@ -1181,6 +1199,8 @@ class GlobalProcessor:
                                 user_id=user_id,
                                 session_key=session_key,
                                 channel_type=channel_type,
+                                run_id=str(meta.get("run_id") or "") or None,
+                                step_id=str(meta.get("run_step_id") or "") or None,
                             ),
                         )
                         request_payload["pending_id"] = record.pending_id

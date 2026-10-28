@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock
 
 import pytest
@@ -73,6 +74,241 @@ def test_hitl_store_register_and_resolve() -> None:
     assert resolved.pending_id == record.pending_id
     store.mark_resolved(record.pending_id, "approved")
     assert store.resolve_for_session("sk1") is None
+
+
+def test_coordinator_persists_approval_without_tool_arguments(tmp_path) -> None:
+    from octop.infra.db.migrate import run_migrations
+    from octop.infra.db.pool import SqlitePool
+    from octop.infra.db.repos.audit import AuditRepo
+
+    db_path = tmp_path / "approval-audit.sqlite"
+    pool = SqlitePool(db_path)
+    run_migrations(pool)
+    audit = AuditRepo(pool)
+    coordinator = HitlChannelCoordinator(audit_repo=audit)
+    record = coordinator.register_from_request(
+        {
+            "action_requests": [
+                {"name": "send_email", "args": {"to": "patient@example.com", "body": "secret"}}
+            ]
+        },
+        ctx=HitlStreamContext(
+            thread_id="thread-1",
+            agent_id="agent-1",
+            user_id=7,
+            session_key="session-1",
+            channel_type="dashboard",
+        ),
+    )
+
+    pending = AuditRepo(SqlitePool(db_path)).query(action="tool_approval.pending")
+    assert len(pending) == 1
+    assert pending[0].actor == "user:7"
+    assert pending[0].payload is not None
+    assert "send_email" in pending[0].payload
+    assert "patient@example.com" not in pending[0].payload
+    assert "secret" not in pending[0].payload
+
+    coordinator.mark_resolved(record.pending_id, "approved")
+    coordinator.mark_resolved(record.pending_id, "approved")
+    decisions = AuditRepo(SqlitePool(db_path)).query(action="tool_approval.decision")
+    assert len(decisions) == 1
+    assert '"decision":"approved"' in (decisions[0].payload or "")
+    coordinator.mark_resolved(record.pending_id, "expired")
+    decisions = AuditRepo(SqlitePool(db_path)).query(action="tool_approval.decision")
+    assert len(decisions) == 2
+    assert '"decision":"expired"' in (decisions[0].payload or "")
+
+
+def test_pending_approval_survives_coordinator_restart_encrypted_and_owner_scoped(tmp_path) -> None:
+    from octop.infra.db.migrate import run_migrations
+    from octop.infra.db.pool import SqlitePool
+    from octop.infra.db.repos.agents import AgentRepo
+    from octop.infra.db.repos.hitl_approvals import HitlApprovalRepo
+    from octop.infra.db.repos.runs import RunRepo
+    from octop.infra.db.repos.secrets import SecretRepo
+    from octop.infra.db.repos.threads import ThreadRepo
+    from octop.infra.db.repos.users import UserRepo
+
+    pool = SqlitePool(tmp_path / "hitl-pending.sqlite")
+    run_migrations(pool)
+    users = UserRepo(pool)
+    owner_id = users.create(username="hitl-owner", password_hash="h", role="user")
+    other_id = users.create(username="hitl-other", password_hash="h", role="user")
+    AgentRepo(pool).create(agent_id="hitl-agent", user_id=owner_id, name="Agent")
+    ThreadRepo(pool).insert(
+        thread_id="hitl-thread",
+        agent_id="hitl-agent",
+        user_id=owner_id,
+        channel_type="dashboard",
+        session_key="hitl-session",
+    )
+    runs = RunRepo(pool)
+    run, _ = runs.create(
+        run_id="hitl-run",
+        owner_user_id=owner_id,
+        agent_id="hitl-agent",
+        project_id=None,
+        parent_run_id=None,
+        thread_id="hitl-thread",
+        input_ref="hitl-message",
+        idempotency_key=None,
+        request_hash="hitl-request",
+    )
+    assert runs.transition("hitl-run", owner_user_id=owner_id, status="queued", expected_version=0)
+    assert runs.transition("hitl-run", owner_user_id=owner_id, status="running", expected_version=1)
+    step = runs.create_step(
+        step_id="hitl-step",
+        run_id="hitl-run",
+        owner_user_id=owner_id,
+        kind="agent",
+        executor="test",
+        parent_step_id=None,
+    )
+    assert runs.transition_step(
+        "hitl-step", owner_user_id=owner_id, status="running", expected_version=0
+    )
+    approvals = HitlApprovalRepo(pool)
+    secrets = SecretRepo(pool)
+    coordinator = HitlChannelCoordinator(approval_repo=approvals, secret_repo=secrets)
+    record = coordinator.register_from_request(
+        {
+            "action_requests": [
+                {"name": "send_email", "args": {"to": "patient@example.com", "body": "private"}}
+            ]
+        },
+        ctx=HitlStreamContext(
+            thread_id="hitl-thread",
+            agent_id="hitl-agent",
+            user_id=owner_id,
+            session_key="hitl-session",
+            channel_type="dashboard",
+            run_id=str(run["run_id"]),
+            step_id=str(step["step_id"]),
+        ),
+    )
+
+    with pool.connect() as conn:
+        blob = bytes(
+            conn.execute(
+                "SELECT request_blob FROM hitl_approvals WHERE pending_id = ?",
+                (record.pending_id,),
+            ).fetchone()["request_blob"]
+        )
+    assert b"patient@example.com" not in blob
+    assert b"private" not in blob
+
+    recovered = HitlChannelCoordinator(
+        approval_repo=HitlApprovalRepo(pool), secret_repo=SecretRepo(pool)
+    )
+    assert (
+        recovered.resolve_pending_for_thread("hitl-thread", agent_id="hitl-agent", user_id=other_id)
+        is None
+    )
+    restored = recovered.resolve_pending_for_thread(
+        "hitl-thread", agent_id="hitl-agent", user_id=owner_id
+    )
+    assert restored is not None
+    assert restored.pending_id == record.pending_id
+    assert restored.run_id == "hitl-run"
+    assert restored.step_id == "hitl-step"
+    assert restored.action_requests[0]["args"]["to"] == "patient@example.com"
+    recovered.set_resume_target(restored, agent_id="hitl-member", thread_id="hitl-member-thread")
+    assert recovered.pending_thread_ids(agent_id="hitl-agent", user_id=owner_id) == frozenset(
+        {"hitl-thread"}
+    )
+    assert recovered.pending_thread_ids(agent_id="hitl-member", user_id=owner_id) == frozenset(
+        {"hitl-member-thread"}
+    )
+
+    competing = HitlChannelCoordinator(
+        approval_repo=HitlApprovalRepo(pool), secret_repo=SecretRepo(pool)
+    )
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        decisions = list(
+            executor.map(
+                lambda coordinator: coordinator.mark_resolved(record.pending_id, "approved"),
+                (recovered, competing),
+            )
+        )
+    assert sorted(decisions) == [False, True]
+    assert HitlApprovalRepo(pool).get(record.pending_id).status == "approved"  # type: ignore[union-attr]
+    with pool.connect() as conn:
+        count = conn.execute(
+            "SELECT COUNT(*) FROM audit_log WHERE action = 'tool_approval.decision'"
+        ).fetchone()[0]
+    assert count == 1
+    assert (
+        HitlChannelCoordinator(
+            approval_repo=HitlApprovalRepo(pool), secret_repo=SecretRepo(pool)
+        ).resolve_pending_for_thread("hitl-thread", agent_id="hitl-agent", user_id=owner_id)
+        is None
+    )
+
+    expiring = recovered.register_from_request(
+        {"action_requests": [{"name": "write", "args": {"secret": "expire-me"}}]},
+        ctx=HitlStreamContext(
+            thread_id="hitl-thread",
+            agent_id="hitl-agent",
+            user_id=owner_id,
+            session_key="hitl-session",
+            channel_type="dashboard",
+        ),
+    )
+    with pool.connect() as conn:
+        conn.execute(
+            "UPDATE hitl_approvals SET expires_at = 1 WHERE pending_id = ?",
+            (expiring.pending_id,),
+        )
+    assert (
+        recovered.list_pending_for_thread("hitl-thread", agent_id="hitl-agent", user_id=owner_id)
+        == []
+    )
+    with pool.connect() as conn:
+        expired = conn.execute(
+            "SELECT status, request_blob FROM hitl_approvals WHERE pending_id = ?",
+            (expiring.pending_id,),
+        ).fetchone()
+        decisions = conn.execute(
+            "SELECT COUNT(*) FROM audit_log WHERE action = 'tool_approval.decision'"
+        ).fetchone()[0]
+    assert expired["status"] == "expired"
+    assert bytes(expired["request_blob"]) == b""
+    assert decisions == 2
+
+
+def test_team_approval_is_audited_before_member_resumes() -> None:
+    audit = MagicMock()
+    sequence: list[str] = []
+    audit.write.side_effect = lambda **_kwargs: sequence.append("audit")
+    coordinator = HitlChannelCoordinator(audit_repo=audit)
+    record = coordinator.register_from_request(
+        {"action_requests": [{"name": "send_email", "args": {}}]},
+        ctx=HitlStreamContext(
+            thread_id="room-thread",
+            agent_id="host-agent",
+            user_id=7,
+            session_key="session-1",
+            channel_type="dashboard",
+        ),
+        resume_agent_id="member-agent",
+    )
+    sequence.clear()
+
+    def deliver(_pending_id: str, _decisions: list[dict[str, object]]) -> bool:
+        sequence.append("resume")
+        return True
+
+    assert (
+        coordinator.hand_member_pause(
+            record,
+            [{"type": "approve"}],
+            deliver=deliver,
+            rejected=False,
+        )
+        is True
+    )
+    assert sequence == ["audit", "resume"]
 
 
 def test_format_hitl_card_contains_commands() -> None:
@@ -269,7 +505,10 @@ async def test_coordinator_slash_approve_invalid_pending_id() -> None:
 @pytest.mark.asyncio
 async def test_coordinator_resume_failure_keeps_pending() -> None:
     store = HitlPendingStore()
-    coordinator = HitlChannelCoordinator(store=store)
+    sequence: list[str] = []
+    audit = MagicMock()
+    audit.write.side_effect = lambda **_kwargs: sequence.append("audit")
+    coordinator = HitlChannelCoordinator(store=store, audit_repo=audit)
     record = store.register(
         thread_id="thr1",
         agent_id="agent1",
@@ -283,6 +522,7 @@ async def test_coordinator_resume_failure_keeps_pending() -> None:
     agent_manager = MagicMock()
 
     async def _fail(*_args: object, **_kwargs: object):
+        sequence.append("resume")
         raise RuntimeError("boom")
         yield  # pragma: no cover
 
@@ -309,6 +549,7 @@ async def test_coordinator_resume_failure_keeps_pending() -> None:
     pending = store.resolve_for_session("sk1")
     assert pending is not None
     assert pending.pending_id == record.pending_id
+    assert sequence == ["audit", "resume"]
 
 
 @pytest.mark.asyncio
@@ -479,7 +720,7 @@ def test_pending_hitl_payload() -> None:
         review_configs=None,
     )
     payload = pending_hitl_payload(
-        store,
+        HitlChannelCoordinator(store=store),
         thread_id="thr1",
         agent_id="agent1",
         user_id=7,

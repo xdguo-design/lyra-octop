@@ -68,8 +68,12 @@ async def test_embedded_subapp_directory_serves_its_index(tmp_octop_home: Path) 
             for path in ("/admission-registration", "/admission-registration/"):
                 r = c.get(path)
                 assert r.status_code == 200, path
-                assert "/admission-registration/assets/" in r.text, path
+                assert "app.html" in r.text, path
                 assert "no-cache" in r.headers.get("cache-control", ""), path
+
+            app = c.get("/admission-registration/app.html")
+            assert app.status_code == 200
+            assert "/admission-registration/assets/" in app.text
 
 
 async def test_path_traversal_is_blocked(tmp_octop_home: Path) -> None:

@@ -175,6 +175,12 @@ def candidate_result(
             for key in uncertain_fields
             if key in _UNCERTAIN_FIELD_TARGETS
         }
+        phones = list(_PHONE.finditer(text))
+        if (
+            len(phones) == 1
+            and "联系人" not in text[max(0, phones[0].start() - 8) : phones[0].start()]
+        ):
+            uncertain_targets.discard("phone")
         values = {key: value for key, value in values.items() if key not in uncertain_targets}
     accepted: dict[str, Any] = {}
     for key, value in values.items():
@@ -188,6 +194,15 @@ def candidate_result(
         else:
             accepted[key] = value
     return accepted, errors
+
+
+def phone_only_input(text: str) -> str | None:
+    """Return an explicitly labeled or bare phone when it is the entire utterance."""
+    value = text.strip().rstrip("。.!！?？，,；;").strip()
+    labeled = _LABELED_PHONE.fullmatch(value)
+    if labeled and value.startswith(("我", "本人")):
+        return labeled.group(1)
+    return value if _PHONE.fullmatch(value) else None
 
 
 def _page1_values(text: str, extracted: dict[str, Any]) -> dict[str, Any]:

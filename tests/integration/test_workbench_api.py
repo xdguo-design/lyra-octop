@@ -309,7 +309,6 @@ async def test_projects_can_nest_under_a_parent_project(env_with_main_agent: Any
         json={"name": parent["name"], "icon": parent["icon"], "parent_id": child["project_id"]},
     )
     assert flipped.status_code == 403
-
     # Deleting the parent sends children back to the top level.
     deleted = await client.delete(
         f"/api/workbench/projects/{parent['project_id']}", headers=admin_auth
@@ -329,6 +328,39 @@ async def test_projects_can_nest_under_a_parent_project(env_with_main_agent: Any
             "updated_at": child["updated_at"],
         }
     ]
+
+
+async def test_project_context_uses_owner_scope_and_revision_cas(env_with_main_agent: Any) -> None:
+    client, _server, admin_auth, _agent_id = env_with_main_agent
+    project = await client.post(
+        "/api/workbench/projects", headers=admin_auth, json={"name": "context"}
+    )
+    assert project.status_code == 201, project.text
+    project_id = project.json()["project_id"]
+
+    current = await client.get(f"/api/workbench/projects/{project_id}/context", headers=admin_auth)
+    assert current.status_code == 200, current.text
+    assert current.json()["instructions_revision"] == 1
+
+    updated = await client.put(
+        f"/api/workbench/projects/{project_id}/context",
+        headers=admin_auth,
+        json={"instructions": "Use only approved project sources.", "expected_revision": 1},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["instructions_revision"] == 2
+
+    stale = await client.put(
+        f"/api/workbench/projects/{project_id}/context",
+        headers=admin_auth,
+        json={"instructions": "stale overwrite", "expected_revision": 1},
+    )
+    assert stale.status_code == 409, stale.text
+    assert stale.json()["error"]["code"] == "WORKBENCH_CONTEXT_CONFLICT"
+
+    other_auth = await create_user(client, admin_auth, username="context-other")
+    hidden = await client.get(f"/api/workbench/projects/{project_id}/context", headers=other_auth)
+    assert hidden.status_code == 404, hidden.text
 
 
 async def test_project_share_is_anonymous_read_only_and_revocable(

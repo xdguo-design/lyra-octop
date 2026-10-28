@@ -21,6 +21,16 @@ export type HitlTranslate = (
 ) => string;
 
 const ALWAYS_HIDDEN = new Set(["session_id", "profile"]);
+const SENSITIVE_KEY_PARTS = new Set([
+  "password",
+  "passwd",
+  "secret",
+  "token",
+  "credential",
+  "credentials",
+  "authorization",
+  "cookie",
+]);
 const TRUNCATE_KEYS = new Set([
   "content",
   "body",
@@ -81,6 +91,16 @@ function isEmpty(value: unknown): boolean {
   return value === null || value === undefined || value === "";
 }
 
+function isSensitiveKey(key: string): boolean {
+  const normalized = key.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+  const parts = normalized.split(/[^a-z0-9]+/).filter(Boolean);
+  return (
+    parts.some((part) => SENSITIVE_KEY_PARTS.has(part)) ||
+    normalized.includes("api_key") ||
+    normalized.includes("private_key")
+  );
+}
+
 function shouldHide(key: string, value: unknown): boolean {
   if (ALWAYS_HIDDEN.has(key) || isEmpty(value)) return true;
   return false;
@@ -110,7 +130,14 @@ function formatPlain(value: unknown, t: HitlTranslate): string {
   if (value && typeof value === "object") {
     return Object.entries(value as Record<string, unknown>)
       .filter(([k, v]) => !shouldHide(k, v))
-      .map(([k, v]) => `${humanizeArgKey(k)}: ${formatPlain(v, t)}`)
+      .map(
+        ([k, v]) =>
+          `${humanizeArgKey(k)}: ${
+            isSensitiveKey(k)
+              ? resolve(t, "chat.hitl.sensitiveValue", "Hidden sensitive value")
+              : formatPlain(v, t)
+          }`,
+      )
       .join("; ");
   }
   return String(value);
@@ -254,7 +281,9 @@ export function summarizeHitlAction(
   const rows: HitlArgRow[] = [];
   for (const [key, value] of Object.entries(safeArgs)) {
     if (shouldHide(key, value)) continue;
-    const formatted = formatArgValue(name, key, value, t);
+    const formatted = isSensitiveKey(key)
+      ? resolve(t, "chat.hitl.sensitiveValue", "Hidden sensitive value")
+      : formatArgValue(name, key, value, t);
     if (!formatted) continue;
     rows.push({
       label: argLabel(key, t),

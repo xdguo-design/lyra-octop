@@ -11,7 +11,9 @@ const initialItems: TodoListItem[] = [
 describe("TodoProgressPanel editing", () => {
   it("lets the user edit tasks and send the updated plan to the Agent", () => {
     const onSyncTodos = vi.fn();
-    render(<TodoProgressPanel items={initialItems} onSyncTodos={onSyncTodos} />);
+    render(
+      <TodoProgressPanel items={initialItems} onSyncTodos={onSyncTodos} />,
+    );
     fireEvent.click(screen.getByRole("button", { name: "编辑任务" }));
     fireEvent.change(screen.getByRole("textbox", { name: "第1项任务" }), {
       target: { value: "检查现有 API 和权限" },
@@ -25,7 +27,9 @@ describe("TodoProgressPanel editing", () => {
 
   it("allows adding a task before syncing", () => {
     const onSyncTodos = vi.fn();
-    render(<TodoProgressPanel items={initialItems} onSyncTodos={onSyncTodos} />);
+    render(
+      <TodoProgressPanel items={initialItems} onSyncTodos={onSyncTodos} />,
+    );
     fireEvent.click(screen.getByRole("button", { name: "编辑任务" }));
     fireEvent.click(screen.getByRole("button", { name: "添加任务" }));
     fireEvent.change(screen.getByRole("textbox", { name: "第3项任务" }), {
@@ -41,7 +45,9 @@ describe("TodoProgressPanel editing", () => {
 
   it("keeps task order when a user moves a task", () => {
     const onSyncTodos = vi.fn();
-    render(<TodoProgressPanel items={initialItems} onSyncTodos={onSyncTodos} />);
+    render(
+      <TodoProgressPanel items={initialItems} onSyncTodos={onSyncTodos} />,
+    );
     fireEvent.click(screen.getByRole("button", { name: "编辑任务" }));
     fireEvent.click(screen.getByRole("button", { name: "下移第1项" }));
     fireEvent.click(screen.getByRole("button", { name: "同步给 Agent" }));
@@ -53,10 +59,18 @@ describe("TodoProgressPanel editing", () => {
   });
 
   it("prevents syncing while the Agent is still working", () => {
-    render(<TodoProgressPanel items={initialItems} onSyncTodos={vi.fn()} isAgentBusy />);
+    render(
+      <TodoProgressPanel
+        items={initialItems}
+        onSyncTodos={vi.fn()}
+        isAgentBusy
+      />,
+    );
     fireEvent.click(screen.getByRole("button", { name: "编辑任务" }));
     expect(screen.getByRole("button", { name: "Agent 执行中" })).toBeDisabled();
-    expect(screen.getByText("Agent 执行中仍可编辑；完成后再同步。")).toBeInTheDocument();
+    expect(
+      screen.getByText("Agent 执行中仍可编辑；完成后再同步。"),
+    ).toBeInTheDocument();
   });
 
   it("keeps the owning Agent when syncing a member task list", () => {
@@ -91,8 +105,14 @@ describe("TodoProgressPanel editing", () => {
       <TodoProgressPanel items={updatedItems} onSyncTodos={onSyncTodos} />,
     );
 
-    expect(screen.getByText(/任务清单在编辑期间已更新|task list changed while you were editing/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Send to Agent|同步给 Agent/ })).toBeDisabled();
+    expect(
+      screen.getByText(
+        /任务清单在编辑期间已更新|task list changed while you were editing/i,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Send to Agent|同步给 Agent/ }),
+    ).toBeDisabled();
     expect(onSyncTodos).not.toHaveBeenCalled();
   });
 });

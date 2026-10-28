@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import en from "../../../locales/en.json";
 import zh from "../../../locales/zh.json";
 import { summarizeHitlAction, type HitlTranslate } from "./summarizeHitlAction";
 
@@ -32,6 +33,7 @@ function tFrom(bundle: unknown): HitlTranslate {
 }
 
 const tZh = tFrom(zh);
+const tEn = tFrom(en);
 
 describe("summarizeHitlAction", () => {
   it("explains browser_use dom_tree in Chinese instead of dumping JSON", () => {
@@ -133,5 +135,48 @@ describe("summarizeHitlAction", () => {
     expect(view.summary).toBe("截取当前网页截图");
     expect(view.rows.map((row) => row.label)).toEqual(["操作"]);
     expect(view.rows.some((row) => row.value === "user-7")).toBe(false);
+  });
+
+  it("redacts sensitive keys recursively while keeping the parameter names", () => {
+    const args = {
+      api_key: "sk-test-api-key",
+      apiToken: "secret-api-token",
+      settings: {
+        refresh_token: "secret-refresh-token",
+        password: "secret-password",
+        region: "us-west",
+      },
+    };
+
+    const zhView = summarizeHitlAction("custom_tool", args, tZh, "自定义工具");
+    const enView = summarizeHitlAction("custom_tool", args, tEn, "Custom tool");
+
+    const zhText = [
+      zhView.summary,
+      ...zhView.rows.map((row) => row.value),
+    ].join(" ");
+    const enText = [
+      enView.summary,
+      ...enView.rows.map((row) => row.value),
+    ].join(" ");
+    for (const secret of [
+      "sk-test-api-key",
+      "secret-api-token",
+      "secret-refresh-token",
+      "secret-password",
+    ]) {
+      expect(zhText).not.toContain(secret);
+      expect(enText).not.toContain(secret);
+    }
+    expect(zhView.rows).toEqual([
+      { label: "Api key", value: "已隐藏（敏感参数）" },
+      { label: "ApiToken", value: "已隐藏（敏感参数）" },
+      {
+        label: "Settings",
+        value:
+          "Refresh token: 已隐藏（敏感参数）; Password: 已隐藏（敏感参数）; Region: us-west",
+      },
+    ]);
+    expect(enView.rows[0]?.value).toBe("Hidden sensitive value");
   });
 });

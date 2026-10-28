@@ -10,6 +10,7 @@ export interface ACPRunnerConfig {
   trusted: boolean;
   tool_parse_mode: ACPToolParseMode;
   stdio_buffer_limit_bytes: number;
+  default_model?: string | null;
 }
 
 export interface ACPConfig {

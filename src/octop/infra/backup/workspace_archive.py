@@ -142,7 +142,7 @@ async def _list_file_paths(workspace: BackendWorkspace) -> list[str]:
     return await _list_via_aglob(workspace)
 
 
-def _clear_local_workspace(workspace_dir: Path) -> None:
+def _clear_local_workspace(workspace_dir: Path, *, protected_paths: set[str]) -> None:
     """Clear visible local workspace content before a replace import.
 
     Hidden entries (``.octop``, ``.env``, …) stay on disk: older archives may omit
@@ -152,13 +152,29 @@ def _clear_local_workspace(workspace_dir: Path) -> None:
     """
     if not workspace_dir.is_dir():
         return
+    protected = {path.replace("\\", "/").strip("/") for path in protected_paths}
+
+    def clear(path: Path, relative: str) -> None:
+        if relative in protected:
+            return
+        has_protected_descendant = any(item.startswith(f"{relative}/") for item in protected)
+        if has_protected_descendant and path.is_symlink():
+            return
+        if path.is_symlink() or not path.is_dir():
+            path.unlink(missing_ok=True)
+            return
+        if has_protected_descendant:
+            for nested in path.iterdir():
+                clear(nested, f"{relative}/{nested.name}")
+            if not any(path.iterdir()):
+                path.rmdir()
+            return
+        shutil.rmtree(path)
+
     for child in workspace_dir.iterdir():
         if child.name in _SKIP_DIR_NAMES or child.name.startswith("."):
             continue
-        if child.is_dir():
-            shutil.rmtree(child)
-        else:
-            child.unlink()
+        clear(child, child.name)
 
 
 def _iter_zip_entries(data: bytes) -> list[tuple[str, bytes]]:
@@ -219,12 +235,17 @@ def _read_entry_bytes(workspace: BackendWorkspace, rel: str) -> bytes | None:
     return workspace.download_bytes(rel)
 
 
-async def export_workspace_zip(workspace: BackendWorkspace) -> bytes:
-    """Pack workspace files into a zip archive."""
+async def export_workspace_zip(
+    workspace: BackendWorkspace, *, excluded_paths: set[str] | None = None
+) -> bytes:
+    """Pack workspace files into a zip archive, omitting explicitly private paths."""
     paths = await _list_file_paths(workspace)
+    excluded = {path.replace("\\", "/").strip("/") for path in (excluded_paths or set())}
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for path in paths:
+            if path.replace("\\", "/").strip("/") in excluded:
+                continue
             blob = await asyncio.to_thread(_read_entry_bytes, workspace, path)
             if blob is None:
                 continue
@@ -238,13 +259,15 @@ async def import_workspace_zip(
     *,
     mode: WorkspaceImportMode,
     local_workspace_dir: Path | None = None,
+    protected_paths: set[str] | None = None,
 ) -> dict[str, int | str | list[str]]:
     """Import a zip archive into the workspace."""
     entries = _iter_zip_entries(data)
     warnings: list[str] = []
 
+    protected = {path.replace("\\", "/").strip("/") for path in (protected_paths or set())}
     if mode == "replace" and local_workspace_dir is not None:
-        _clear_local_workspace(local_workspace_dir)
+        _clear_local_workspace(local_workspace_dir, protected_paths=protected)
     elif mode == "replace":
         warnings.append(
             "replace mode cleared only the local harness workspace; remote-only files may remain"
@@ -253,11 +276,19 @@ async def import_workspace_zip(
     # ``DELETE`` / ``move`` refuse this prefix, so writing it from an archive would
     # leave entries the user cannot remove; the files Octop owns are re-seeded on
     # every agent start anyway.
-    pairs = [(rel, blob) for rel, blob in entries if not is_octop_builtin_skills_path(rel)]
+    pairs = [
+        (rel, blob)
+        for rel, blob in entries
+        if not is_octop_builtin_skills_path(rel) and rel not in protected
+    ]
+    protected_skipped = sum(1 for rel, _ in entries if rel in protected)
     skipped = len(entries) - len(pairs)
-    if skipped:
+    if protected_skipped:
+        warnings.append(f"preserved {protected_skipped} registered ChatFile revision path(s)")
+    if skipped > protected_skipped:
         warnings.append(
-            f"skipped {skipped} {OCTOP_BUILTIN_SKILLS_ROOT!r} entry/entries (owned by Octop)"
+            f"skipped {skipped - protected_skipped} {OCTOP_BUILTIN_SKILLS_ROOT!r} "
+            "entry/entries (owned by Octop)"
         )
     if pairs:
         await workspace.aupload_many(pairs)

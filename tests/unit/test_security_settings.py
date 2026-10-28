@@ -34,7 +34,7 @@ def test_save_round_trip() -> None:
 
 
 def test_tool_execution_may_pause() -> None:
-    assert tool_execution_may_pause(SecurityPolicy.defaults()) is False
+    assert tool_execution_may_pause(SecurityPolicy.defaults()) is True
     assert tool_execution_may_pause(SecurityPolicy.from_dict({"hitl": {"enabled": True}})) is True
     assert (
         tool_execution_may_pause(
@@ -46,5 +46,5 @@ def test_tool_execution_may_pause() -> None:
         tool_execution_may_pause(
             SecurityPolicy.from_dict({"tool_guard": {"enabled": False, "mode": "require_approval"}})
         )
-        is False
+        is True
     )

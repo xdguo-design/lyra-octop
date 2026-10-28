@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -135,6 +136,23 @@ def test_wrap_respects_original_when() -> None:
         assert wrapped["write_file"]["when"](None) is False
 
 
+def test_protected_tool_cannot_be_skipped_by_thread_bypass() -> None:
+    store = HitlSessionPolicyStore()
+    store.set("thr_1", HitlSessionPolicy(mode="allow_all"))
+
+    def original(_req: Any) -> bool:
+        return False
+
+    wrapped = apply_session_bypass(
+        {"write_file": {"when": original}}, store, protected_tools={"write_file"}
+    )
+
+    assert wrapped is not None
+    assert wrapped["write_file"]["when"] is original
+    with hitl_thread_scope("thr_1"):
+        assert wrapped["write_file"]["when"](None) is False
+
+
 def test_store_set_persists_once() -> None:
     repo = MagicMock()
     store = HitlSessionPolicyStore(repo)
@@ -156,12 +174,17 @@ async def test_resume_hitl_binds_thread_scope() -> None:
             yield {}
 
     manager = AgentManager.__new__(AgentManager)
-    manager._harness_manager = SimpleNamespace(resume_hitl=fake_resume)
+    manager._harness_manager = SimpleNamespace(
+        resume_hitl=fake_resume,
+        get_agent=lambda _agent_id: MagicMock(agent=MagicMock()),
+    )
     manager._history_backfills = {}
     manager._reclaim_pending = set()
     manager._reclaim_holds = {}
     manager._reclaim_task = None
     manager._reclaim_wake = None
+    manager._last_activity = {}
+    manager._idle_stop_task = None
     manager._invocation_waiters = {}
     manager._active_invocations = {}
     manager._thread_execution_locks = {}
@@ -173,7 +196,25 @@ async def test_resume_hitl_binds_thread_scope() -> None:
     assert current_hitl_thread_id() is None
 
 
-def test_build_harness_config_skips_interrupt_for_allowed_thread(
+@pytest.mark.asyncio
+async def test_ensure_running_waits_for_agent_startup_policy_initialization() -> None:
+    ready = asyncio.Event()
+    manager = AgentManager.__new__(AgentManager)
+    manager._harness_manager = SimpleNamespace(
+        get_agent=lambda _agent_id: SimpleNamespace(agent=object())
+    )
+    manager._agent_start_events = {"agt": ready}
+    manager._last_activity = {}
+
+    task = asyncio.create_task(manager._ensure_running("agt"))
+    await asyncio.sleep(0)
+    assert not task.done()
+
+    ready.set()
+    await task
+
+
+def test_build_harness_config_protects_required_approvals_from_thread_bypass(
     manager: AgentManager,
 ) -> None:
     from tests.unit.agents.test_agent_manager import _row, _seed_test_provider
@@ -188,8 +229,66 @@ def test_build_harness_config_skips_interrupt_for_allowed_thread(
     cfg = manager._build_harness_config(_row())
     assert cfg.interrupt_on is not None
     write_cfg = cfg.interrupt_on["write_file"]
-    assert callable(write_cfg.get("when"))
+    assert "cronjob_delete" in cfg.interrupt_on
+    assert "read_file" not in cfg.interrupt_on
     with hitl_thread_scope("thr_1"):
-        assert write_cfg["when"](None) is False
+        assert write_cfg.get("when") is None
     with hitl_thread_scope("other"):
-        assert write_cfg["when"](None) is True
+        assert write_cfg.get("when") is None
+
+
+def test_build_harness_config_requires_risky_tool_approval_when_hitl_is_disabled(
+    manager: AgentManager,
+) -> None:
+    from tests.unit.agents.test_agent_manager import _row, _seed_test_provider
+
+    _seed_test_provider(manager)
+    manager._security.save(SecurityPolicy.from_dict({"hitl": {"enabled": False}}))
+    store = HitlSessionPolicyStore()
+    store.set("thr_1", HitlSessionPolicy(mode="allow_all"))
+    manager.set_hitl_session_store(store)
+
+    cfg = manager._build_harness_config(_row())
+
+    assert cfg.interrupt_on is not None
+    assert cfg.interrupt_on["write_file"]["allowed_decisions"] == ["approve", "reject"]
+    with hitl_thread_scope("thr_1"):
+        assert "when" not in cfg.interrupt_on["write_file"]
+
+
+def test_tool_risk_classification_defaults_unknown_tools_to_approval() -> None:
+    from octop.infra.agents.security.tool_risk import (
+        approval_required_tools,
+        tool_operation,
+    )
+
+    assert tool_operation("read_file") == "read"
+    assert tool_operation("cronjob_delete") == "write"
+    assert tool_operation("send_file_to_user") == "external_send"
+    assert tool_operation("read_env_file") == "external_send"
+    assert tool_operation("connector_unknown__mutate") == "write"
+    assert approval_required_tools(["read_file", "connector_unknown__mutate"]) == {
+        "connector_unknown__mutate"
+    }
+
+
+def test_dynamic_mcp_tool_is_gated_before_graph_compilation(manager: AgentManager) -> None:
+    store = HitlSessionPolicyStore()
+    store.set("thr_1", HitlSessionPolicy(mode="allow_all"))
+    manager.set_hitl_session_store(store)
+    agent = SimpleNamespace(config=SimpleNamespace(interrupt_on=None))
+
+    manager._prepare_tool_interrupts(
+        agent,
+        [
+            SimpleNamespace(name="unknown_mcp__update_record"),
+            SimpleNamespace(name="read_file"),
+        ],
+    )
+
+    assert agent.config.interrupt_on["unknown_mcp__update_record"]["allowed_decisions"] == [
+        "approve",
+        "reject",
+    ]
+    assert "when" not in agent.config.interrupt_on["unknown_mcp__update_record"]
+    assert "when" not in agent.config.interrupt_on["read_file"]
