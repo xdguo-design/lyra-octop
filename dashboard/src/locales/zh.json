@@ -2312,6 +2312,8 @@
     "todoSyncBusy": "Agent 执行中",
     "todoSyncHint": "Agent 执行中仍可编辑；完成后再同步。",
     "todoStaleHint": "任务清单在编辑期间已更新。请取消编辑并重新打开，避免覆盖 Agent 的新进度。",
+    "todoCollapse": "收起清单",
+    "todoExpand": "展开清单",
     "todoContentPlaceholder": "输入任务内容",
     "todoContentLabel": "第{{number}}项任务",
     "todoStatusLabel": "第{{number}}项状态",

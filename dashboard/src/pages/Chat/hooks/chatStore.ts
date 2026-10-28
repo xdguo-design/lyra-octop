@@ -488,6 +488,10 @@ function getOrCreate(sessionId: string): SessionStreamState {
 function notify(state: SessionStreamState) {
   // Rebuild the snapshot reference so useSyncExternalStore sees the change.
   state._snapshot = buildSnapshot(state);
+  wakeListeners(state);
+}
+
+function wakeListeners(state: SessionStreamState) {
   for (const fn of state.listeners) {
     try {
       fn();
@@ -495,6 +499,41 @@ function notify(state: SessionStreamState) {
       /* ignore */
     }
   }
+}
+
+const STREAM_NOTIFY_THROTTLE_MS = 80;
+const pendingStreamNotifyTimers = new WeakMap<
+  SessionStreamState,
+  ReturnType<typeof setTimeout>
+>();
+
+function cancelDeferredStreamNotify(state: SessionStreamState): void {
+  const timer = pendingStreamNotifyTimers.get(state);
+  if (timer !== undefined) {
+    clearTimeout(timer);
+    pendingStreamNotifyTimers.delete(state);
+  }
+}
+
+/**
+ * Coalesce token/reasoning chunks into at most one listener wakeup per
+ * interval. Waking React per token made long replies freeze the main thread:
+ * every render re-parses the whole streaming markdown and re-renders the
+ * message list, so cost grows quadratically with reply length. The snapshot
+ * itself is rebuilt eagerly so synchronous `getSnapshot()` readers (history
+ * reconciliation, tests) always see current messages. Structural chunks
+ * (tool, done, error, …) always flush immediately instead.
+ */
+function notifyThrottled(state: SessionStreamState): void {
+  state._snapshot = buildSnapshot(state);
+  if (pendingStreamNotifyTimers.has(state)) return;
+  pendingStreamNotifyTimers.set(
+    state,
+    setTimeout(() => {
+      pendingStreamNotifyTimers.delete(state);
+      wakeListeners(state);
+    }, STREAM_NOTIFY_THROTTLE_MS),
+  );
 }
 
 function beginStream(state: SessionStreamState, sessionId: string): void {
@@ -903,6 +942,7 @@ export function removeSession(sessionId: string) {
   const state = sessionStates.get(sessionId);
   if (state) {
     state.abortController?.abort();
+    cancelDeferredStreamNotify(state);
     sessionStates.delete(sessionId);
   }
   pendingResumeBySession.delete(sessionId);
@@ -1309,7 +1349,14 @@ function handleHarnessChunk(
       // Debug-only — phase 15 will add a debug toggle that surfaces these.
       break;
   }
-  notify(state);
+  // Text-streaming chunks only coalesce; anything structural must flush now
+  // so a trailing throttle timer can never render stale state after `done`.
+  if (chunk.type === "token" || chunk.type === "reasoning") {
+    notifyThrottled(state);
+  } else {
+    cancelDeferredStreamNotify(state);
+    notify(state);
+  }
 }
 
 /** Apply one live harness frame (used by WS and unit tests). */
