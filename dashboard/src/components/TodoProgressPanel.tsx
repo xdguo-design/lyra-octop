@@ -5,6 +5,7 @@ import {
   ChevronUp,
   Circle,
   CircleDot,
+  ListTodo,
   Loader2,
   Pencil,
   Plus,
@@ -36,6 +37,19 @@ function statusIcon(status: TodoListItem["status"], isStreaming: boolean) {
   }
 }
 
+function statusClass(status: TodoListItem["status"]): string {
+  switch (status) {
+    case "completed":
+      return styles.todoItemCompleted;
+    case "in_progress":
+      return styles.todoItemInProgress;
+    case "cancelled":
+      return styles.todoItemCancelled;
+    default:
+      return styles.todoItemPending;
+  }
+}
+
 export function TodoListView({
   items,
   isStreaming = false,
@@ -63,20 +77,31 @@ export function TodoListView({
         .join(" ")}
     >
       <div className={styles.todoListHeader}>
-        <div className={styles.todoListTitle}>
-          {t("chatUsage.todoListTitle", "Task progress")}
-        </div>
-        <div className={styles.todoListSummary}>
-          {t("chatUsage.todoListSummary", {
-            completed,
-            total: items.length,
-            defaultValue: "{{completed}}/{{total}} done",
-          })}
+        <div className={styles.todoListTitleWrap}>
+          <ListTodo
+            size={15}
+            className={styles.todoHeaderIcon}
+            aria-hidden="true"
+          />
+          <div className={styles.todoListTitle}>
+            {t("chatUsage.todoListTitle", "Task progress")}
+          </div>
+          <div className={styles.todoListSummary}>
+            {t("chatUsage.todoListSummary", {
+              completed,
+              total: items.length,
+              defaultValue: "{{completed}}/{{total}} done",
+            })}
+          </div>
         </div>
       </div>
       <ul className={styles.todoListItems}>
         {items.map((item) => (
-          <li key={item.id} className={styles.todoListItem}>
+          <li
+            key={item.id}
+            className={`${styles.todoListItem} ${statusClass(item.status)}`}
+            aria-label={t(`chatUsage.todoStatus.${item.status}`, item.status)}
+          >
             <span className={styles.todoListIcon}>
               {statusIcon(item.status, isStreaming)}
             </span>
@@ -90,9 +115,6 @@ export function TodoListView({
               }`}
             >
               {item.content}
-            </span>
-            <span className={styles.todoListStatus}>
-              {t(`chatUsage.todoStatus.${item.status}`, item.status)}
             </span>
           </li>
         ))}
@@ -121,7 +143,10 @@ export function TodoProgressPanel({
   const { t } = useTranslation();
   const itemsSignature = JSON.stringify(items);
   const [editing, setEditing] = useState(false);
-  const [draftItems, setDraftItems] = useState<TodoListItem[]>(() => [...items]);
+  const [collapsed, setCollapsed] = useState(false);
+  const [draftItems, setDraftItems] = useState<TodoListItem[]>(() => [
+    ...items,
+  ]);
   const [baseSignature, setBaseSignature] = useState(itemsSignature);
   const [hasExternalChanges, setHasExternalChanges] = useState(false);
 
@@ -151,7 +176,11 @@ export function TodoProgressPanel({
   const handleAdd = () => {
     setDraftItems((current) => [
       ...current,
-      { id: "draft-" + Date.now() + "-" + current.length, content: "", status: "pending" },
+      {
+        id: "draft-" + Date.now() + "-" + current.length,
+        content: "",
+        status: "pending",
+      },
     ]);
   };
 
@@ -198,29 +227,77 @@ export function TodoProgressPanel({
     styles.todoListBlock,
     styles.todoProgressPanel,
     followingProcessSummary ? styles.followingProcessSummary : null,
-  ].filter(Boolean).join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const listTitle = ownerLabel
+    ? t("chatUsage.todoAgentPlanTitle", {
+        agent: ownerLabel,
+        defaultValue: "{{agent}} · 任务清单",
+      })
+    : t("chatUsage.todoListTitle", "任务进度");
+  const collapseLabel = collapsed
+    ? t("chatUsage.todoExpand", "展开清单")
+    : t("chatUsage.todoCollapse", "收起清单");
 
   return (
     <div className={containerClassName}>
       <div className={styles.todoListHeader}>
-        <div className={styles.todoListTitle}>
-          {ownerLabel
-            ? t("chatUsage.todoAgentPlanTitle", {
-                agent: ownerLabel,
-                defaultValue: "{{agent}} · 任务清单",
-              })
-            : t("chatUsage.todoListTitle", "任务进度")}
-        </div>
-        <div className={styles.todoHeaderActions}>
-          <div className={styles.todoListSummary}>
-            {t("chatUsage.todoListSummary", {
-              completed,
-              total: visibleItems.length,
-              defaultValue: "已完成 {{completed}}/{{total}}",
-            })}
+        {!editing ? (
+          <button
+            type="button"
+            className={styles.todoCollapseToggle}
+            onClick={() => setCollapsed((value) => !value)}
+            aria-expanded={!collapsed}
+            aria-label={collapseLabel}
+            title={collapseLabel}
+          >
+            <ListTodo
+              size={15}
+              className={styles.todoHeaderIcon}
+              aria-hidden="true"
+            />
+            <span className={styles.todoListTitle}>{listTitle}</span>
+            <span className={styles.todoListSummary}>
+              {t("chatUsage.todoListSummary", {
+                completed,
+                total: visibleItems.length,
+                defaultValue: "已完成 {{completed}}/{{total}}",
+              })}
+            </span>
+            <ChevronDown
+              size={15}
+              aria-hidden="true"
+              className={[
+                styles.todoChevron,
+                collapsed ? styles.todoChevronCollapsed : "",
+              ].join(" ")}
+            />
+          </button>
+        ) : (
+          <div className={styles.todoListTitleWrap}>
+            <ListTodo
+              size={15}
+              className={styles.todoHeaderIcon}
+              aria-hidden="true"
+            />
+            <span className={styles.todoListTitle}>{listTitle}</span>
+            <span className={styles.todoListSummary}>
+              {t("chatUsage.todoListSummary", {
+                completed,
+                total: visibleItems.length,
+                defaultValue: "已完成 {{completed}}/{{total}}",
+              })}
+            </span>
           </div>
+        )}
+        <div className={styles.todoHeaderActions}>
           {!editing && onSyncTodos ? (
-            <button type="button" className={styles.todoActionButton} onClick={handleStartEditing}>
+            <button
+              type="button"
+              className={styles.todoActionButton}
+              onClick={handleStartEditing}
+            >
               <Pencil size={14} aria-hidden="true" />
               {t("chatUsage.todoEdit", "编辑任务")}
             </button>
@@ -239,12 +316,22 @@ export function TodoProgressPanel({
                     defaultValue: "第{{number}}项状态",
                   })}
                   value={item.status}
-                  onChange={(event) => updateItem(item.id, { status: event.currentTarget.value })}
+                  onChange={(event) =>
+                    updateItem(item.id, { status: event.currentTarget.value })
+                  }
                 >
-                  <option value="pending">{t("chatUsage.todoStatus.pending", "待处理")}</option>
-                  <option value="in_progress">{t("chatUsage.todoStatus.in_progress", "进行中")}</option>
-                  <option value="completed">{t("chatUsage.todoStatus.completed", "已完成")}</option>
-                  <option value="cancelled">{t("chatUsage.todoStatus.cancelled", "已取消")}</option>
+                  <option value="pending">
+                    {t("chatUsage.todoStatus.pending", "待处理")}
+                  </option>
+                  <option value="in_progress">
+                    {t("chatUsage.todoStatus.in_progress", "进行中")}
+                  </option>
+                  <option value="completed">
+                    {t("chatUsage.todoStatus.completed", "已完成")}
+                  </option>
+                  <option value="cancelled">
+                    {t("chatUsage.todoStatus.cancelled", "已取消")}
+                  </option>
                 </select>
                 <input
                   className={styles.todoContentInput}
@@ -252,9 +339,14 @@ export function TodoProgressPanel({
                     number: index + 1,
                     defaultValue: "第{{number}}项任务",
                   })}
-                  placeholder={t("chatUsage.todoContentPlaceholder", "输入任务内容")}
+                  placeholder={t(
+                    "chatUsage.todoContentPlaceholder",
+                    "输入任务内容",
+                  )}
                   value={item.content}
-                  onChange={(event) => updateItem(item.id, { content: event.currentTarget.value })}
+                  onChange={(event) =>
+                    updateItem(item.id, { content: event.currentTarget.value })
+                  }
                 />
                 <button
                   type="button"
@@ -292,19 +384,31 @@ export function TodoProgressPanel({
             ))}
           </ul>
           <div className={styles.todoEditorFooter}>
-            <button type="button" className={styles.todoActionButton} onClick={handleAdd}>
+            <button
+              type="button"
+              className={styles.todoActionButton}
+              onClick={handleAdd}
+            >
               <Plus size={14} aria-hidden="true" />
               {t("chatUsage.todoAdd", "添加任务")}
             </button>
             <div className={styles.todoEditorActions}>
-              <button type="button" className={styles.todoActionButton} onClick={handleCancel}>
+              <button
+                type="button"
+                className={styles.todoActionButton}
+                onClick={handleCancel}
+              >
                 <X size={14} aria-hidden="true" />
                 {t("chatUsage.todoCancel", "取消")}
               </button>
               <button
                 type="button"
                 className={styles.todoSyncButton}
-                disabled={isAgentBusy || hasExternalChanges || !draftItems.some((item) => item.content.trim().length > 0)}
+                disabled={
+                  isAgentBusy ||
+                  hasExternalChanges ||
+                  !draftItems.some((item) => item.content.trim().length > 0)
+                }
                 onClick={handleSync}
               >
                 <Send size={14} aria-hidden="true" />
@@ -328,29 +432,35 @@ export function TodoProgressPanel({
             </div>
           ) : isAgentBusy ? (
             <div className={styles.todoSyncHint}>
-              {t("chatUsage.todoSyncHint", "Agent 执行中仍可编辑；完成后再同步。")}
+              {t(
+                "chatUsage.todoSyncHint",
+                "Agent 执行中仍可编辑；完成后再同步。",
+              )}
             </div>
           ) : null}
         </>
       ) : (
-        <ul className={styles.todoListItems}>
+        <ul className={styles.todoListItems} hidden={collapsed}>
           {items.map((item) => (
-            <li key={item.id} className={styles.todoListItem}>
-              <span className={styles.todoListIcon}>{statusIcon(item.status, isStreaming)}</span>
+            <li
+              key={item.id}
+              className={`${styles.todoListItem} ${statusClass(item.status)}`}
+              aria-label={t(`chatUsage.todoStatus.${item.status}`, item.status)}
+            >
+              <span className={styles.todoListIcon}>
+                {statusIcon(item.status, isStreaming)}
+              </span>
               <span
                 className={
                   styles.todoListText +
                   (item.status === "completed"
                     ? " " + styles.todoListTextCompleted
                     : item.status === "cancelled"
-                      ? " " + styles.todoListTextCancelled
-                      : "")
+                    ? " " + styles.todoListTextCancelled
+                    : "")
                 }
               >
                 {item.content}
-              </span>
-              <span className={styles.todoListStatus}>
-                {t("chatUsage.todoStatus." + item.status, item.status)}
               </span>
             </li>
           ))}

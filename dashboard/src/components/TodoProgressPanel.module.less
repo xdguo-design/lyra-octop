@@ -1,17 +1,20 @@
+/* DeepSeek-harness-style task list: quiet rounded card, collapsible header,
+ * status conveyed by icon + text treatment (no right-hand status labels). */
+
 .todoListBlock {
   margin-top: 8px;
-  padding: 10px 12px;
+  padding: 10px 14px;
   border: 1px solid var(--fn-border-secondary, rgba(0, 0, 0, 0.06));
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--fn-bg-secondary, rgba(0, 0, 0, 0.02));
 }
 
 .todoProgressPanel {
   margin-top: 0;
   margin-bottom: 10px;
-  border-color: var(--fn-border-primary, rgba(22, 119, 255, 0.18));
+  border-color: var(--fn-border-secondary, rgba(0, 0, 0, 0.06));
   background: var(--fn-bg-elevated, #fff);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .followingProcessSummary {
@@ -23,13 +26,64 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+.todoListTitleWrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.todoCollapseToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 3px 6px;
+  margin: -3px -6px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--fn-transition-fast, 0.15s ease);
+}
+
+.todoCollapseToggle:hover {
+  background: var(--fn-bg-secondary, rgba(0, 0, 0, 0.04));
+}
+
+.todoCollapseToggle:focus-visible {
+  outline: 2px solid var(--fn-color-brand);
+  outline-offset: 2px;
+}
+
+.todoHeaderIcon {
+  flex: none;
+  color: var(--fn-text-secondary);
+}
+
+.todoChevron {
+  flex: none;
+  color: var(--fn-text-tertiary);
+  transition: transform var(--fn-transition-fast, 0.15s ease);
+}
+
+.todoChevronCollapsed {
+  transform: rotate(-90deg);
 }
 
 .todoListTitle {
   color: var(--fn-text-secondary);
   font-size: 12px;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .todoListSummary {
@@ -41,29 +95,40 @@
 .todoListItems {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 2px;
   margin: 0;
-  padding: 0;
+  padding: 2px 0 0;
   list-style: none;
 }
 
 .todoListItem {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) auto;
+  grid-template-columns: 18px minmax(0, 1fr);
   gap: 8px;
   align-items: start;
+  padding: 4px 6px;
+  border-radius: 8px;
 }
 
 .todoListIcon {
   display: inline-flex;
-  margin-top: 1px;
+  margin-top: 2px;
 }
 
 .todoListText {
   color: var(--fn-text-primary);
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.5;
   word-break: break-word;
+}
+
+/* In-progress item: gently highlighted like DeepSeek's active step. */
+.todoItemInProgress {
+  background: var(--fn-bg-hover, rgba(0, 0, 0, 0.04));
+}
+
+.todoItemInProgress .todoListText {
+  font-weight: 500;
 }
 
 .todoListTextCompleted,
@@ -72,22 +137,16 @@
   text-decoration: line-through;
 }
 
-.todoListStatus {
-  color: var(--fn-text-tertiary);
-  font-size: 11px;
-  white-space: nowrap;
-}
-
 .todoStatusPending {
-  color: #8c8c8c;
+  color: var(--fn-text-tertiary, #8c8c8c);
 }
 
 .todoStatusInProgress {
-  color: #1677ff;
+  color: var(--fn-color-brand, #1677ff);
 }
 
 .todoStatusInProgressSpin {
-  color: #1677ff;
+  color: var(--fn-color-brand, #1677ff);
   animation: todoSpin 1s linear infinite;
 }
 
@@ -105,40 +164,138 @@
 }
 
 .todoStatusCancelled {
-  color: #ff4d4f;
+  color: var(--fn-text-tertiary, #8c8c8c);
 }
 
-
-.todoHeaderActions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
-.todoActionButton, .todoSyncButton, .todoRemoveButton, .todoMoveButton {
-  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-  min-height: 30px; padding: 4px 8px; border: 1px solid var(--fn-border-primary);
-  border-radius: 7px; background: var(--fn-bg-elevated, #fff); color: var(--fn-text-secondary);
-  font-size: 12px; line-height: 1.2; white-space: nowrap; cursor: pointer;
-  transition: color var(--fn-transition-fast, 0.15s ease), border-color var(--fn-transition-fast, 0.15s ease), background var(--fn-transition-fast, 0.15s ease);
+.todoHeaderActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
 }
-.todoActionButton:hover, .todoRemoveButton:hover, .todoMoveButton:hover:not(:disabled) { color: var(--fn-text-primary); border-color: var(--fn-color-brand); }
-.todoSyncButton { border-color: var(--fn-color-brand); background: var(--fn-color-brand); color: #fff; }
-.todoSyncButton:hover:not(:disabled) { filter: brightness(0.96); }
-.todoActionButton:focus-visible, .todoSyncButton:focus-visible, .todoRemoveButton:focus-visible, .todoMoveButton:focus-visible, .todoContentInput:focus-visible, .todoStatusSelect:focus-visible {
-  outline: 2px solid var(--fn-color-brand); outline-offset: 2px;
+.todoActionButton,
+.todoSyncButton,
+.todoRemoveButton,
+.todoMoveButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 1px solid var(--fn-border-primary);
+  border-radius: 8px;
+  background: var(--fn-bg-elevated, #fff);
+  color: var(--fn-text-secondary);
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color var(--fn-transition-fast, 0.15s ease),
+    border-color var(--fn-transition-fast, 0.15s ease),
+    background var(--fn-transition-fast, 0.15s ease);
 }
-.todoSyncButton:disabled { opacity: 0.55; cursor: not-allowed; }
-.todoEditorItems { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.todoEditorItem { display: grid; grid-template-columns: 112px minmax(0, 1fr) 26px 26px 30px; align-items: center; gap: 6px; }
-.todoStatusSelect, .todoContentInput {
-  box-sizing: border-box; width: 100%; min-width: 0; height: 32px; padding: 0 8px;
-  border: 1px solid var(--fn-border-primary); border-radius: 7px;
-  background: var(--fn-bg-elevated, #fff); color: var(--fn-text-primary); font: inherit; font-size: 12px;
+.todoActionButton:hover,
+.todoRemoveButton:hover,
+.todoMoveButton:hover:not(:disabled) {
+  color: var(--fn-text-primary);
+  border-color: var(--fn-color-brand);
 }
-.todoRemoveButton { width: 30px; min-width: 30px; padding: 0; color: var(--fn-text-tertiary); }
-.todoMoveButton { width: 26px; min-width: 26px; padding: 0; color: var(--fn-text-tertiary); }
-.todoMoveButton:disabled { opacity: 0.35; cursor: not-allowed; }
-.todoEditorFooter { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-.todoEditorActions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
-.todoSyncHint { margin-top: 8px; color: var(--fn-text-tertiary); font-size: 11px; line-height: 1.45; }
+.todoSyncButton {
+  border-color: var(--fn-color-brand);
+  background: var(--fn-color-brand);
+  color: #fff;
+}
+.todoSyncButton:hover:not(:disabled) {
+  filter: brightness(0.96);
+}
+.todoActionButton:focus-visible,
+.todoSyncButton:focus-visible,
+.todoRemoveButton:focus-visible,
+.todoMoveButton:focus-visible,
+.todoContentInput:focus-visible,
+.todoStatusSelect:focus-visible {
+  outline: 2px solid var(--fn-color-brand);
+  outline-offset: 2px;
+}
+.todoSyncButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.todoEditorItems {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 4px 0 0;
+  list-style: none;
+}
+.todoEditorItem {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) 26px 26px 30px;
+  align-items: center;
+  gap: 6px;
+}
+.todoStatusSelect,
+.todoContentInput {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--fn-border-primary);
+  border-radius: 8px;
+  background: var(--fn-bg-elevated, #fff);
+  color: var(--fn-text-primary);
+  font: inherit;
+  font-size: 12px;
+}
+.todoRemoveButton {
+  width: 30px;
+  min-width: 30px;
+  padding: 0;
+  color: var(--fn-text-tertiary);
+}
+.todoMoveButton {
+  width: 26px;
+  min-width: 26px;
+  padding: 0;
+  color: var(--fn-text-tertiary);
+}
+.todoMoveButton:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.todoEditorFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.todoEditorActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.todoSyncHint {
+  margin-top: 8px;
+  color: var(--fn-text-tertiary);
+  font-size: 11px;
+  line-height: 1.45;
+}
 @media (max-width: 520px) {
-  .todoHeaderActions { gap: 5px; }
-  .todoEditorItem { grid-template-columns: minmax(0, 1fr) 26px 26px 30px; }
-  .todoStatusSelect { grid-column: 1 / -1; }
+  .todoHeaderActions {
+    gap: 5px;
+  }
+  .todoEditorItem {
+    grid-template-columns: minmax(0, 1fr) 26px 26px 30px;
+  }
+  .todoStatusSelect {
+    grid-column: 1 / -1;
+  }
 }
