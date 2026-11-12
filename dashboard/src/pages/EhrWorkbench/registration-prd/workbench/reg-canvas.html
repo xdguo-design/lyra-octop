@@ -1,0 +1,951 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="门诊挂号登记工作台 · 高保真交互画布（组件联动工作台中央画布，含 C 编号标记与工作台协议）" />
+  <title>门诊挂号登记 · 交互画布</title>
+  <style>
+    :root {
+      --ink: #182433; --muted: #6c7a8c; --subtle: #9aa6b4;
+      --line: #dfe6ee; --line-strong: #cbd5e1;
+      --canvas: #f4f7fa; --paper: #ffffff;
+      --blue: #2f6ff3; --blue-deep: #1f4fc1;
+      --teal: #0b8e83; --green: #16805b; --green-soft: #e7f6ef;
+      --orange: #bc7000; --orange-soft: #fff4df;
+      --red: #c23d46; --red-soft: #fff0f1;
+      --purple: #7458ca; --purple-soft: #f0ecff;
+      --shadow: 0 10px 30px rgba(30, 51, 75, .07);
+      --shadow-small: 0 3px 10px rgba(30, 51, 75, .06);
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--canvas); }
+    body {
+      margin: 0; color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      font-size: 14px; line-height: 1.45; background: var(--canvas); min-width: 1160px;
+    }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; }
+    button:disabled, input:disabled, select:disabled { cursor: not-allowed; opacity: .52; }
+    .app-shell { min-height: 100vh; }
+    .topbar {
+      height: 72px; padding: 0 28px; display: flex; align-items: center; gap: 24px;
+      background: #12233b; color: #fff; box-shadow: 0 4px 18px rgba(11, 27, 48, .18);
+    }
+    .wordmark { display: flex; align-items: center; gap: 11px; min-width: 274px; }
+    .wordmark-mark {
+      width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(145deg, #69d0c2, #2f6ff3);
+      display: grid; place-items: center; position: relative; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25);
+    }
+    .wordmark-mark:before, .wordmark-mark:after { content: ""; position: absolute; background: #fff; border-radius: 999px; }
+    .wordmark-mark:before { width: 15px; height: 4px; }
+    .wordmark-mark:after { width: 4px; height: 15px; }
+    .wordmark-main { font-size: 16px; font-weight: 760; letter-spacing: .03em; }
+    .wordmark-sub { color: #a9bad0; font-size: 11px; margin-top: 1px; }
+    .topbar-divider { width: 1px; height: 27px; background: rgba(255,255,255,.15); }
+    .crumbs { color: #a9bad0; font-size: 12px; white-space: nowrap; }
+    .topbar-spacer { flex: 1; }
+    .operator { display: flex; gap: 10px; align-items: center; color: #dbe5f1; }
+    .operator-avatar { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; color: #16314a; background: #cfe8e5; font-weight: 750; }
+    .operator-name { font-weight: 650; }
+    .operator-role { color: #9eb0c5; font-size: 11px; }
+    main { max-width: 1560px; margin: 0 auto; padding: 20px 24px 26px; }
+    .status-strip {
+      min-height: 56px; display: flex; align-items: center; gap: 17px; padding: 10px 16px; background: var(--paper);
+      border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-small); margin-bottom: 14px;
+    }
+    .status-anchor { display: flex; align-items: center; gap: 9px; padding-right: 17px; border-right: 1px solid var(--line); min-width: 170px; }
+    .status-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--subtle); box-shadow: 0 0 0 4px #eef2f5; }
+    .status-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; }
+    .status-value { margin-left: 2px; font-size: 13px; font-weight: 780; letter-spacing: .03em; }
+    .status-context { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+    .context-title { font-weight: 720; white-space: nowrap; }
+    .context-detail { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .status-meta { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .tag { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border-radius: 999px; font-size: 11px; font-weight: 720; letter-spacing: .03em; border: 1px solid transparent; }
+    .tag-neutral { color: #637184; background: #f3f5f7; border-color: #e1e6eb; }
+    .tag-blue { color: var(--blue-deep); background: #edf3ff; border-color: #cfddff; }
+    .tag-green { color: var(--green); background: var(--green-soft); border-color: #bce8d3; }
+    .tag-orange { color: var(--orange); background: var(--orange-soft); border-color: #f1d59f; }
+    .tag-red { color: var(--red); background: var(--red-soft); border-color: #f4c7ca; }
+    .tag-purple { color: var(--purple); background: var(--purple-soft); border-color: #ddd3ff; }
+    .search-pair { display: grid; grid-template-columns: 1.06fr .94fr; gap: 14px; margin-bottom: 14px; }
+    .search-panel { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-small); padding: 14px 16px 15px; }
+    .search-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .section-kicker { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .zone-code { color: var(--blue); font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+    .section-title { color: var(--ink); font-size: 14px; font-weight: 760; letter-spacing: .01em; }
+    .field-row { display: grid; grid-template-columns: minmax(120px, 168px) minmax(150px, 1fr) auto auto 1fr; gap: 10px; align-items: start; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field-label { color: var(--muted); font-size: 11px; font-weight: 650; }
+    .control { height: 36px; background: #fbfcfd; border: 1px solid var(--line-strong); border-radius: 7px; padding: 0 11px; color: var(--ink); outline: none; transition: border .15s, box-shadow .15s, background .15s; }
+    .control:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(47,111,243,.12); background: #fff; }
+    .inline-hint { align-self: center; padding-top: 17px; color: var(--muted); font-size: 11px; }
+    .btn { height: 36px; padding: 0 14px; border: 1px solid transparent; border-radius: 7px; font-weight: 720; white-space: nowrap; transition: background .15s, border .15s, transform .08s; }
+    .btn:active:not(:disabled) { transform: translateY(1px); }
+    .btn-primary { color: #fff; background: var(--blue); box-shadow: 0 4px 9px rgba(47,111,243,.2); }
+    .btn-primary:hover:not(:disabled) { background: var(--blue-deep); }
+    .btn-secondary { color: #365069; background: #fff; border-color: var(--line-strong); }
+    .btn-secondary:hover:not(:disabled) { background: #f4f7fb; border-color: #aab8c7; }
+    .btn-quiet { color: #667588; background: transparent; border-color: transparent; padding: 0 8px; }
+    .btn-quiet:hover:not(:disabled) { color: var(--blue-deep); background: #f0f4fa; }
+    .btn-success { color: #fff; background: var(--green); }
+    .btn-success:hover:not(:disabled) { background: #0e694a; }
+    .btn-warning { color: #704000; background: #fff6e4; border-color: #efd39b; }
+    .btn-danger { color: #9d2f38; background: #fff; border-color: #efbcc1; }
+    .btn-sm { height: 29px; padding: 0 9px; font-size: 12px; }
+    .workspace { display: grid; grid-template-columns: minmax(640px, 1.16fr) minmax(470px, .84fr); gap: 14px; align-items: start; }
+    .panel { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-small); overflow: hidden; }
+    .panel + .panel { margin-top: 14px; }
+    .panel-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 15px 16px 13px; border-bottom: 1px solid var(--line); }
+    .panel-title-wrap { display: flex; gap: 10px; align-items: flex-start; }
+    .zone-marker { flex: 0 0 auto; min-width: 30px; height: 23px; padding: 0 7px; border-radius: 5px; background: #edf3ff; color: var(--blue-deep); display: inline-flex; align-items: center; justify-content: center; font-weight: 820; font-size: 11px; letter-spacing: .05em; }
+    .panel-title { font-size: 14px; font-weight: 800; }
+    .panel-subtitle { color: var(--muted); font-size: 11px; margin-top: 2px; }
+    .head-actions { display: flex; align-items: center; gap: 6px; }
+    .sub-block { margin: 13px 16px 13px; padding: 11px 12px; border: 1px solid #e2e8ee; border-radius: 8px; background: #fbfcfd; }
+    .sub-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+    .sub-title { font-size: 12px; font-weight: 780; color: #506376; }
+    .sub-note { color: #8290a3; font-size: 10.5px; line-height: 1.6; margin-top: 8px; }
+    .read-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .kv-cell { padding: 7px 9px; border: 1px solid #e8edf2; border-radius: 7px; background: #fff; }
+    .kv-label { color: var(--muted); font-size: 10px; font-weight: 700; }
+    .kv-value { color: #263b50; font-weight: 720; font-size: 12px; margin-top: 2px; }
+    .kv-value.empty { color: #9aa6b4; font-weight: 600; }
+    .kv-value.money { font-family: ui-monospace, Consolas, monospace; }
+    .sync-row { display: grid; grid-template-columns: 1fr 84px; gap: 8px; margin-top: 9px; }
+    .schedule-table { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    .schedule-table th { height: 32px; padding: 0 9px; color: #718094; background: #f6f8fa; border-bottom: 1px solid var(--line); font-size: 10px; font-weight: 760; text-align: left; white-space: nowrap; }
+    .schedule-table td { padding: 8px 9px; border-bottom: 1px solid #e9eef3; font-size: 12px; vertical-align: middle; }
+    .schedule-table tbody tr { cursor: pointer; transition: background .12s; }
+    .schedule-table tbody tr:hover { background: #f7faff; }
+    .schedule-table tbody tr.selected { background: #f2f6ff; box-shadow: inset 3px 0 0 var(--blue); }
+    .schedule-table tbody tr.full { color: #9aa6b4; }
+    .schedule-table tbody tr.full:hover { background: #fff; cursor: not-allowed; }
+    .schedule-table tbody tr:last-child td { border-bottom: 0; }
+    .remain-pill { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; font-size: 10px; font-weight: 760; background: #eaf7f3; color: #158466; }
+    .remain-pill.zero { background: #fdeeee; color: #c0392b; }
+    .check-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+    .check-list li { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 7px 10px; border: 1px solid #e2e8f0; border-radius: 7px; background: #fbfcfd; }
+    .check-list li .st { margin-left: auto; font-size: 10.5px; border-radius: 999px; padding: 1px 8px; background: #eef1f5; color: #8290a3; flex: 0 0 auto; }
+    .check-list li.ok .st { background: #eaf7f3; color: #158466; }
+    .check-list li.bad .st { background: #fdeeee; color: #c0392b; font-weight: 700; }
+    .check-list li.na .st { background: #f4f0e4; color: #8a6a1f; }
+    .regist-row { display: flex; gap: 8px; align-items: flex-start; margin: 13px 16px 0; }
+    .regist-row .hint { align-self: center; color: var(--muted); font-size: 11px; }
+    .visit-list { width: calc(100% - 32px); margin: 0 16px 13px; border-collapse: collapse; font-size: 11px; }
+    .visit-list th { color: #8290a1; font-size: 10px; font-weight: 750; text-align: left; padding: 0 6px 7px; }
+    .visit-list td { padding: 7px 6px; border-top: 1px solid #e8edf2; color: #4c6074; }
+    .visit-list td.money { font-weight: 760; color: #294157; font-family: ui-monospace, Consolas, monospace; }
+    .visit-empty { color: #9aa6b4; font-size: 11px; padding: 4px 16px 12px; }
+    .payway-row { display: flex; gap: 8px; align-items: center; }
+    .payway-row select { flex: 1; }
+    .balance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 9px; }
+    .fee-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+    .fee-table td { padding: 5px 2px; border-bottom: 1px dashed #e5ebf0; }
+    .fee-table td:first-child { color: #6d7d8e; }
+    .fee-table td:last-child { text-align: right; font-family: ui-monospace, Consolas, monospace; font-weight: 720; color: #263f56; }
+    .fee-total td { border-bottom: 0; padding-top: 8px; }
+    .fee-total td:last-child { font-size: 15px; color: var(--blue-deep); }
+    .confirm-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 11px; }
+    .aux-row { display: flex; gap: 8px; align-items: flex-start; }
+    .timeline { display: grid; gap: 7px; max-height: 190px; overflow: auto; padding-right: 4px; }
+    .timeline-item { display: grid; grid-template-columns: 58px 1fr; gap: 10px; align-items: center; min-height: 26px; padding-bottom: 7px; border-bottom: 1px dashed #e5ebf0; }
+    .timeline-item:last-child { border-bottom: 0; }
+    .timeline-time { color: #9aa6b3; font-family: ui-monospace, Consolas, monospace; font-size: 10px; }
+    .timeline-copy { color: #52667a; font-size: 11px; }
+    .timeline-copy strong { color: #2b455e; font-weight: 760; }
+    .timeline-code { color: #96a2ae; font-size: 10px; font-family: ui-monospace, Consolas, monospace; grid-column: 2; }
+    .scene-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; padding: 10px 12px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-small); }
+    .scene-bar button { border: 1px solid #cbd8f3; background: #eef4ff; color: #315ea8; border-radius: 999px; padding: 4px 11px; font-size: 11.5px; }
+    .scene-bar button:hover { border-color: var(--blue); }
+    .lock-banner { display: none; margin-bottom: 14px; padding: 9px 14px; border: 1px solid #d7b275; border-radius: 9px; background: #fff9e9; color: #8a6a1f; font-size: 12px; }
+    .lock-banner.show { display: block; }
+    .toast { position: fixed; right: 24px; bottom: 24px; z-index: 10; min-width: 260px; max-width: 420px; display: flex; align-items: flex-start; gap: 9px; padding: 12px 14px; color: #fff; background: #21374e; border-radius: 9px; box-shadow: 0 10px 30px rgba(22, 40, 58, .25); transform: translateY(22px); opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast-dot { flex: 0 0 auto; width: 8px; height: 8px; margin-top: 4px; border-radius: 50%; background: #6ed2c2; }
+    .toast.error .toast-dot { background: #ff8c93; }
+    .toast-copy { font-size: 12px; line-height: 1.5; }
+    .mask { position: fixed; inset: 0; background: rgba(15,23,42,.42); display: none; z-index: 20; }
+    .modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); width: min(520px, 92vw); background: #fff; border-radius: 14px; padding: 18px; display: none; z-index: 25; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+    .modal h3 { margin: 0 0 12px; font-size: 15px; }
+    .modal-body { font-size: 13px; line-height: 1.8; color: #44536a; }
+    .modal-actions { display: flex; gap: 8px; margin-top: 14px; justify-content: flex-end; }
+    .muted { color: var(--muted); }
+    @media (max-width: 1220px) {
+      main { padding: 16px; }
+      .workspace { grid-template-columns: minmax(590px, 1.1fr) minmax(440px, .9fr); }
+      .topbar { padding: 0 18px; gap: 16px; }
+      .wordmark { min-width: 228px; }
+    }
+  </style>
+  <style>
+    /* ===== 工作台画布层（叠加在原型设计之上，不改原型样式） ===== */
+    body { min-width: 0; }
+    .rp-canvas-page { padding: 14px; background: #eef2f7; min-height: 100vh; }
+    .rp-canvas-viewport { overflow: hidden; }
+    .rp-canvas-scaler { width: 1180px; transform-origin: 0 0; }
+    .wb-anchor-host { position: relative; }
+    .wb-anchor-host.sub-block { margin-top: 24px; }
+    .wb-anchor-host.regist-row { margin-top: 24px; }
+    .wb-badge { position: absolute; top: -10px; left: -6px; z-index: 6; display: inline-flex; align-items: center; padding: 2px 5px; border: 1px solid #9fc4f1; border-radius: 5px; background: #eaf3ff; color: #1764ba; font: 700 10px/1.2 ui-monospace, Consolas, monospace; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 3px rgba(23,57,91,.12); }
+    .wb-badge--inline { position: static; display: inline-flex; align-items: center; padding: 2px 4px; border: 1px solid #9fc4f1; border-radius: 5px; background: #eaf3ff; color: #1764ba; font: 700 10px/1.2 ui-monospace, Consolas, monospace; white-space: nowrap; pointer-events: none; flex: 0 0 auto; }
+    .wb-target-selected { outline: 2px solid #3185f6 !important; outline-offset: 2px; border-radius: 10px; }
+    .wb-ctl-chip { display: inline-flex; align-items: center; margin-right: 6px; padding: 1px 4px; border: 1px solid currentColor; border-radius: 4px; font: 700 9px/1.3 ui-monospace, Consolas, monospace; letter-spacing: .02em; opacity: .8; pointer-events: none; }
+    /* 屏蔽按 iframe 视口触发的响应式堆叠（媒体查询看的是 iframe 宽度不是画布宽） */
+    .rp-canvas-page .search-pair { grid-template-columns: 1.06fr .94fr !important; }
+    .rp-canvas-page .workspace { grid-template-columns: minmax(640px, 1.16fr) minmax(470px, .84fr) !important; }
+  </style>
+</head>
+<body>
+<main class="rp-canvas-page">
+  <div class="rp-canvas-viewport" id="rpCanvasViewport">
+    <div class="rp-canvas-scaler" id="rpCanvasScaler">
+<div class="app-shell">
+    <header class="topbar">
+      <div class="wordmark" aria-label="门诊挂号工作台">
+        <div class="wordmark-mark" aria-hidden="true"></div>
+        <div><div class="wordmark-main">门诊挂号工作台</div><div class="wordmark-sub">OUTPATIENT REGISTRATION DESK · V2</div></div>
+      </div>
+      <div class="topbar-divider"></div>
+      <div class="crumbs">临床 / 门诊挂号登记 / 窗口挂号</div>
+      <div class="topbar-spacer"></div>
+      <div class="operator"><div class="operator-avatar">收</div><div><div class="operator-name">收银员001</div><div class="operator-role">挂号收费窗口 · 01号窗口</div></div></div>
+    </header>
+
+    <main>
+      <div class="scene-bar" id="sceneBar" aria-label="演示场景"></div>
+      <div class="lock-banner" id="lockBanner">🔒 挂号收费中：AMB_REGIST.CHARGE_LOCK=1（收费时服务端锁，防医生改患者数据）</div>
+
+      <section class="status-strip" id="z1Status" aria-label="Z1 全局状态条">
+        <div class="status-anchor"><span class="status-dot" id="statusDot"></span><span class="status-label">RegistContext</span><span class="status-value" id="statusValue">IDLE</span></div>
+        <div class="status-context"><span class="context-title" id="contextTitle">尚未定位患者</span><span class="context-detail" id="contextDetail">先查询号源选号，再读卡定位患者（无卡可建档建卡）</span></div>
+        <div class="status-meta"><span class="tag tag-neutral" id="permTag">未选号别</span><span class="tag tag-neutral" id="chargeLockTag">CHARGE_LOCK=0</span></div>
+      </section>
+
+      <div class="search-pair">
+        <section class="search-panel" id="z2ScheduleQuery" aria-label="Z2 号源查询条件">
+          <div class="search-head"><div class="section-kicker"><span class="zone-code">Z2a</span><span class="section-title">号源查询条件</span><span class="muted">C001</span></div><span class="tag tag-neutral" id="scheduleStatus">待查询</span></div>
+          <div class="field-row">
+            <div class="field"><label class="field-label" for="permFilter">号别（科室）</label><select class="control" id="permFilter" aria-label="号别筛选"><option value="">全部号别</option><option>普通门诊</option><option>儿科</option><option>妇科</option><option>急诊</option></select></div>
+            <button class="btn btn-primary" id="scheduleQueryBtn" type="button">查询号源</button>
+            <button class="btn btn-secondary" id="scheduleRefreshBtn" type="button">刷新号源</button>
+            <div class="inline-hint">GET patad/evn/amb/schedule/query · surpluNum≤0 弹「已无号源！」</div>
+          </div>
+        </section>
+        <section class="search-panel" id="z2PatQuery" aria-label="Z2 患者查询条件">
+          <div class="search-head"><div class="section-kicker"><span class="zone-code">Z2b</span><span class="section-title">患者查询条件</span><span class="muted">C003</span></div><span class="tag tag-neutral" id="patQueryStatus">待输入</span></div>
+          <div class="field-row">
+            <div class="field"><label class="field-label" for="patNo">就诊卡号</label><input class="control" id="patNo" placeholder="如 0000012345" autocomplete="off" /></div>
+            <button class="btn btn-primary" id="patQueryCardBtn" type="button">按卡号查询</button>
+            <button class="btn btn-secondary" id="patQueryNameBtn" type="button">按姓名查询</button>
+            <div class="inline-hint">ENTER 直接按卡号查询 · 卡号&lt;10 位左补零（Patad_IsAutoZero）</div>
+          </div>
+        </section>
+      </div>
+
+      <div class="workspace">
+        <div class="left-stack">
+          <section class="panel" id="z3Schedule" aria-label="Z3 号源排班区">
+            <div class="panel-head">
+              <div class="panel-title-wrap"><span class="zone-marker">Z3</span><div><div class="panel-title">号源排班表</div><div class="panel-subtitle">C002 · 选号即锁号源（GET 后 PUT updateRegistNum ±1）</div></div></div>
+              <div class="head-actions"><button class="btn btn-secondary btn-sm" id="myScheduleBtn" type="button">我的号源</button></div>
+            </div>
+            <div style="padding: 12px 16px 15px;">
+              <table class="schedule-table" id="scheduleRows">
+                <thead><tr><th>号别</th><th>医师</th><th>午别</th><th>金额</th><th>剩余 / 总数</th></tr></thead>
+                <tbody></tbody>
+              </table>
+              <div class="sub-note">选中行即锁定号源：先查号表再 PUT updateRegistNum 增减 registUseNum，切换号表 / 关页释放；003 客户端先 GET 再 PUT ±1，无服务端原子性保障（高峰并发超号风险）。</div>
+            </div>
+          </section>
+
+          <section class="panel" id="z4Patient" aria-label="Z4 患者识别区">
+            <div class="panel-head">
+              <div class="panel-title-wrap"><span class="zone-marker">Z4</span><div><div class="panel-title">患者识别</div><div class="panel-subtitle">C005 读卡 · C004 信息 · C013 建卡 · 五通道定位</div></div></div>
+              <span class="tag tag-neutral" id="patStateTag">待读卡</span>
+            </div>
+            <div class="sub-block" id="wb-C005">
+              <div class="sub-head"><span class="sub-title">读卡通道</span><span class="tag tag-blue">身份证 / 电子凭证 / 医保卡</span></div>
+              <div class="read-row">
+                <button class="btn btn-secondary btn-sm" id="readIdCardBtn" type="button">身份证阅读器</button>
+                <button class="btn btn-secondary btn-sm" id="readEcertBtn" type="button">医保电子凭证</button>
+                <button class="btn btn-secondary btn-sm" id="readMiCardBtn" type="button">社保卡（07/09）</button>
+              </div>
+              <div class="sub-note">readIDCard / miECReadCard / miBaseReadAmbCard 按费别分支读社保卡（07 职工 / 09 工伤）；电子凭证读卡后按身份证号回查就诊卡号（pat/getbyidno/query）。</div>
+            </div>
+            <div class="sub-block" id="wb-C004">
+              <div class="sub-head"><span class="sub-title">患者信息表单</span><span class="tag tag-neutral" id="patFormTag">未定位</span></div>
+              <div class="kv-grid" id="patInfoGrid">
+                <div class="kv-cell"><div class="kv-label">姓名</div><div class="kv-value empty" id="patName">请先读卡定位患者</div></div>
+                <div class="kv-cell"><div class="kv-label">性别 / 年龄</div><div class="kv-value empty" id="patSexAge">—</div></div>
+                <div class="kv-cell"><div class="kv-label">费别</div><div class="kv-value empty" id="patFeeType">—</div></div>
+                <div class="kv-cell"><div class="kv-label">卡号</div><div class="kv-value empty" id="patCardNo">—</div></div>
+              </div>
+              <div class="sync-row">
+                <div class="field"><label class="field-label" for="birthInput">出生日期</label><input class="control" id="birthInput" type="date" aria-label="出生日期" /></div>
+                <div class="field"><label class="field-label" for="ageInput">年龄</label><input class="control" id="ageInput" type="number" min="0" aria-label="年龄" /></div>
+              </div>
+              <div class="sub-note">出生日期与年龄双向换算（003 L003_BIRTH_AGE / 020 出生日期提交 L020_BIRTH_DATE_COMMIT）；必填校验按 Patad_PatRequired 参数化配置。</div>
+            </div>
+            <div class="sub-block" id="wb-C013">
+              <div class="sub-head"><span class="sub-title">建卡入口</span></div>
+              <div class="aux-row">
+                <button class="btn btn-warning btn-sm" id="createPatBtn" type="button">建档建卡</button>
+                <span class="hint muted" style="align-self:center;font-size:11px">无主索引时先建卡（createPatCardCommand）；020 三无人员免卡直建（withoutType=1）</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel" id="z5Regist" aria-label="Z5 挂号操作区">
+            <div class="panel-head">
+              <div class="panel-title-wrap"><span class="zone-marker">Z5</span><div><div class="panel-title">挂号操作</div><div class="panel-subtitle">C006 提交 · C007 退号 · C008 当日已挂号</div></div></div>
+              <span class="tag tag-neutral" id="registStateTag">未挂号</span>
+            </div>
+            <div class="regist-row">
+              <button class="btn btn-primary" id="registBtn" type="button">挂号（F2）</button>
+              <span class="hint">先选号别再读卡；校验链全通过后算费，收费窗确认收款提交窗口事务</span>
+            </div>
+            <div class="regist-row" id="wb-C007" style="margin-bottom:13px">
+              <button class="btn btn-danger" id="refundBtn" type="button">退号</button>
+              <span class="hint">已接诊二次确认（statusCode=CLINIC）；已缴费走 judgeCancelRegist（退费+医保反结算）</span>
+            </div>
+            <div class="sub-block" id="wb-C008">
+              <div class="sub-head"><span class="sub-title">当日已挂号记录</span><button class="btn btn-secondary btn-sm" id="registListBtn" type="button">查询当日记录</button></div>
+              <table class="visit-list" id="visitList">
+                <thead><tr><th>就诊号</th><th>患者</th><th>号别</th><th>金额</th><th>状态</th></tr></thead>
+                <tbody><tr><td colspan="5" class="visit-empty">尚未查询；挂号成功后自动登记。</td></tr></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <div class="right-stack">
+          <section class="panel" id="z6Checks" aria-label="Z6 挂号前置校验">
+            <div class="panel-head">
+              <div class="panel-title-wrap"><span class="zone-marker">Z6</span><div><div class="panel-title">挂号前置校验链</div><div class="panel-subtitle">C006 提交前置 · 原文提示语来自页面级 PRD</div></div></div>
+              <span class="tag tag-neutral" id="checkSummary">待处理</span>
+            </div>
+            <div style="padding: 12px 16px 15px;">
+              <ul class="check-list" id="checks">
+                <li class="na">已选号且号源 &gt; 0<span class="st">待处理</span></li>
+                <li class="na">患者必填完整（Patad_PatRequired）<span class="st">待处理</span></li>
+                <li class="na">临床限制通过（儿科年龄 / 妇科性别）<span class="st">待处理</span></li>
+                <li class="na">三日重复已确认（Regist/examine）<span class="st">待处理</span></li>
+                <li class="na">发票余量充足<span class="st">待处理</span></li>
+                <li class="na">支付方式已配置<span class="st">待处理</span></li>
+              </ul>
+            </div>
+          </section>
+
+          <section class="panel" id="z7Pay" aria-label="Z7 收费与提交区">
+            <div class="panel-head">
+              <div class="panel-title-wrap"><span class="zone-marker">Z7</span><div><div class="panel-title">收费与提交</div><div class="panel-subtitle">C009 支付方式 · C010 账户充值 · C014 收费确认</div></div></div>
+              <span class="tag tag-neutral" id="payStateTag">未算费</span>
+            </div>
+            <div class="sub-block" id="wb-C009">
+              <div class="sub-head"><span class="sub-title">支付方式</span></div>
+              <div class="payway-row">
+                <select class="control" id="paywaySelect" aria-label="支付方式">
+                  <option value="cash">现金（500901000001）</option>
+                  <option value="wechat">微信（POS）</option>
+                  <option value="alipay">支付宝（POS）</option>
+                  <option value="account">账户（预缴金）</option>
+                </select>
+              </div>
+              <div class="sub-note">无支付方式提示「没有支付方式，找管理员配置支付方式」；Econ_Other_Pay 三方支付开关开启且非现金时走微信 / 支付宝 POS 分支（020 AmbClinicRegistController:690）。</div>
+            </div>
+            <div class="sub-block" id="wb-C010">
+              <div class="sub-head"><span class="sub-title">账户充值补差</span><span class="tag tag-neutral" id="rechargeTag">不适用</span></div>
+              <div class="balance-grid">
+                <div class="kv-cell"><div class="kv-label">账户余额</div><div class="kv-value money" id="accountBalance">—</div></div>
+                <div class="kv-cell"><div class="kv-label">应收合计</div><div class="kv-value money" id="accountNeed">—</div></div>
+              </div>
+              <div class="sync-row" id="rechargeRow" hidden>
+                <div class="field"><label class="field-label" for="rechargeInput">充值补差金额</label><input class="control" id="rechargeInput" type="number" min="0" step="0.01" aria-label="充值补差金额" /></div>
+                <span class="inline-hint" style="padding-top:22px" id="rechargeHint">挂号费大于账户余额时补差</span>
+              </div>
+              <div class="sub-note">支付方式切到「账户」时校验余额；L020_PRICE_BALANCE_CHECK：挂号费大于账户余额时显示充值补差金额。</div>
+            </div>
+            <div class="sub-block" id="wb-C014">
+              <div class="sub-head"><span class="sub-title">挂号收费确认 · REGISTER_AMB_RCPT_MODEL</span><span class="tag tag-neutral" id="commitTag">待算费</span></div>
+              <table class="fee-table" id="feeTable">
+                <tbody><tr><td colspan="2" class="muted" style="text-align:center">尚未算费——完成校验链后自动填充</td></tr></tbody>
+              </table>
+              <div class="confirm-row">
+                <span class="muted" style="font-size:10.5px" id="commitHint">窗口挂号事务：挂号 + 收费 + 发票 + 指引单一次提交（patad/evn/amb/windowRegist/insert）</span>
+                <button class="btn btn-success" id="payConfirmBtn" type="button" disabled>确认收款</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel" id="z8Aux" aria-label="Z8 辅助与关联操作">
+            <div class="panel-head">
+              <div class="panel-title-wrap"><span class="zone-marker">Z8</span><div><div class="panel-title">辅助与关联操作</div><div class="panel-subtitle">C011 指引单 · C012 跳转收费</div></div></div>
+            </div>
+            <div style="padding: 12px 16px 4px;">
+              <div class="sub-block" id="wb-C011" style="margin:12px 0 24px">
+                <div class="sub-head"><span class="sub-title">就诊指引单</span></div>
+                <div class="aux-row">
+                  <button class="btn btn-secondary btn-sm" id="printGuideBtn" type="button">打印指引单</button>
+                  <span class="hint muted" style="align-self:center;font-size:11px">amb_register_bill 报表 · 热敏打印；补打走「指引单补打」</span>
+                </div>
+              </div>
+              <div class="sub-block" id="wb-C012" style="margin:0 0 13px">
+                <div class="sub-head"><span class="sub-title">跳转门诊收费</span></div>
+                <div class="aux-row">
+                  <button class="btn btn-secondary btn-sm" id="econSkipBtn" type="button">跳转收费</button>
+                  <span class="hint muted" style="align-self:center;font-size:11px">携带挂号上下文进入门诊收费（L003_ECON_SKIP）</span>
+                </div>
+              </div>
+            </div>
+            <div style="padding: 0 16px 15px;">
+              <div class="section-kicker" style="margin-bottom:9px"><span class="zone-code">LOG</span><span class="section-title">操作日志</span><span class="muted">最新在上</span></div>
+              <div class="timeline" id="timeline"></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <div class="mask" id="mask"></div>
+    <div class="modal" id="confirmModal">
+      <h3 id="confirmTitle">确认</h3>
+      <div class="modal-body" id="confirmBody"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="confirmCancel" type="button">取消</button>
+        <button class="btn btn-primary" id="confirmGo" type="button">继续</button>
+      </div>
+    </div>
+    <div class="toast" id="toast"><span class="toast-dot"></span><span class="toast-copy" id="toastCopy"></span></div>
+</div>
+    </div>
+  </div>
+</main>
+<script>
+    /* ===== 门诊挂号登记工作台交互层（演示 mock，提示文案取自页面级 PRD 原文） ===== */
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const PERMS = {
+        '普通门诊': { price: 12, total: 20, left: 4, doctor: '周建国', session: '上午' },
+        '儿科': { price: 12, total: 20, left: 2, doctor: '孙幼', session: '上午' },
+        '妇科': { price: 16, total: 20, left: 1, doctor: '林芳', session: '上午' },
+        '急诊': { price: 20, total: 20, left: 0, doctor: '值急诊', session: '全天' }
+      };
+      const PATS = {
+        '0000012345': { name: '李梅', sex: '女', age: 34, feeType: '08 自费', invoiceOk: true, threeDay: false, seen: false, paidOrders: false, channel: '身份证' },
+        '0000012346': { name: '李小球', sex: '男', age: 12, feeType: '08 自费', invoiceOk: true, threeDay: false, seen: false, paidOrders: false, babyOver: true, channel: '身份证' },
+        '0000012347': { name: '王强', sex: '男', age: 41, feeType: '08 自费', invoiceOk: true, threeDay: false, seen: false, paidOrders: false, gynWrong: true, channel: '身份证' },
+        '0000012348': { name: '张丽娜', sex: '女', age: 28, feeType: '08 自费', invoiceOk: true, threeDay: true, seen: false, paidOrders: false, channel: '社保卡' },
+        '0000012349': { name: '陈志远', sex: '男', age: 55, feeType: '08 自费', invoiceOk: false, threeDay: false, seen: false, paidOrders: false, channel: '电子凭证' },
+        '0000012350': { name: '赵桂香', sex: '女', age: 63, feeType: '08 自费', invoiceOk: true, threeDay: false, seen: true, paidOrders: true, channel: '社保卡' }
+      };
+      const SCN = [
+        ['正常自费挂号', '0000012345', '普通门诊'],
+        ['儿科超龄拦截', '0000012346', '儿科'],
+        ['妇科性别拦截', '0000012347', '妇科'],
+        ['三日重复确认', '0000012348', '普通门诊'],
+        ['发票余量不足', '0000012349', '普通门诊'],
+        ['退号：已缴费医嘱', '0000012350', '普通门诊']
+      ];
+      const state = {
+        schedule: null, patient: null, registed: false, threeDayOk: false,
+        charged: false, fee: null, visitSeq: 0, visits: [], logs: []
+      };
+      function timeNow() { return new Date().toLocaleTimeString('zh-CN', { hour12: false }); }
+      function log(action, code) {
+        state.logs.unshift({ time: timeNow(), action, code });
+        state.logs = state.logs.slice(0, 30);
+        $('timeline').innerHTML = state.logs.map(item => `<div class="timeline-item"><span class="timeline-time">${item.time}</span><span class="timeline-copy"><strong>${item.action}</strong></span><span class="timeline-code">${item.code}</span></div>`).join('');
+      }
+      function toast(message, type = 'info') {
+        $('toastCopy').textContent = message; $('toast').classList.toggle('error', type === 'error'); $('toast').classList.add('show');
+        clearTimeout(window.__regToastTimer); window.__regToastTimer = setTimeout(() => $('toast').classList.remove('show'), 3600);
+      }
+      function setTag(el, text, cls) { el.textContent = text; el.className = 'tag ' + cls; }
+      function money(n) { return Number(n).toFixed(2); }
+      function setUI(next) {
+        const colors = { IDLE: '#9aa6b4', SCHEDULED: '#2f6ff3', LOCATED: '#2f6ff3', CHARGING: '#bc7000', REGISTED: '#16805b' };
+        $('statusValue').textContent = next;
+        const color = colors[next] || '#9aa6b4';
+        $('statusDot').style.background = color; $('statusDot').style.boxShadow = `0 0 0 4px ${color}22`;
+      }
+
+      /* ---- 场景 ---- */
+      SCN.forEach(([label, no, perm]) => {
+        const b = document.createElement('button'); b.type = 'button'; b.textContent = label;
+        b.onclick = () => { $('patNo').value = no; $('permFilter').value = perm; renderSchedule(); locate('0000' + no.slice(-6), '场景预置'); };
+        $('sceneBar').appendChild(b);
+      });
+
+      /* ---- C001/C002 号源查询与选号 ---- */
+      function renderSchedule() {
+        const filter = $('permFilter').value;
+        const tbody = $('scheduleRows').querySelector('tbody');
+        tbody.innerHTML = Object.entries(PERMS).filter(([name]) => !filter || name === filter).map(([name, p]) => {
+          const selected = state.schedule === name;
+          const zero = p.left <= 0;
+          return `<tr data-perm="${name}" class="${selected ? 'selected' : ''} ${zero ? 'full' : ''}"><td><b>${name}</b></td><td>${p.doctor}</td><td>${p.session}</td><td class="money">${money(p.price)}</td><td><span class="remain-pill ${zero ? 'zero' : ''}">${p.left} / ${p.total}</span></td></tr>`;
+        }).join('');
+      }
+      $('scheduleQueryBtn').onclick = () => {
+        renderSchedule();
+        setTag($('scheduleStatus'), `已加载 ${$('permFilter').value || '全部'}号源`, 'tag tag-green');
+        log('查询号源排班（GET schedule/query）', 'EVT_SCHEDULE_QUERY');
+        if (!state.schedule) toast('号表已加载：请点击行选中号别（选号即锁号源）');
+      };
+      $('scheduleRefreshBtn').onclick = () => {
+        renderSchedule();
+        setTag($('scheduleStatus'), '号源已刷新', 'tag tag-green');
+        log('刷新号源排班列表', 'EVT_SCHEDULE_REFRESH');
+        toast('号源已刷新（剩余号源以最新号表为准）');
+      };
+      $('myScheduleBtn').onclick = () => {
+        log('按当前登录医生查询本人号源', 'EVT_MY_SCHEDULE');
+        toast('已按当前登录医生过滤号源（mySchedule）');
+      };
+      $('scheduleRows').addEventListener('click', (e) => {
+        const row = e.target.closest('tr[data-perm]');
+        if (!row || row.classList.contains('full')) { if (row) toast('已无号源！', 'error'); return; }
+        state.schedule = row.dataset.perm;
+        state.registed = false; state.charged = false; state.threeDayOk = false; state.fee = null;
+        $('lockBanner').classList.remove('show');
+        setTag($('chargeLockTag'), 'CHARGE_LOCK=0', 'tag tag-neutral');
+        setTag($('commitTag'), '待算费', 'tag tag-neutral');
+        setTag($('registStateTag'), '未挂号', 'tag tag-neutral');
+        $('payConfirmBtn').disabled = true;
+        renderSchedule(); updateChecks(); updateStatus();
+        log(`选中号别 ${state.schedule}（PUT updateRegistNum ±1 锁号）`, 'EVT_SCHEDULE_SELECT');
+      });
+      $('permFilter').onchange = () => { renderSchedule(); log(`号别筛选切换为「${$('permFilter').value || '全部'}」`, 'EVT_SCHEDULE_QUERY'); };
+
+      /* ---- C003 患者查询 ---- */
+      function locate(cardNo, channel) {
+        const patient = PATS[cardNo];
+        if (!patient) { toast('查无该卡号（演示数据见场景按钮）', 'error'); return; }
+        patient.channel = channel || patient.channel;
+        state.patient = patient; state.registed = false; state.charged = false; state.threeDayOk = false; state.fee = null;
+        $('lockBanner').classList.remove('show');
+        setTag($('chargeLockTag'), 'CHARGE_LOCK=0', 'tag tag-neutral');
+        setTag($('commitTag'), '待算费', 'tag tag-neutral');
+        setTag($('registStateTag'), '未挂号', 'tag tag-neutral');
+        $('payConfirmBtn').disabled = true;
+        renderPatient(); updateChecks(); updateStatus();
+        setTag($('patQueryStatus'), '已定位', 'tag tag-green');
+        log(`查询患者档案（${channel}）· ${patient.name}`, 'EVT_PAT_QUERY_CARD');
+        toast(`定位成功：${patient.name}（${patient.sex} · ${patient.age}岁 · ${patient.feeType}）`);
+      }
+      $('patQueryCardBtn').onclick = () => {
+        const no = $('patNo').value.trim();
+        if (!no) { setTag($('patQueryStatus'), '请输入卡号', 'tag tag-orange'); toast('请输入就诊卡号', 'error'); return; }
+        locate(no.length < 10 ? no.padStart(10, '0') : no, '卡号');
+      };
+      $('patQueryNameBtn').onclick = () => {
+        log('按姓名模糊查询患者档案', 'EVT_PAT_QUERY_NAME');
+        const no = $('patNo').value.trim();
+        if (PATS[no]) { locate(no, '姓名'); return; }
+        toast('姓名模糊查询：演示数据请使用场景按钮预置卡号', 'error');
+      };
+      $('patNo').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('patQueryCardBtn').click(); });
+
+      /* ---- C005 读卡三通道 ---- */
+      const READ_CHANNELS = {
+        readIdCardBtn: { label: '身份证阅读器', event: 'EVT_READ_ID_CARD', note: 'readIDCard：身份证阅读器读卡并回填患者信息' },
+        readEcertBtn: { label: '医保电子凭证', event: 'EVT_READ_ECERT', note: 'miECReadCard：电子凭证扫码识别，回查就诊卡号' },
+        readMiCardBtn: { label: '社保卡', event: 'EVT_READ_MI_CARD', note: 'miBaseReadAmbCard：按费别分支读社保卡（07 职工 / 09 工伤）' }
+      };
+      Object.entries(READ_CHANNELS).forEach(([btnId, meta]) => {
+        $(btnId).onclick = () => {
+          const no = $('patNo').value.trim();
+          if (!PATS[no]) { toast('请先在演示场景中选择患者（读卡需要卡内信息）', 'error'); return; }
+          log(`${meta.note}`, meta.event);
+          locate(no, meta.label);
+        };
+      });
+
+      /* ---- C004 出生日期 ↔ 年龄双向换算 ---- */
+      function ageFromBirth(birth) {
+        const b = new Date(birth); if (isNaN(b)) return null;
+        const now = new Date();
+        let age = now.getFullYear() - b.getFullYear();
+        if (now < new Date(now.getFullYear(), b.getMonth(), b.getDate())) age -= 1;
+        return Math.max(0, age);
+      }
+      $('birthInput').addEventListener('change', () => {
+        const age = ageFromBirth($('birthInput').value);
+        if (age !== null && state.patient) { state.patient.age = age; renderPatient(); }
+        log(`出生日期换算年龄：${age === null ? '无效日期' : age + ' 岁'}`, 'EVT_BIRTH_AGE_SYNC');
+      });
+      $('ageInput').addEventListener('change', () => {
+        const age = Number($('ageInput').value);
+        if (!isNaN(age) && age >= 0 && state.patient) { state.patient.age = age; renderPatient(); }
+        log(`年龄手改提交（020 出生日期提交分支）`, 'EVT_BIRTH_AGE_SYNC');
+      });
+
+      function renderPatient() {
+        const p = state.patient;
+        if (!p) {
+          $('patName').textContent = '请先读卡定位患者'; $('patName').classList.add('empty');
+          ['patSexAge', 'patFeeType', 'patCardNo'].forEach(id => { $(id).textContent = '—'; $(id).classList.add('empty'); });
+          setTag($('patFormTag'), '未定位', 'tag tag-neutral');
+          return;
+        }
+        $('patName').textContent = p.name; $('patName').classList.remove('empty');
+        $('patSexAge').textContent = `${p.sex} · ${p.age}岁`; $('patSexAge').classList.remove('empty');
+        $('patFeeType').textContent = p.feeType; $('patFeeType').classList.remove('empty');
+        $('patCardNo').textContent = $('patNo').value.trim(); $('patCardNo').classList.remove('empty');
+        $('birthInput').value = `19${String(2026 - p.age).padStart(4, '0')}-06-15`;
+        $('ageInput').value = p.age;
+        setTag($('patFormTag'), '已定位', 'tag tag-green');
+        setTag($('patStateTag'), `${p.channel}读取成功`, 'tag tag-green');
+      }
+
+      /* ---- C013 建档建卡 ---- */
+      $('createPatBtn').onclick = () => {
+        log('建档建卡（createPatCardCommand）', 'EVT_CREATE_PAT_CARD');
+        toast('已进入建档建卡流程（无主索引信息时先办卡；020 三无人员免卡直建 withoutType=1）');
+      };
+
+      /* ---- C006 挂号提交：校验链 → 算费 ---- */
+      function updateChecks() {
+        const p = state.patient;
+        const perm = state.schedule ? PERMS[state.schedule] : null;
+        const clinicalBad = p && state.schedule && ((state.schedule === '儿科' && p.babyOver) || (state.schedule === '妇科' && p.gynWrong));
+        const rows = [
+          ['已选号且号源 > 0', state.schedule && perm.left > 0 ? 'ok' : state.schedule ? 'bad' : 'na', state.schedule ? (perm.left > 0 ? '通过' : '未通过') : '待处理'],
+          ['患者必填完整（Patad_PatRequired）', p ? 'ok' : 'na', p ? '通过' : '待处理'],
+          ['临床限制通过（儿科年龄 / 妇科性别）', clinicalBad ? 'bad' : p ? 'ok' : 'na', clinicalBad ? '未通过' : p ? '通过' : '待处理'],
+          ['三日重复已确认（Regist/examine）', p ? (p.threeDay ? (state.threeDayOk ? 'ok' : 'na') : 'ok') : 'na', p ? (p.threeDay ? (state.threeDayOk ? '通过' : '待确认') : '通过') : '待处理'],
+          ['发票余量充足', p ? (p.invoiceOk ? 'ok' : 'bad') : 'na', p ? (p.invoiceOk ? '通过' : '未通过') : '待处理'],
+          ['支付方式已配置', 'ok', $('paywaySelect').value ? '通过' : '待处理']
+        ];
+        $('checks').innerHTML = rows.map(([t, st, label]) => `<li class="${st}">${t}<span class="st">${label}</span></li>`).join('');
+        const bad = rows.some(([, st]) => st === 'bad');
+        const pending = rows.some(([, st]) => st === 'na');
+        setTag($('checkSummary'), bad ? '存在拦截' : pending ? '待处理' : '全部通过', bad ? 'tag tag-red' : pending ? 'tag tag-orange' : 'tag tag-green');
+      }
+      function updateStatus() {
+        const p = state.patient;
+        $('contextTitle').textContent = p ? `${p.name} · ${$('patNo').value.trim()}` : '尚未定位患者';
+        $('contextDetail').textContent = p
+          ? `${state.schedule ? state.schedule + ' · ' + PERMS[state.schedule].doctor : '未选号别'} · ${p.feeType}${state.charged ? ' · 挂号收费中' : ''}`
+          : '先查询号源选号，再读卡定位患者（无卡可建档建卡）';
+        setTag($('permTag'), state.schedule ? state.schedule + ' · ' + money(PERMS[state.schedule].price) : '未选号别', state.schedule ? 'tag tag-blue' : 'tag tag-neutral');
+        setUI(p ? (state.charged ? 'REGISTED' : state.schedule ? 'LOCATED' : 'SCHEDULED') : 'IDLE');
+      }
+      $('registBtn').onclick = () => {
+        if (!state.patient) { toast('没有主索引信息，请先办卡', 'error'); return; }
+        if (!state.schedule) { toast('请先在号源排班表中选中号别', 'error'); return; }
+        const p = state.patient; const perm = state.schedule; const pd = PERMS[perm];
+        if (pd.left <= 0) { toast('已无号源！', 'error'); return; }
+        if (!p.invoiceOk) { toast('此人当前结算发票剩余 0 张，不足以结算当前挂号，请先领取发票', 'error'); return; }
+        if (perm === '儿科' && p.babyOver) { toast('此患者年龄大于6岁，不能按儿童挂号!', 'error'); return; }
+        if (perm === '妇科' && p.gynWrong) { toast('只有女性患者，才可以挂妇科类的号！', 'error'); return; }
+        if (p.threeDay && !state.threeDayOk) {
+          $('confirmTitle').textContent = '三日重复挂号确认';
+          $('confirmBody').textContent = '该患者满足一次挂号管三天规则（Regist/examine 返回），本日已存在有效挂号。是否继续挂号？';
+          openConfirm(() => { state.threeDayOk = true; updateChecks(); computeFee(); });
+          return;
+        }
+        computeFee();
+      };
+      function computeFee() {
+        const p = state.patient; const pd = PERMS[state.schedule];
+        const cardFee = 0, bookFee = 0;
+        state.fee = { reg: pd.price, card: cardFee, book: bookFee, total: pd.price + cardFee + bookFee };
+        $('feeTable').querySelector('tbody').innerHTML =
+          `<tr><td>挂号费（${state.schedule} · ${pd.doctor}）</td><td>${money(state.fee.reg)}</td></tr>` +
+          `<tr><td>卡费（Patad_IsCardCharge 关闭）</td><td>${money(state.fee.card)}</td></tr>` +
+          `<tr><td>病历本</td><td>${money(state.fee.book)}</td></tr>` +
+          `<tr class="fee-total"><td>应收合计（Econ_Rounded 两位 ROUND_DOWN）</td><td>${money(state.fee.total)}</td></tr>`;
+        setTag($('commitTag'), '待收款', 'tag tag-orange');
+        setTag($('payStateTag'), '已算费', 'tag tag-green');
+        $('payConfirmBtn').disabled = false;
+        log(`算费（POST /ambPatientcharge/amb/costs/byRegist）· 应收 ${money(state.fee.total)}`, 'EVT_REGIST_SUBMIT');
+        toast('校验通过并完成算费：请在「收费与提交」确认收款');
+      }
+
+      /* ---- C009 支付方式 / C010 账户充值补差 ---- */
+      const ACCOUNT_BALANCE = 8;
+      $('paywaySelect').addEventListener('change', () => {
+        const way = $('paywaySelect').value;
+        const isAccount = way === 'account';
+        $('accountBalance').textContent = isAccount ? money(ACCOUNT_BALANCE) : '—';
+        $('accountNeed').textContent = isAccount && state.fee ? money(state.fee.total) : '—';
+        const short = isAccount && state.fee && state.fee.total > ACCOUNT_BALANCE;
+        $('rechargeRow').hidden = !short;
+        setTag($('rechargeTag'), isAccount ? (short ? '需补差' : '余额充足') : '不适用', isAccount ? (short ? 'tag tag-orange' : 'tag tag-green') : 'tag tag-neutral');
+        if (short) { $('rechargeInput').value = (state.fee.total - ACCOUNT_BALANCE).toFixed(2); $('rechargeHint').textContent = `补差后余额 ${money(state.fee.total)}，可完成结算`; }
+        log(`支付方式切换：${$('paywaySelect').options[$('paywaySelect').selectedIndex].text}${isAccount ? ' · 展开账户与充值补差' : ''}`, 'EVT_PAYWAY_COMMIT');
+      });
+      $('rechargeInput').addEventListener('change', () => {
+        const add = Number($('rechargeInput').value) || 0;
+        log(`账户充值补差 ${money(add)}（L020_PRICE_BALANCE_CHECK）`, 'EVT_ACCOUNT_RECHARGE');
+        toast(`已登记充值补差 ${money(add)} 元，补足后可确认收款`);
+      });
+
+      /* ---- C014 收费确认（窗口事务） ---- */
+      $('payConfirmBtn').onclick = () => {
+        if (!state.fee || state.charged) return;
+        state.charged = true; state.registed = true;
+        PERMS[state.schedule].left -= 1;
+        state.visitSeq += 1;
+        const visitCode = 'MZ20261011' + String(state.visitSeq).padStart(4, '0');
+        state.visits.unshift({ visitCode, patient: state.patient.name, perm: state.schedule, amount: money(state.fee.total), status: '已挂号（chargeLock=1）' });
+        renderSchedule(); updateStatus(); updateChecks();
+        $('lockBanner').classList.add('show');
+        setTag($('chargeLockTag'), 'CHARGE_LOCK=1', 'tag tag-orange');
+        setTag($('commitTag'), 'SUCCESS', 'tag tag-green');
+        setTag($('payStateTag'), '收费完成', 'tag tag-green');
+        setTag($('registStateTag'), '已挂号', 'tag tag-green');
+        renderVisits();
+        log(`窗口挂号事务提交（windowRegist/insert）· ${visitCode} + 发票 FP-30215 + 指引单待打印`, 'EVT_REGIST_COMMIT');
+        toast('窗口挂号事务提交成功：visitCode 已生成 + 发票 FP-30215 + 指引单待打印；chargeLock=1');
+      };
+
+      /* ---- C008 当日已挂号列表 ---- */
+      function renderVisits() {
+        const tbody = $('visitList').querySelector('tbody');
+        if (!state.visits.length) { tbody.innerHTML = '<tr><td colspan="5" class="visit-empty">尚未查询；挂号成功后自动登记。</td></tr>'; return; }
+        tbody.innerHTML = state.visits.map(v => `<tr><td>${v.visitCode}</td><td>${v.patient}</td><td>${v.perm}</td><td class="money">${v.amount}</td><td>${v.status}</td></tr>`).join('');
+      }
+      $('registListBtn').onclick = () => {
+        if (!state.visits.length) state.visits.unshift({ visitCode: 'MZ202610110901', patient: '吴晨（演示存量）', perm: '普通门诊', amount: '12.00', status: '已接诊' });
+        renderVisits();
+        log('查询当日已挂号记录（amb/regist/list/sourceregist）', 'EVT_REGIST_LIST');
+        toast('已加载当日挂号记录');
+      };
+
+      /* ---- C007 退号 ---- */
+      $('refundBtn').onclick = () => {
+        if (!state.patient) { toast('请先读卡定位患者', 'error'); return; }
+        const p = state.patient;
+        if (!state.registed && !p.seen) { toast('该患者无今日挂号记录（演示：先挂号或选择退号场景）', 'error'); return; }
+        if (p.seen || (!state.registed && p.seen)) {
+          $('confirmTitle').textContent = '已接诊退号确认';
+          $('confirmBody').textContent = '已经接诊，是否要继续退号？（statusCode=CLINIC）';
+          openConfirm(() => {
+            if (p.paidOrders) { toast('患者存在已缴费的医嘱，不允许退号（020 三重校验）', 'error'); return; }
+            log('退号 judgeCancelRegist（退费 + 医保反结算，工伤三段）· JH0105 异步推送', 'EVT_REGIST_CANCEL');
+            toast('退号成功：已走 judgeCancelRegist（退费 + 医保反结算）；JH0105 已异步推送');
+            resetAfterRefund();
+          });
+          return;
+        }
+        if (p.paidOrders) { toast('患者存在已缴费的医嘱，不允许退号（020 三重校验：已缴费单据 / 诊断 / 医嘱 / 电子票据入账）', 'error'); return; }
+        log('退号（未收费 PUT cancelRegist）· JH0105 异步推送集成平台', 'EVT_REGIST_CANCEL');
+        toast('退号成功（未收费 PUT cancelRegist）；JH0105 已异步推送集成平台');
+        resetAfterRefund();
+      };
+      function resetAfterRefund() {
+        if (state.registed && state.schedule) PERMS[state.schedule].left += 1;
+        state.registed = false; state.charged = false; state.fee = null;
+        $('lockBanner').classList.remove('show');
+        setTag($('chargeLockTag'), 'CHARGE_LOCK=0', 'tag tag-neutral');
+        setTag($('commitTag'), '待算费', 'tag tag-neutral');
+        setTag($('payStateTag'), '未算费', 'tag tag-neutral');
+        setTag($('registStateTag'), '未挂号', 'tag tag-neutral');
+        $('payConfirmBtn').disabled = true;
+        $('feeTable').querySelector('tbody').innerHTML = '<tr><td colspan="2" class="muted" style="text-align:center">尚未算费——完成校验链后自动填充</td></tr>';
+        renderSchedule(); updateChecks(); updateStatus();
+      }
+
+      /* ---- C011 指引单 / C012 跳转收费 ---- */
+      $('printGuideBtn').onclick = () => {
+        if (!state.registed) { toast('请先完成挂号收费', 'error'); return; }
+        log('打印就诊指引单（amb_register_bill 报表 · 热敏）', 'EVT_PRINT_GUIDE');
+        toast('指引单已打印（amb_register_bill 报表 · 热敏）；补打走「指引单补打」');
+      };
+      $('econSkipBtn').onclick = () => {
+        log('携带挂号上下文跳转门诊收费（L003_ECON_SKIP）', 'EVT_ECON_SKIP');
+        toast('已携带挂号上下文跳转门诊收费（演示：不离开本页）');
+      };
+
+      /* ---- 确认弹窗 ---- */
+      let confirmHandler = null;
+      function openConfirm(handler) { confirmHandler = handler; $('mask').style.display = 'block'; $('confirmModal').style.display = 'block'; }
+      function closeConfirm() { confirmHandler = null; $('mask').style.display = 'none'; $('confirmModal').style.display = 'none'; }
+      $('confirmGo').onclick = () => { const h = confirmHandler; closeConfirm(); if (h) h(); };
+      $('confirmCancel').onclick = closeConfirm;
+      $('mask').onclick = closeConfirm;
+
+      renderSchedule(); renderPatient(); updateChecks(); updateStatus();
+      log('进入工作台 · 初始化 Patad_* / Econ_* 参数开关', 'EVT_SCHEDULE_QUERY');
+      log('加载号表（GET patad/evn/amb/schedule/query）', 'EVT_SCHEDULE_QUERY');
+      setUI('IDLE');
+    })();
+  </script>
+
+  <script>
+  /* ===== 工作台联动协议层（pd-reg-canvas） ===== */
+  (() => {
+    'use strict';
+    const workbenchMode = new URLSearchParams(location.search).get('workbench') === '1';
+    const BASE_WIDTH = 1180;
+    const CANVAS_TARGETS = [
+      { id: 'C001', targetId: 'z2ScheduleQuery', mode: 'head' },
+      { id: 'C002', targetId: 'z3Schedule', mode: 'head' },
+      { id: 'C003', targetId: 'z2PatQuery', mode: 'head' },
+      { id: 'C004', targetId: 'wb-C004', mode: 'overlay' },
+      { id: 'C005', targetId: 'wb-C005', mode: 'overlay' },
+      { id: 'C006', targetId: 'z5Regist', mode: 'head' },
+      { id: 'C007', targetId: 'wb-C007', mode: 'overlay' },
+      { id: 'C008', targetId: 'wb-C008', mode: 'overlay' },
+      { id: 'C009', targetId: 'wb-C009', mode: 'overlay' },
+      { id: 'C010', targetId: 'wb-C010', mode: 'overlay' },
+      { id: 'C011', targetId: 'wb-C011', mode: 'overlay' },
+      { id: 'C012', targetId: 'wb-C012', mode: 'overlay' },
+      { id: 'C013', targetId: 'wb-C013', mode: 'overlay' },
+      { id: 'C014', targetId: 'wb-C014', mode: 'overlay' }
+    ];
+    const RUNTIME_LINKS = {
+      scheduleQueryBtn: 'EVT_SCHEDULE_QUERY',   // C001 查询号源
+      scheduleRefreshBtn: 'EVT_SCHEDULE_REFRESH', // C001 刷新号表
+      scheduleRow: 'EVT_SCHEDULE_SELECT',       // C002 点击号表行选号（类名委托）
+      myScheduleBtn: 'EVT_MY_SCHEDULE',         // C002 我的号源
+      patQueryNameBtn: 'EVT_PAT_QUERY_NAME',    // C003 按姓名查询
+      patQueryCardBtn: 'EVT_PAT_QUERY_CARD',    // C003 按卡号查询（含 ENTER）
+      birthInput: 'EVT_BIRTH_AGE_SYNC',         // C004 出生日期换算年龄
+      ageInput: 'EVT_BIRTH_AGE_SYNC',           // C004 年龄手改提交
+      readIdCardBtn: 'EVT_READ_ID_CARD',        // C005 身份证阅读器
+      readEcertBtn: 'EVT_READ_ECERT',           // C005 医保电子凭证
+      readMiCardBtn: 'EVT_READ_MI_CARD',        // C005 社保卡（07/09）
+      registBtn: 'EVT_REGIST_SUBMIT',           // C006 挂号提交（校验链→算费）
+      refundBtn: 'EVT_REGIST_CANCEL',           // C007 退号
+      registListBtn: 'EVT_REGIST_LIST',         // C008 当日已挂号查询
+      paywaySelect: 'EVT_PAYWAY_COMMIT',        // C009 支付方式切换
+      rechargeInput: 'EVT_ACCOUNT_RECHARGE',    // C010 充值补差
+      payConfirmBtn: 'EVT_REGIST_COMMIT',       // C014 确认收款（窗口事务）
+      printGuideBtn: 'EVT_PRINT_GUIDE',         // C011 指引单打印
+      econSkipBtn: 'EVT_ECON_SKIP',             // C012 跳转门诊收费
+      createPatBtn: 'EVT_CREATE_PAT_CARD'       // C013 建档建卡
+    };
+    const CONTROL_CHIPS = [
+      { buttonId: 'scheduleQueryBtn', code: 'C001' },
+      { buttonId: 'scheduleRefreshBtn', code: 'C001' },
+      { buttonId: 'myScheduleBtn', code: 'C002' },
+      { buttonId: 'patQueryCardBtn', code: 'C003' },
+      { buttonId: 'patQueryNameBtn', code: 'C003' },
+      { buttonId: 'readIdCardBtn', code: 'C005' },
+      { buttonId: 'readEcertBtn', code: 'C005' },
+      { buttonId: 'readMiCardBtn', code: 'C005' },
+      { buttonId: 'registBtn', code: 'C006' },
+      { buttonId: 'refundBtn', code: 'C007' },
+      { buttonId: 'registListBtn', code: 'C008' },
+      { buttonId: 'payConfirmBtn', code: 'C014' },
+      { buttonId: 'printGuideBtn', code: 'C011' },
+      { buttonId: 'econSkipBtn', code: 'C012' },
+      { buttonId: 'createPatBtn', code: 'C013' }
+    ];
+    function installControlChips() {
+      CONTROL_CHIPS.forEach(item => {
+        const button = document.getElementById(item.buttonId);
+        if (!button || button.querySelector(':scope > .wb-ctl-chip')) return;
+        const chip = document.createElement('span');
+        chip.className = 'wb-ctl-chip';
+        chip.textContent = item.code;
+        button.prepend(chip);
+      });
+    }
+    function postWorkbenchMessage(message) {
+      if (window.parent === window || !workbenchMode) return;
+      const origin = location.origin === 'null' ? '*' : location.origin;
+      window.parent.postMessage({ source: 'pd-reg-canvas', ...message }, origin);
+    }
+    function postRuntimeLink(key) {
+      const model = RUNTIME_LINKS[key];
+      if (!model) return;
+      postWorkbenchMessage({ type: 'runtime-link', eventId: key, modelEventId: model });
+    }
+    document.addEventListener('click', event => {
+      const button = event.target.closest('button');
+      if (button && RUNTIME_LINKS[button.id]) postRuntimeLink(button.id);
+      else if (event.target.closest('#scheduleRows tbody tr')) postRuntimeLink('scheduleRow');
+      setTimeout(installControlChips, 0);
+    }, true);
+    document.addEventListener('change', event => {
+      const target = event.target;
+      if (target.id && RUNTIME_LINKS[target.id] && (target.tagName === 'SELECT' || target.tagName === 'INPUT')) postRuntimeLink(target.id);
+      setTimeout(installControlChips, 0);
+    }, true);
+    function installBadges() {
+      CANVAS_TARGETS.forEach(item => {
+        const anchor = document.getElementById(item.targetId);
+        if (!anchor) return;
+        if (item.mode === 'head') {
+          const wrap = anchor.querySelector('.panel-title-wrap') || anchor.querySelector('.search-head');
+          if (!wrap || wrap.querySelector('.wb-badge--inline')) return;
+          const badge = document.createElement('span');
+          badge.className = 'wb-badge--inline';
+          badge.textContent = item.id;
+          const marker = wrap.querySelector('.zone-marker');
+          if (marker) marker.after(badge); else wrap.prepend(badge);
+          return;
+        }
+        if (anchor.querySelector(':scope > .wb-badge')) return;
+        const badge = document.createElement('span');
+        badge.className = 'wb-badge';
+        badge.textContent = item.id;
+        anchor.classList.add('wb-anchor-host');
+        anchor.append(badge);
+      });
+    }
+    function renderWorkbenchTarget(componentId, targetId) {
+      if (!workbenchMode) return;
+      document.querySelectorAll('.wb-target-selected').forEach(el => el.classList.remove('wb-target-selected'));
+      const target = CANVAS_TARGETS.find(item => item.id === componentId);
+      if (!target || (targetId && target.targetId !== targetId)) return;
+      const anchor = document.getElementById(target.targetId);
+      if (!anchor) return;
+      anchor.classList.add('wb-target-selected');
+      anchor.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
+    }
+    function clearWorkbenchSelection() {
+      document.querySelectorAll('.wb-target-selected').forEach(el => el.classList.remove('wb-target-selected'));
+    }
+    function readyWorkbench() {
+      postWorkbenchMessage({ type: 'ready', links: Object.entries(RUNTIME_LINKS).map(([eventId, model]) => ({ eventId, modelEventId: model })) });
+    }
+    window.renderWorkbenchTarget = renderWorkbenchTarget;
+    window.clearWorkbenchSelection = clearWorkbenchSelection;
+    window.addEventListener('message', event => {
+      if (event.source !== window.parent || event.origin !== location.origin) return;
+      const message = event.data;
+      if (!message || message.source !== 'pd-reg-workbench' || typeof message.type !== 'string') return;
+      if (message.type === 'handshake-request') { readyWorkbench(); return; }
+      if (message.type === 'clear-component') { clearWorkbenchSelection(); return; }
+      if (message.type === 'set-canvas-zoom') { setCanvasZoom(message.mode); return; }
+      if (message.type !== 'select-component' || typeof message.componentId !== 'string' || !/^C\d{3}$/.test(message.componentId)) return;
+      renderWorkbenchTarget(message.componentId, typeof message.targetId === 'string' ? message.targetId : '');
+    });
+    const viewport = document.getElementById('rpCanvasViewport');
+    const scaler = document.getElementById('rpCanvasScaler');
+    let canvasZoom = 1;
+    let zoomMode = 'fit';
+    function applyZoom(next, mode) {
+      canvasZoom = Math.min(1.8, Math.max(0.35, Math.round(next * 100) / 100));
+      zoomMode = mode || 'manual';
+      scaler.style.transform = 'scale(' + canvasZoom + ')';
+      viewport.style.height = (scaler.offsetHeight * canvasZoom) + 'px';
+      viewport.style.overflowX = (BASE_WIDTH * canvasZoom > viewport.clientWidth + 2) ? 'auto' : 'hidden';
+      postWorkbenchMessage({ type: 'canvas-zoom-changed', label: Math.round(canvasZoom * 100) + '%' });
+    }
+    function setCanvasZoom(mode) {
+      if (mode === 'in') applyZoom(canvasZoom + 0.1, 'manual');
+      else if (mode === 'out') applyZoom(canvasZoom - 0.1, 'manual');
+      else if (mode === 'reset') applyZoom(1, 'manual');
+      else if (mode === 'fit') applyZoom(Math.min(1, viewport.clientWidth / BASE_WIDTH), 'fit');
+    }
+    window.addEventListener('resize', () => { if (zoomMode === 'fit') setCanvasZoom('fit'); });
+    installBadges();
+    installControlChips();
+    requestAnimationFrame(() => setCanvasZoom('fit'));
+    if (workbenchMode) readyWorkbench();
+  })();
+  </script>
+
+</body>
+</html>

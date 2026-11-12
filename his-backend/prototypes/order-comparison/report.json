@@ -1,0 +1,49 @@
+[
+  {
+    "file": "stitch.png",
+    "width": 1344,
+    "height": 693,
+    "columns": 2,
+    "items": [
+      {
+        "naturalWidth": 1156,
+        "naturalHeight": 1108,
+        "scale": 1,
+        "renderScale": 0.5536332179930796,
+        "sourceCrop": {
+          "x": 0,
+          "y": 0,
+          "width": 1156,
+          "height": 1108
+        },
+        "width": 640,
+        "height": 613,
+        "labelHeight": 32,
+        "x": 24,
+        "y": 24,
+        "label": "调整前",
+        "labelY": 645
+      },
+      {
+        "naturalWidth": 1160,
+        "naturalHeight": 1013,
+        "scale": 1,
+        "renderScale": 0.5517241379310345,
+        "sourceCrop": {
+          "x": 0,
+          "y": 0,
+          "width": 1160,
+          "height": 1013
+        },
+        "width": 640,
+        "height": 559,
+        "labelHeight": 32,
+        "x": 680,
+        "y": 24,
+        "label": "紧凑美化版",
+        "labelY": 591
+      }
+    ],
+    "issues": []
+  }
+]

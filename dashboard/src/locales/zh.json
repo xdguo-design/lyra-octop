@@ -405,6 +405,8 @@
       "admissionDemoDescription": "AI 自助住院登记演示，体验身份识别、信息补充、语音交互与登记确认流程。",
       "admissionRegistration": "智能入院登记",
       "admissionRegistrationDescription": "Vue 原型演示：模拟身份核验、资料填写、语音交互与入院登记。",
+      "patientAppointment": "患者预约小程序",
+      "patientAppointmentDescription": "独立 Vue 3 H5 预约演示，可单独部署到 HIS 页面，支持选择科室、医生、时段、确认和取消。",
       "speechRecognition": "语音识别",
       "speechRecognitionDescription": "点击麦克风直接进入对话并开始语音输入。",
       "planet": "星球乐园",

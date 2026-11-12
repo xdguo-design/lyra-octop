@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
@@ -8,7 +8,8 @@ vi.mock("react-i18next", () => ({
     t: (key: string) =>
       ({
         "ehrWorkbenchPage.homeTitle": "EHR 知识工作站",
-        "ehrWorkbenchPage.prdSummaryTitle": "门诊收费 PRD 汇总",
+        "ehrWorkbenchPage.prdSummaryTitle": "门诊收费与住院业务 PRD 汇总",
+        "ehrWorkbenchPage.prdSummarySetStatus": "PRD 文档集 · 评审稿",
         "ehrWorkbenchPage.prdSummaryVersion": "修订 0.7",
         "ehrWorkbenchPage.prdSummaryStatus": "尚未交付完整闭环",
         "ehrWorkbenchPage.prdSummaryStatusDetail": "当前页面是安全演示",
@@ -53,7 +54,8 @@ describe("EHR PRD summary", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("门诊收费 PRD 汇总")).toBeTruthy();
+    expect(screen.getByText("门诊收费与住院业务 PRD 汇总")).toBeTruthy();
+    expect(screen.getByText("PRD 文档集 · 评审稿")).toBeTruthy();
     expect(screen.getByText("医保、支付、票据未完成")).toBeTruthy();
     expect(screen.getByText("020 已确认作为目标院区基线")).toBeTruthy();
     expect(screen.getByText("020 基线实现状态")).toBeTruthy();
@@ -61,6 +63,15 @@ describe("EHR PRD summary", () => {
     expect(screen.getByText("医保、支付、票据：未实现 / TODO")).toBeTruthy();
     expect(screen.getByText("退费与日结：未实现")).toBeTruthy();
     expect(screen.getByText("PRD 正文")).toBeTruthy();
+    fireEvent.click(screen.getByText("挂号 PRD + 动态交互原型 · HTML"));
+    const registrationDocument = screen.getByTitle("门诊挂号登记产品需求文档");
+    expect(registrationDocument).toHaveAttribute("srcdoc");
+    expect(registrationDocument.getAttribute("srcdoc")).toContain(
+      '<nav aria-label="文档章节">',
+    );
+    expect(registrationDocument.getAttribute("srcdoc")).toContain(
+      'id="acceptance"',
+    );
     expect(screen.getByText("门诊收费产品需求（重梳理稿）")).toBeTruthy();
     expect(screen.getByText("Q-08 部分确认，其余问题未关闭")).toBeTruthy();
     expect(

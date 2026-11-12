@@ -1,0 +1,130 @@
+/* 门诊收费包导航外壳：视觉按用户提供的 FreeLLM 参考图对齐。 */
+body.outpatient-theme{
+  --package-ink:#102344;
+  --package-muted:#6f84a3;
+  --package-blue:#1769ff;
+  --package-line:#dce8f8;
+  height:100vh;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 78% 0,rgba(110,181,255,.2),transparent 28rem),
+    linear-gradient(180deg,#f8fbff 0%,#edf5ff 52%,#f8fbff 100%);
+}
+body.outpatient-theme .portal{height:100vh!important;min-height:0!important;overflow:hidden!important;background:transparent!important}
+body.outpatient-theme .portal-main{display:flex;flex-direction:column;height:100vh;min-height:0;overflow:hidden}
+body.outpatient-theme .portal-main>section{display:flex;flex:1;flex-direction:column;min-height:0;overflow:hidden}
+html:not(.package-embed) body.outpatient-theme{height:auto;min-height:100vh;overflow:auto}
+html:not(.package-embed) body.outpatient-theme .portal{height:auto!important;min-height:100vh!important;overflow:visible!important}
+html:not(.package-embed) body.outpatient-theme .portal-main{height:auto;min-height:100vh;overflow:visible}
+html:not(.package-embed) body.outpatient-theme .portal-main>section,
+html:not(.package-embed) body.outpatient-theme .prd-center{flex:none;min-height:0;overflow:visible}
+
+body.outpatient-theme .prd-center{display:flex;flex:1;flex-direction:column;min-height:0;overflow:hidden}
+body.outpatient-theme .package-intro,body.outpatient-theme .package-tabs{flex:none}
+body.outpatient-theme .context-bar{
+  background:rgba(255,255,255,.88)!important;
+  border-bottom-color:#dce8f8!important;
+  backdrop-filter:blur(14px);
+}
+body.outpatient-theme .prd-center{color:var(--package-ink)}
+body.outpatient-theme .package-intro{
+  border:1px solid rgba(255,255,255,.92)!important;
+  border-radius:18px!important;
+  background:linear-gradient(115deg,rgba(255,255,255,.9),rgba(239,247,255,.88))!important;
+  box-shadow:0 12px 34px rgba(36,72,121,.06)!important;
+  padding:18px 22px!important;
+  margin-bottom:10px;
+}
+body.outpatient-theme .package-intro h1{color:#142d52!important}
+body.outpatient-theme .package-intro p{color:#58708f!important}
+body.outpatient-theme .package-tabs{
+  gap:6px!important;
+  padding:6px 9px!important;
+  margin:8px 0 12px!important;
+  border:1px solid rgba(255,255,255,.92)!important;
+  border-radius:13px!important;
+  background:rgba(255,255,255,.78)!important;
+  box-shadow:0 5px 18px rgba(36,72,121,.045)!important;
+}
+body.outpatient-theme .package-tab{
+  border:1px solid transparent!important;
+  border-radius:9px!important;
+  padding:8px 12px!important;
+  color:#526986!important;
+  font-size:12px!important;
+  font-weight:650!important;
+  transition:background .16s,color .16s,border-color .16s,box-shadow .16s;
+}
+body.outpatient-theme .package-tab:hover{background:#f0f6ff!important;color:#155bd3!important}
+body.outpatient-theme .package-tab.active{
+  border-color:#cbdfff!important;
+  background:linear-gradient(145deg,#edf5ff,#e4efff)!important;
+  color:#155bd3!important;
+  box-shadow:0 2px 7px rgba(37,104,218,.1)!important;
+  font-weight:650!important;
+}
+body.outpatient-theme .package-view .surface,
+body.outpatient-theme .package-view .card,
+body.outpatient-theme .package-view .prd-document,
+body.outpatient-theme .package-view .doc-toc-scroll,
+body.outpatient-theme .package-view .canvas-card,
+body.outpatient-theme .package-view .inspector,
+body.outpatient-theme .package-view .catalog{
+  border-color:var(--package-line);
+  box-shadow:0 8px 24px rgba(36,72,121,.055);
+}
+html:not(.package-embed) body.outpatient-theme>.app{display:none!important}
+.package-content-frame{
+  display:block;
+  transition:opacity .12s ease;
+  flex:1 1 auto;
+  width:100%;
+  height:calc(100vh - 214px);
+  min-height:520px;
+  border:0;
+  background:transparent;
+}
+.package-content-frame[hidden]{display:none}
+.package-frame-loading{
+  display:grid;
+  flex:1;
+  min-height:520px;
+  place-items:center;
+  color:#7186a0;
+  font-size:13px;
+}
+body.package-router-ready .prd-center > :not(.package-intro):not(.package-tabs):not(.package-content-frame){display:none!important}
+body.package-router-ready .package-content-frame{margin-top:2px;overflow:visible}
+body.package-switching .package-content-frame{opacity:.72;pointer-events:none}
+html.package-embed,html.package-embed body{min-height:100%;height:auto;overflow:visible}
+html.package-embed body{background:#f4f8fd!important}
+html.package-embed .side-nav,
+html.package-embed .context-bar,
+html.package-embed .package-intro,
+html.package-embed .package-tabs,
+html.package-embed .outpatient-related-nav{display:none!important}
+html.package-embed .portal{display:block!important;width:100%!important;min-height:0!important;height:auto!important;margin:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;overflow:visible!important}
+html.package-embed .prototype-public-shell{display:none!important}
+html.package-embed .portal-main{display:block!important;min-height:0!important;height:auto!important;overflow:visible!important}
+html.package-embed .prd-center{padding:0!important}
+html.package-embed .package-view{display:block!important;padding-top:0!important}
+html.package-embed .banner{margin-top:0!important}
+html.package-embed body.outpatient-theme{background:#f4f8fd!important}
+html.package-embed body.outpatient-theme .portal{background:transparent!important}
+html.package-embed .app{display:grid!important;width:100%!important;min-height:0!important;height:auto!important;margin:0!important;grid-template-columns:1fr!important;background:transparent!important}
+html.package-embed .app>.side,
+html.package-embed .app>.main>.top{display:none!important}
+html.package-embed .app>.main{display:block!important;min-width:0!important}
+html.package-embed .app .content{max-width:none!important;margin:0!important;padding:18px 20px 26px!important}
+@media(max-width:980px){
+  body.outpatient-theme .portal{grid-template-rows:auto minmax(0,1fr)!important;height:100vh!important;min-height:0!important}
+  body.outpatient-theme .portal-main{height:auto;min-height:0}
+  .package-content-frame{height:calc(100vh - 170px);min-height:520px}
+  html.package-embed .app .content{padding:14px!important}
+}
+@media(max-width:560px){
+  body.outpatient-theme .package-intro{padding:14px 15px!important}
+  body.outpatient-theme .package-tabs{padding:5px!important}
+  body.outpatient-theme .package-tab{padding:7px 9px!important;font-size:11px!important}
+  .package-content-frame{height:calc(100vh - 120px);min-height:520px}
+}

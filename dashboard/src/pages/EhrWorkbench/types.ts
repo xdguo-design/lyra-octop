@@ -6,7 +6,7 @@ export type {
   SearchResult,
 } from "@/api/modules/ehr";
 
-export type EhrViewKey = "search" | "graph" | "drug" | "skills";
+export type EhrViewKey = "search" | "graph" | "skills";
 
 export interface EhrNavItem {
   key: EhrViewKey;
@@ -17,7 +17,6 @@ export interface EhrNavItem {
 export const EHR_NAV: EhrNavItem[] = [
   { key: "search", label: "知识检索", icon: "search" },
   { key: "graph", label: "知识图谱", icon: "graph" },
-  { key: "drug", label: "药品查询", icon: "drug" },
   { key: "skills", label: "技能", icon: "skill" },
 ];
 

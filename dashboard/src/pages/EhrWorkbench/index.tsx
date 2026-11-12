@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import { SettingOutlined } from "@ant-design/icons";
 import { ehrApi, publicEhrApi } from "@/api/modules/ehr";
 import AgentPanel from "./AgentPanel";
-import DrugQueryView from "./DrugQueryView";
 import GraphView from "./GraphView";
 import SearchHome from "./SearchHome";
 import SkillsView from "./SkillsView";
@@ -144,13 +143,9 @@ export default function EhrWorkbenchPage({
         <div className={styles.ehrBody}>
           <div className={styles.ehrMain}>
             {view === "search" && (
-              <SearchHome
-                publicMode={publicMode}
-                onOpenDrugQuery={() => setView("drug")}
-              />
+              <SearchHome publicMode={publicMode} />
             )}
             {view === "graph" && <GraphView />}
-            {view === "drug" && <DrugQueryView />}
             {view === "skills" && <SkillsView />}
           </div>
           {agentOpen && (

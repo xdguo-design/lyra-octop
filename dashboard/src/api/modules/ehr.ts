@@ -73,6 +73,7 @@ export interface SearchResponse {
   query: string;
   total: number;
   results: SearchResult[];
+  rerank_status?: "reranked" | "margin_shortcut" | "single_candidate" | "fallback";
 }
 
 export interface QaSource {
@@ -148,9 +149,9 @@ export const ehrApi = {
       method: "POST",
       body: JSON.stringify({
         query,
-        type: opts.type || undefined,
-        filters: opts.types?.length ? { type: opts.types } : undefined,
-        top_k: opts.top_k || 10,
+        ...(opts.type ? { type: opts.type } : {}),
+        ...(opts.types?.length ? { filters: { type: opts.types } } : {}),
+        ...(opts.top_k !== undefined ? { top_k: opts.top_k } : {}),
       }),
     });
   },

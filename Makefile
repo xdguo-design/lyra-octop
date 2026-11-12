@@ -101,6 +101,9 @@ build-frontend:
 	@echo "[build-frontend] Building admission-registration static app..."
 	cd $(REPO_ROOT)/demos/admission-registration/frontend && npm ci
 	cd $(REPO_ROOT)/demos/admission-registration/frontend && npm run build:dashboard
+	@echo "[build-frontend] Building patient-appointment Vue app..."
+	cd $(REPO_ROOT)/demos/patient-appointment/frontend && npm ci
+	cd $(REPO_ROOT)/demos/patient-appointment/frontend && npm run build:octop
 	@echo "[build-frontend] Done."
 
 .PHONY: build-wheel

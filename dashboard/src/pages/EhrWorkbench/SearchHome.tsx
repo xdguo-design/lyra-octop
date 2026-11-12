@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import {
+  Alert,
   Button,
   Card,
   Empty,
@@ -31,10 +32,8 @@ const MEDICAL_TYPES = [
 
 export default function SearchHome({
   publicMode = false,
-  onOpenDrugQuery,
 }: {
   publicMode?: boolean;
-  onOpenDrugQuery?: () => void;
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
@@ -43,6 +42,14 @@ export default function SearchHome({
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  let loginUrl = "";
+  try {
+    loginUrl = ehrPlatformLoginUrl();
+  } catch (err) {
+    console.error("Invalid EHR console URL", err);
+  }
 
   const runSearch = useCallback(
     async (q: string, searchScope: SearchScope) => {
@@ -50,6 +57,7 @@ export default function SearchHome({
       if (!text) return;
       setLoading(true);
       setError("");
+      setNotice("");
       try {
         const filter =
           searchScope === "medical"
@@ -61,8 +69,11 @@ export default function SearchHome({
             : {};
         const resp = publicMode
           ? await publicEhrApi.search(text, 12)
-          : await ehrApi.search(text, { ...filter, top_k: 12 });
+          : await ehrApi.search(text, filter);
         setResults(resp.results);
+        if (resp.rerank_status === "fallback") {
+          setNotice(t("ehrWorkbenchPage.rerankFallback"));
+        }
         setSearched(true);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -71,7 +82,7 @@ export default function SearchHome({
         setLoading(false);
       }
     },
-    [publicMode],
+    [publicMode, t],
   );
 
   const scopeOptions = publicMode
@@ -133,9 +144,13 @@ export default function SearchHome({
               aria-label={t("ehrWorkbenchPage.moreEntries")}
             >
               <Link to="/ehr/prd">{t("ehrWorkbenchPage.docsEntry")}</Link>
-              <a href={ehrPlatformLoginUrl()}>
+              <Button
+                type="primary"
+                href={loginUrl || undefined}
+                disabled={!loginUrl}
+              >
                 {t("ehrWorkbenchPage.hisLoginEntry")}
-              </a>
+              </Button>
               <a
                 href="https://github.com/xdguo-design/ehr-platform/tree/main"
                 target="_blank"
@@ -143,9 +158,6 @@ export default function SearchHome({
               >
                 {t("ehrWorkbenchPage.codeEntry")}
               </a>
-              <Button type="link" onClick={onOpenDrugQuery}>
-                {t("ehrWorkbenchPage.drugEntry")}
-              </Button>
             </nav>
           )}
         </section>
@@ -181,6 +193,7 @@ export default function SearchHome({
       )}
 
       {error && <Typography.Text type="danger">{error}</Typography.Text>}
+      {notice && <Alert type="warning" showIcon message={notice} />}
 
       {loading && results.length === 0 && (
         <div style={{ textAlign: "center", padding: 40 }}>

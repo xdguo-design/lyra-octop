@@ -1,0 +1,22 @@
+/* 代码逻辑分析器 · 共享壳层样式（顶栏 + 维度导航），与已批准视觉一致。
+   各分析页只需引入本文件 + analyzer-shell.js，并在 <body data-analyzer-tab="…"> 上声明当前页签。 */
+.analyzer-topbar{position:sticky;top:0;z-index:30;margin:-16px -20px 8px;background:rgba(248,252,255,.98);border-bottom:1px solid #d9e8f7;box-shadow:0 2px 10px rgba(36,114,243,.06);backdrop-filter:blur(12px)}
+.analyzer-row{min-height:42px;padding:5px 14px;display:flex;align-items:center;gap:14px}
+.analyzer-brand{display:flex;align-items:center;gap:8px;min-width:max-content;color:#102f55}
+.analyzer-brand .mark{width:25px;height:25px;border-radius:7px;display:grid;place-items:center;background:#1f72ed;color:#fff;font-weight:900;font-size:17px;box-shadow:0 4px 10px rgba(31,114,237,.24)}
+.analyzer-brand .divider{width:1px;height:16px;background:#ccdae9}
+.analyzer-brand b{font-size:13px}
+.analyzer-brand strong{font-size:12px}
+.analyzer-crumb{font-size:11px;color:#66809e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.analyzer-spacer{flex:1}
+.release-compare{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.release-compare select{border:1px solid #cfe0f2;background:#fff;color:#375675;border-radius:6px;padding:5px 8px;font-size:11px}
+.release-compare .swap{color:#6d88a5;font-size:13px}
+.export-report{border:0;border-radius:6px;background:#2472f3;color:#fff;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;box-shadow:0 4px 10px rgba(36,114,243,.2)}
+.export-report:hover{background:#1c63da}
+.analysis-nav{display:flex;align-items:center;gap:4px;padding:0 12px;border-top:1px solid #eef4fa;overflow-x:auto;white-space:nowrap}
+.analysis-nav a{padding:8px 10px 7px;color:#5a7390;text-decoration:none;font-size:12px;border-bottom:2px solid transparent}
+.analysis-nav a:hover{color:#1767d2;background:#f4f9ff}
+.analysis-nav a.active{color:#1767d2;border-bottom-color:#2472f3;font-weight:700}
+.panel:target{outline:2px solid rgba(36,114,243,.3);outline-offset:2px}
+@media(max-width:900px){.analyzer-topbar{position:static;margin:-8px -8px 8px}.analyzer-row{flex-wrap:wrap}.analyzer-spacer{display:none}.release-compare{margin-left:auto}.evidence-strip{display:none}.analysis-nav{padding:0 6px}}

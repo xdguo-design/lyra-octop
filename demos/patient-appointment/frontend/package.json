@@ -1,0 +1,20 @@
+{
+  "name": "octop-patient-appointment-demo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "test": "node --test ../tests/assistant.test.mjs ../tests/ehrAppointmentApi.test.mjs",
+    "build": "vite build",
+    "build:octop": "vite build --mode octop",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "vue": "3.4.21"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "5.2.4",
+    "vite": "5.2.8"
+  }
+}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -74,6 +75,22 @@ async def test_embedded_subapp_directory_serves_its_index(tmp_octop_home: Path) 
             app = c.get("/admission-registration/app.html")
             assert app.status_code == 200
             assert "/admission-registration/assets/" in app.text
+
+
+async def test_patient_appointment_demo_serves_page_and_assets(tmp_octop_home: Path) -> None:
+    sub_index = _DASHBOARD / "patient-appointment" / "index.html"
+    if not sub_index.exists():
+        return
+    async with octop_client(tmp_octop_home) as (_client, srv):
+        app = build_app(srv)
+        with TestClient(app) as c:
+            page = c.get("/patient-appointment/index.html")
+            assert page.status_code == 200
+            paths = re.findall(r'(?:src|href)="\./(assets/[^\"]+)"', page.text)
+            assert len(paths) >= 2
+            for path in paths:
+                asset = c.get(f"/patient-appointment/{path}")
+                assert asset.status_code == 200, path
 
 
 async def test_path_traversal_is_blocked(tmp_octop_home: Path) -> None:

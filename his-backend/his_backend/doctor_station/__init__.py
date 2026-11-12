@@ -1,0 +1,1 @@
+"""Doctor station domain slice."""

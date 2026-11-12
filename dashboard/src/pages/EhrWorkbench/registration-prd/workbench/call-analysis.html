@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate"/><meta http-equiv="Pragma" content="no-cache"/><meta http-equiv="Expires" content="0"/>
+<title>门诊挂号登记 · 调用链分析 · 工作台</title>
+<link rel="stylesheet" href="assets/app.css">
+<link rel="stylesheet" href="assets/outpatient-economy.css">
+<link rel="stylesheet" href="assets/outpatient-package-theme.css">
+<link rel="stylesheet" href="assets/outpatient-hospital-theme.css">
+<link rel="stylesheet" href="assets/navigation.css">
+<link rel="stylesheet" href="assets/outpatient-package-shell.css">
+<link rel="stylesheet" href="analyzer/analyzer-shell.css?v=20260928-1">
+<link rel="stylesheet" href="analyzer/source-index.css?v=20260928-1">
+<link rel="stylesheet" href="analyzer/call-analysis.css?v=20260929-1">
+<style>.package-intro,.package-tabs,.outpatient-related-nav,.analyzer-subnav,.regist-evidence-brief{display:none!important}.workbench-view-switch,.analysis-content-switch{margin:8px 0}.prd-action-summary{max-height:120px;overflow:auto;margin:5px 0;padding:8px 10px;border:1px solid #d8e3f1;border-radius:7px;background:#f5f8fc;color:#536b86;font-size:11px;line-height:1.55}.prd-action-summary strong{color:#27466a}.unknown-analysis{padding:18px;border:1px dashed #c6a765;border-radius:10px;background:#fff9e9;color:#765a21}.unknown-analysis b{display:block;margin-bottom:7px}.inferred-priority{font-size:10px;color:#8a6a1f}</style>
+</head>
+<body data-analyzer-tab="调用链分析">
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true"><symbol id="icon-db" viewBox="0 0 24 24"><path d="M12 2C7.58 2 4 3.79 4 6v12c0 2.21 3.58 4 8 4s8-1.79 8-4V6c0-2.21-3.58-4-8-4zm0 2c3.87 0 6 1.5 6 2s-2.13 2-6 2-6-1.5-6-2 2.13-2 6-2zm6 14c0 .5-2.13 2-6 2s-6-1.5-6-2v-3.11C7.45 15.57 9.58 16 12 16s4.55-.43 6-1.11V18zm0-5c0 .5-2.13 2-6 2s-6-1.5-6-2V7.89C7.45 8.57 9.58 9 12 9s4.55-.43 6-1.11V13z"/></symbol><symbol id="icon-switch" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M7 6h10a6 6 0 0 1 0 12H7A6 6 0 0 1 7 6zm10 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></symbol><symbol id="icon-param" viewBox="0 0 24 24"><path d="M3 7h8a3 3 0 0 1 5.66 0H21v2h-4.34a3 3 0 0 1-5.66 0H3V7zm0 8h4.34a3 3 0 0 1 5.66 0H21v2h-8a3 3 0 0 1-5.66 0H3v-2z"/></symbol><symbol id="icon-tree" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="5" rx="1"/><rect x="11" y="7" width="2" height="4"/><rect x="5" y="10" width="14" height="2"/><rect x="5" y="12" width="2" height="3"/><rect x="17" y="12" width="2" height="3"/><rect x="3" y="15" width="6" height="5" rx="1"/><rect x="15" y="15" width="6" height="5" rx="1"/></symbol><symbol id="icon-graph" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="5" rx="1"/><rect x="2" y="17" width="6" height="5" rx="1"/><rect x="16" y="17" width="6" height="5" rx="1"/><path d="M11 7h2v4h6v6h-2v-4H7v4H5v-6h6V7z"/></symbol><symbol id="icon-bolt" viewBox="0 0 24 24"><path d="M13 2 4.8 13.4h5.7L9.2 22l9-12.6h-5.8L13 2z"/></symbol></svg>
+<div class="page">
+  <div class="package-intro intro">
+    <div><h1>临床 → 门诊挂号登记</h1><p>患者进入医院就诊的第一道环节：建立或识别患者身份，完成就诊登记与号源分配，生成就诊记录。本包以 003 / 020 两院区旧版源码为事实基线，维护调用链分析、数据与接口、V2 目标实现与引用统计。</p></div>
+    <div class="brand-tag">EHR · PRODUCT</div>
+  </div>
+  <nav class="package-tabs" aria-label="门诊挂号登记设计包">
+          <a class="package-tab" href="index.html">概览</a>
+          <a class="package-tab" href="spec.html">业务流程</a>
+          <a class="package-tab" href="original.html">开发规格</a>
+          <a class="package-tab" href="prototype.html">页面分析</a>
+          <a class="package-tab" href="demo.html">Demo</a>
+          <a class="package-tab" href="test.html">测试与验收</a>
+          <a class="package-tab" href="sequence.html">时序图</a>
+          <a class="package-tab" href="flow.html">流程图</a>
+          <a class="package-tab active" href="call-analysis.html" aria-current="page">调用链分析</a>
+          <a class="package-tab" href="component-workbench.html">组件工作台</a>
+          <a class="package-tab" href="analysis/index.html">开发文档</a>
+        </nav>
+  <div class="outpatient-related-nav" aria-label="关联业务"><a href="../../经济/门诊收费/call-analysis.html">进入门诊收费 · 调用链分析 →</a><span>挂号侧维护号源占用与登记；收费侧维护结算与逆向交易。</span></div>
+  <nav class="view-toolbar analyzer-subnav" aria-label="调用链分析子页">
+    <a class="seg active" href="call-analysis.html" aria-current="page">分析工作台</a>
+    <a class="seg" href="call-analysis-versions.html">版本对照</a>
+    <a class="seg" href="data-sources.html">数据与接口</a>
+    <a class="seg" href="call-analysis-v2.html">新架构实现</a>
+    <a class="seg" href="call-analysis-usage.html">引用统计</a>
+  </nav>
+  <header class="head">
+    <div><h2>门诊挂号登记 · 代码逻辑分析</h2><p>从真实页面控件和事件追到 Java 方法、Command、接口与源码位置；版本映射与 V2 目标实现见子页。</p></div>
+    <div class="head-controls"><details class="source-index-tools"><summary>本地源码 · <span id="sourceIndexState" class="source-index-state">未载入</span></summary><div class="source-index-actions"><label for="sourceIndexFile">导入源码索引<input id="sourceIndexFile" type="file" accept="application/json,.json"></label><button id="sourceIndexClear" type="button">清除本地索引</button></div></details><button id="exportAnalysisReport" class="export-report" type="button">⇩ 导出分析报告</button></div>
+  </header>
+  <section class="evidence-lanes" aria-label="分析证据分区">
+    <div class="evidence-lane legacy"><span class="lane-status">VERIFIED / UNKNOWN</span><div><strong>003 / 020 Legacy 源码事实</strong><small>FXML、Controller、Command、调用边和行号只按可追溯源码标记；动态分派与跨模块调用保留 UNKNOWN。</small></div></div>
+    <div class="evidence-lane semantic"><span class="lane-status">INFERRED</span><div><strong>业务语义与跨版本映射</strong><small>职责映射和产品解释属于语义覆盖层，不会因为名称相同自动升级为源码事实。</small></div></div>
+    <div class="evidence-lane target"><span class="lane-status">PROPOSED</span><div><strong>V2 目标参考实现</strong><small>Hook / Service 为可落地参考代码，正式 V2 仓库出现 commit/path 后才升级证据。</small></div></div>
+  </section>
+  <nav class="view-toolbar workbench-view-switch" role="tablist" aria-label="工作台视图切换">
+    <button class="seg active" id="viewTabAnalysis" type="button" role="tab" aria-selected="true" aria-controls="workbenchShell">调用图视图</button>
+    <button class="seg" id="viewTabCanvas" type="button" role="tab" aria-selected="false" aria-controls="canvasView">页面画布</button>
+    <span class="view-switch-note">点击画布操作会同步定位 PRD 动作、调用链、文字树和源码证据</span>
+  </nav>
+  <nav class="analysis-content-switch" id="analysisModeTabs" role="tablist" aria-label="调用分析内容切换">
+    <button class="seg active" id="analysisModeGraph" type="button" role="tab" aria-selected="true">调用图</button>
+    <button class="seg" id="analysisModeFull" type="button" role="tab" aria-selected="false">完整调用解说</button>
+    <button class="seg" id="analysisModeGuide" type="button" role="tab" aria-selected="false">方法逐层解读</button>
+  </nav>
+  <section class="regist-evidence-brief" aria-labelledby="registEvidenceTitle">
+    <div class="regist-evidence-head"><div><span class="regist-evidence-kicker">PRD SOURCE TRACE</span><h2 id="registEvidenceTitle">挂号主流程证据补充</h2><p>将页面级 PRD 的关键链路带入工作台；点击章节可查看完整源码追踪与数据库说明。</p></div><span class="regist-evidence-status">003 / 020 · Legacy</span></div>
+    <div class="regist-evidence-grid">
+      <article class="regist-evidence-card">
+        <div class="regist-evidence-card-head"><h3>003 · 选号、预处理与收费窗提交</h3><span>VERIFIED · 分段链路</span></div>
+        <ol><li>选号通过 GET 查询并 PUT 更新 <code>registUseNum</code>，属于页面选择计数的读改写。</li><li><code>RegistCommand</code> 校验并锁定 <code>visitCode</code>、计算费用，然后打开收费窗。</li><li>收费窗确认后，<code>CommitRcptRegisterAmbCommand</code> 才 POST <code>windowRegist/insert</code>；失败分支会释放所选排班。</li></ol>
+        <div class="regist-evidence-links"><a href="prd-doc.html#s9">服务端与数据库调用链 ↗</a><a href="prd-doc.html#s25">003 选号读改写 ↗</a><a href="prd-doc.html#s27">方法覆盖状态 ↗</a></div>
+      </article>
+      <article class="regist-evidence-card">
+        <div class="regist-evidence-card-head"><h3>020 · 支付准备与最终挂号提交</h3><span>VERIFIED / UNKNOWN</span></div>
+        <ol><li><code>doPay</code> 先做限额、患者与支付分支处理；收费窗确认另由 <code>CommitRcptRegisterAmbCommand</code> 提交。</li><li><code>windowRegist</code> 服务在事务中写登记，并按 <code>REG_REMAINING_NUM &gt; 0</code> 条件扣减号源余量。</li><li>客户端路径与服务端路由写法不同，二者映射关系待确认；分诊坑位也不等同于排班余量。</li></ol>
+        <div class="regist-evidence-links"><a href="prd-doc.html#s16">020 服务端与数据库调用链 ↗</a><a href="prd-doc.html#s17">windowRegist 分段追踪 ↗</a><a href="prd-doc.html#s26">服务端条件扣减 ↗</a><a href="prd-doc.html#s29">路由映射待核实 ↗</a></div>
+      </article>
+    </div>
+  </section>
+  <main class="shell" id="workbenchShell">
+    <aside class="panel sidebar" id="components">
+      <div class="ph"><button class="sidebar-mode-button" id="componentViewToggle" type="button" aria-label="切换仅显示组件编码" aria-pressed="false" title="切换仅显示组件编码">▤</button><div><b>逻辑组件目录</b><small id="logicCount">—</small></div></div>
+      <div class="search"><input id="componentSearch" type="search" placeholder="搜索组件 / 方法 / 关键词"></div>
+      <div id="componentTree" class="tree"></div>
+      <div id="sourceComponentTree"></div>
+      <div id="sourceMappingSummary" class="source-mapping-summary"></div>
+      <div class="sidebar-note">纳入条件：存在事件、状态、校验、显隐、格式化、选择、计算、数据加载、接口调用或弹窗控制之一。</div>
+    </aside>
+    <div class="workspace">
+    <section class="analysis-top" id="analysisTopContent">
+      <section class="panel" id="call-graph"><div class="ph"><div><b><svg class="ic ph-ic" aria-hidden="true"><use href="#icon-graph"/></svg>调用图视图 ·</b><small id="graphTitle">—</small></div><div class="graph-tools"><label>PRD 动作<select id="eventSelect"></select></label><div class="legend"><span>页面事件</span><span>前端方法</span><span>状态更新</span><span>参数处理</span><span>校验判断</span><span>API 调用</span><span>异常分支</span></div></div></div><div id="prdActionSummary" class="prd-action-summary" aria-live="polite"></div><div id="callGraph" class="graph"></div><div class="rule-note"><b>证据边界：</b>003/020 源码按原始快照定位；未登记的方法、调用边和数据源显示 UNKNOWN。</div></section>
+      <section class="panel" id="event-method"><div class="ph"><div><b><svg class="ic ph-ic" aria-hidden="true"><use href="#icon-tree"/></svg>文字树视图</b></div><button class="copy" data-copy="textTree">复制</button></div><div id="textTree" class="text-tree" role="tree"></div></section>
+    <section class="panel lines"><div class="ph"><div><b id="lineTitle">旧版源码</b><small>旧版代码逐行取自 003 / 020 原始文件；语义链路按证据状态单独标注</small></div><span class="src-mode-toggle" id="srcModeToggle" hidden><button type="button" data-src-mode="legacy" class="active" aria-pressed="true">旧版源码</button><button type="button" data-src-mode="v2" aria-pressed="false">原型方案</button></span><button class="badge warn evidence-help-button" type="button" data-evidence-help aria-haspopup="dialog">状态说明</button></div><div class="line-grid"><ol id="codeLines" class="code"></ol><ol id="lineExplain" class="explain"></ol></div><section id="apiSqlPanel" class="api-sql-panel" hidden></section><div class="meta"><section class="fact-card"><h3>方法信息</h3><div><span>方法名</span><b id="methodName">—</b></div><div><span>所属组件</span><b id="methodOwner">—</b></div><div><span>方法类型</span><b id="methodType">—</b></div><div><span>引用次数</span><b id="methodUses">0</b></div><div><span>入参</span><b id="methodArgs">—</b></div><div><span>出参</span><b id="methodReturns">—</b></div></section><section class="fact-card"><h3><svg class="ic" aria-hidden="true"><use href="#icon-switch"/></svg>参数 / 开关</h3><div><span><svg class="ic" aria-hidden="true"><use href="#icon-db"/></svg>接口 / 数据访问</span><b id="methodIo">无</b></div><div><span><svg class="ic" aria-hidden="true"><use href="#icon-switch"/></svg>业务开关</span><b>—</b></div></section></div><div id="sourceFileInfo" style="padding:0 9px 6px"></div><div id="sourceReferenceInfo" class="source-reference-box"><b>源码引用</b><div>载入本地索引后显示当前位置。</div></div></section>
+      <section class="canvas-embed" id="canvasView" hidden><iframe id="canvasFrame" title="门诊挂号登记 · 可交互页面画布" src="about:blank"></iframe></section>
+    </section>
+    <section class="panel hierarchy-panel" id="hierarchyExplanation" hidden aria-labelledby="hierarchyTitle"><div class="ph"><div><b id="hierarchyTitle">完整调用解说</b><small>A 表示调用深度；P 表示业务重要程度，未被 PRD 标注时保持待分级。</small></div><span class="hierarchy-event-label" id="hierarchyEventLabel"></span></div><div class="hierarchy-summary" id="hierarchyPrioritySummary"></div><div class="hierarchy-methods" id="hierarchyMethodDetails" aria-live="polite"></div></section>
+    <section class="method-guide-embed" id="methodGuideView" hidden aria-label="方法逐层解读"><section class="component-guide-panel"><div id="componentGuideContent"></div></section></section>
+    </div>
+  </main>
+</div>
+<dialog id="typeReferenceDialog" class="type-reference-dialog" aria-labelledby="typeDialogTitle"><div class="type-dialog-head"><span id="typeDialogEyebrow">类型定义</span><button id="typeDialogClose" class="type-dialog-close" type="button" aria-label="关闭">×</button></div><div class="type-dialog-body"><h2 id="typeDialogTitle"></h2><div id="typeDialogDefinition"></div></div></dialog>
+<script src="analyzer/data/enums.js?v=20260928-1"></script>
+<script src="analyzer/data/apis.js?v=20260928-1"></script>
+<script src="analyzer/data/data-sources.js?v=20260928-1"></script>
+<script src="analyzer/data/frontend-logic.js?v=20260928-1"></script>
+<script src="analyzer/data/v2-reference.js?v=20260928-1"></script>
+<script src="analyzer/v2-reference-view.js?v=20260928-1"></script>
+<script src="analyzer/report-export.js?v=20260928-1"></script>
+<script src="analyzer/data-usage-view.js?v=20260928-1"></script>
+<script src="call-analysis-data.js?v=20260928-1"></script>
+<script src="analyzer/data/legacy-source-snapshots.js?v=20260928-1"></script>
+<script src="prd-actions.js"></script>
+<script src="analyzer/registration-actions-adapter.js"></script>
+<script src="assets/pd-call-analysis-engine.js"></script>
+<script src="analyzer/source-index.js?v=20260928-1"></script>
+<script src="analyzer/reg-component-method-guide.js"></script>
+<script src="analyzer/registration-hierarchy.js"></script>
+<script src="analyzer/workbench-view.js"></script>
+</body></html>

@@ -1,10 +1,12 @@
-import { Alert, Card, Col, Row, Space, Tag, Typography } from "antd";
+import { Alert, Card, Col, Row, Space, Tabs, Tag, Typography } from "antd";
 import { ExclamationCircleOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import prdDocument from "./PRD.md?raw";
+import inpatientPrdDocument from "./InpatientPRD.md?raw";
+import registrationPrdHtml from "./registration-prd/挂号PRD.html?raw";
 import styles from "./PrdSummary.module.less";
 
 export default function PrdSummary() {
@@ -19,7 +21,7 @@ export default function PrdSummary() {
             {t("ehrWorkbenchPage.prdSummaryTitle")}
           </Typography.Title>
           <Space>
-            <Tag color="gold">PRD-001 · In Review</Tag>
+            <Tag color="gold">{t("ehrWorkbenchPage.prdSummarySetStatus")}</Tag>
             <Typography.Text type="secondary">
               {t("ehrWorkbenchPage.prdSummaryVersion")}
             </Typography.Text>
@@ -86,9 +88,45 @@ export default function PrdSummary() {
             {t("ehrWorkbenchPage.prdDocumentSource")}
           </Typography.Paragraph>
           <article className={styles.prdDocument}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {prdDocument}
-            </ReactMarkdown>
+            <Tabs
+              items={[
+                {
+                  key: "outpatient",
+                  label: "门诊收费 PRD-001",
+                  children: (
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {prdDocument}
+                    </ReactMarkdown>
+                  ),
+                },
+                {
+                  key: "inpatient",
+                  label: "住院业务 PRD-002",
+                  children: (
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {inpatientPrdDocument}
+                    </ReactMarkdown>
+                  ),
+                },
+                {
+                  key: "registration",
+                  label: "挂号 PRD + 动态交互原型 · HTML",
+                  children: (
+                    <iframe
+                      title="门诊挂号登记产品需求文档"
+                      srcDoc={registrationPrdHtml}
+                      sandbox="allow-scripts allow-modals allow-popups"
+                      style={{
+                        width: "100%",
+                        height: "78vh",
+                        border: 0,
+                        borderRadius: 8,
+                      }}
+                    />
+                  ),
+                },
+              ]}
+            />
           </article>
         </Card>
 

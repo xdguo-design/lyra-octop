@@ -1,0 +1,70 @@
+/* PD 统一导航 v1：所有门户页共用同一套侧栏、层级与响应式规则。 */
+html.nav-embed,html.nav-embed body{width:100%!important;min-width:0!important;min-height:100%;margin:0!important;overflow-x:hidden!important}
+html.nav-embed body .portal{display:block!important;width:100%!important;min-width:0!important;min-height:100vh!important;margin:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;overflow:visible!important}
+html.nav-embed body .portal .side-nav{display:none!important}
+html.nav-embed body.outpatient-theme .portal-main,html.nav-embed body .portal>main,html.nav-embed body .portal>.main{display:flex!important;flex-direction:column!important;width:100%!important;min-width:0!important;max-width:none!important}
+html.nav-embed.package-embed body .prototype-public-shell{display:none!important}
+:root{--pd-nav-width:248px;--pd-nav-compact-width:76px;--pd-nav-ink:#183153;--pd-nav-muted:#7186a0;--pd-nav-line:#e2ebf5;--pd-nav-active:#eaf3ff;--pd-nav-blue:#2c7df0}
+.portal{grid-template-columns:var(--pd-nav-width) minmax(0,1fr)!important}
+.portal.nav-collapsed{grid-template-columns:var(--pd-nav-compact-width) minmax(0,1fr)!important}
+.portal.nav-collapsed .side-nav{width:var(--pd-nav-compact-width)!important;min-width:var(--pd-nav-compact-width)!important;align-items:center!important;padding:18px 8px 14px!important;overflow-x:hidden!important;opacity:1!important;pointer-events:auto!important}
+.portal.nav-collapsed .side-brand{justify-content:center!important;gap:0!important;width:100%;padding:3px 0 16px!important}
+.portal.nav-collapsed .brand-text,.portal.nav-collapsed .nav-label,.portal.nav-collapsed .nav-section-label,.portal.nav-collapsed .side-footer{display:none!important}
+.portal.nav-collapsed .side-menu{width:100%;align-items:center!important}
+.portal.nav-collapsed .nav-item{justify-content:center!important;gap:0!important;width:100%;padding:8px!important}
+.portal.nav-collapsed .nav-section{width:100%;padding-right:0;padding-left:0}
+.side-main-toggle{display:none!important}
+.nav-is-collapsed .side-main-toggle{display:none!important}
+.side-nav{position:sticky;top:0;align-self:start;height:100vh;min-height:100vh;box-sizing:border-box;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:18px 14px 14px!important;background:#fff!important;color:var(--pd-nav-ink)!important;border-right:1px solid var(--pd-nav-line)!important;box-shadow:4px 0 18px rgba(27,66,112,.035)!important}
+.outpatient-theme .portal{grid-template-columns:var(--pd-nav-width) minmax(0,1fr)!important}
+.outpatient-theme .portal.nav-collapsed{grid-template-columns:var(--pd-nav-compact-width) minmax(0,1fr)!important}
+.outpatient-theme .side-nav{height:100vh!important;min-height:100vh!important;padding:18px 14px 14px!important;background:#fff!important;border-right:1px solid var(--pd-nav-line)!important}
+.side-brand{display:flex!important;align-items:center!important;gap:11px!important;flex:none;text-decoration:none!important;padding:3px 6px 16px!important;margin:0 0 3px!important;border:0!important;border-bottom:1px solid var(--pd-nav-line)!important}
+.side-brand .brand-mark{width:34px!important;height:34px!important;flex:none;border:0;border-radius:10px!important;background:linear-gradient(135deg,#2c7df0,#6da9ff)!important;color:#fff!important;font-size:22px!important;font-weight:500!important;line-height:1!important;display:flex!important;align-items:center!important;justify-content:center!important;box-shadow:0 5px 14px rgba(44,125,240,.2)!important;cursor:default!important}
+.side-brand button.brand-mark-toggle{appearance:none!important;-webkit-appearance:none!important;width:34px!important;height:34px!important;min-width:34px!important;min-height:34px!important;padding:0!important;margin:0!important;border:0!important;transform:none!important;line-height:1!important;cursor:pointer!important}
+.side-brand .brand-text{display:block!important;min-width:0!important;text-decoration:none!important}
+.side-brand b{display:block!important;color:#17365f!important;font-size:14px!important;font-weight:760!important;letter-spacing:.01em}
+.side-brand span{display:block!important;margin-top:2px!important;color:#8a9bb0!important;font-size:10px!important;line-height:1.35}
+.side-menu{display:flex!important;flex:1;flex-direction:column!important;align-items:stretch!important;gap:5px!important;min-width:0}
+.nav-item{display:flex!important;align-items:center!important;gap:10px!important;min-height:40px;padding:8px 10px!important;border-radius:9px!important;color:#506985!important;text-decoration:none!important;font-size:13px!important;font-weight:650!important;white-space:nowrap}
+.nav-item:hover{background:#f3f8ff!important;color:#2166bf!important}
+.nav-item.active{background:var(--pd-nav-active)!important;color:#2166c5!important;box-shadow:inset 3px 0 0 #4e9aff!important;font-weight:650!important}
+.nav-icon{display:inline-flex!important;width:20px!important;flex:none;align-items:center;justify-content:center;color:#7892ae!important;font-size:14px!important;text-align:center}
+.nav-icon::before{display:block;line-height:1}
+.icon-home::before{content:"⌂"}.icon-prd::before{content:"▤"}.icon-domain::before{content:"◇"}
+.icon-architecture::before{content:"▦"}.icon-middleware::before{content:"⚙"}.icon-guide::before{content:"✦"}
+.icon-ai::before{content:"✧"}.icon-print::before{content:"▣"}
+.nav-item.active .nav-icon{color:#2c7df0!important}
+.nav-section{display:flex;flex-direction:column;gap:3px;margin:8px 0 5px;padding:8px 0 2px;border-top:1px solid #edf2f8}
+.nav-section-label{padding:0 10px 3px;color:#91a2b6;font-size:10px;font-weight:700;letter-spacing:.06em}
+.nav-section .nav-item{min-height:35px;padding:7px 10px 7px 16px!important;font-size:12.5px!important}
+.nav-section.active-group .nav-section-label{color:#477db7}
+.side-footer{display:block!important;flex:none;margin-top:auto;padding:12px 8px 0!important;border-top:1px solid var(--pd-nav-line)!important;color:#9aabbe!important;font-size:10px!important}
+@media(max-width:980px){
+  .portal,.portal.nav-collapsed,.outpatient-theme .portal{width:100%!important;margin:0!important;border-radius:0!important;grid-template-columns:minmax(0,1fr)!important}
+  .portal.nav-collapsed{grid-template-columns:minmax(0,1fr)!important}
+  .portal.nav-collapsed .side-nav{width:auto!important;min-width:0!important;max-height:155px!important;overflow:hidden!important;padding:10px 12px 8px!important;opacity:1!important;pointer-events:auto!important}
+  .portal.nav-collapsed .side-brand{justify-content:flex-start!important;padding:0 4px 7px!important}
+  .portal.nav-collapsed .brand-text{display:block!important}
+  .portal.nav-collapsed .side-menu{display:flex!important}
+  .nav-is-collapsed .side-main-toggle{display:none!important}
+  .side-nav,.outpatient-theme .side-nav{position:sticky!important;top:0!important;z-index:80;height:auto!important;min-height:0!important;max-height:155px;overflow:hidden;gap:8px;padding:10px 12px 8px!important;border-right:0!important;border-bottom:1px solid var(--pd-nav-line)!important}
+  .side-brand{padding:0 4px 7px!important;margin:0!important;border-bottom:1px solid #edf2f8!important}
+  .side-brand .brand-mark{width:29px!important;height:29px!important;border-radius:8px!important;font-size:19px!important}
+  .side-brand b{font-size:12px!important}
+  .side-brand span{font-size:9px!important}
+  .side-menu{flex-direction:row!important;align-items:center!important;gap:4px!important;overflow-x:auto!important;overflow-y:hidden!important;overscroll-behavior-x:contain;scrollbar-width:thin;padding-bottom:3px}
+  .nav-item,.portal.nav-collapsed .nav-item{min-height:34px!important;flex:none!important;padding:6px 9px!important;font-size:11.5px!important;gap:7px!important}
+  .nav-item.active{box-shadow:inset 0 -2px 0 #4e9aff!important}
+  .nav-section{flex:none;flex-direction:row;align-items:center;gap:3px;margin:0;padding:0 3px;border-top:0;border-left:1px solid #e7eef6}
+  .nav-section-label{display:block;flex:none;padding:0 5px;color:#91a2b6;font-size:9px}
+  .nav-section .nav-item{min-height:34px!important;padding:6px 8px!important;font-size:11px!important}
+  .side-footer{display:none!important}
+}
+@media(max-width:560px){
+  .side-nav,.outpatient-theme .side-nav{max-height:148px;padding:8px 9px 6px!important}
+  .side-brand .brand-text span{display:none!important}
+  .side-menu{gap:2px!important}
+  .nav-item,.nav-section .nav-item{font-size:10.5px!important;padding:6px 7px!important;gap:5px!important}
+  .nav-icon{width:16px!important;font-size:12px!important}
+}

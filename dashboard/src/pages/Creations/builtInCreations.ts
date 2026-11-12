@@ -51,6 +51,15 @@ export const BUILT_IN_CREATIONS: BuiltInCreation[] = [
     route: "/admission-demo",
   },
   {
+    id: "patient-appointment",
+    type: "app",
+    category: "applet",
+    titleKey: "creationsPage.builtIn.patientAppointment",
+    descriptionKey: "creationsPage.builtIn.patientAppointmentDescription",
+    thumb: "/patient-appointment-cover.svg",
+    url: "/patient-appointment/index.html",
+  },
+  {
     id: "admission-registration",
     type: "app",
     category: "applet",

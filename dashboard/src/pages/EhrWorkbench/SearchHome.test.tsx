@@ -29,10 +29,9 @@ vi.mock("react-i18next", () => ({
         "ehrWorkbenchPage.scopeCode": "代码",
         "ehrWorkbenchPage.scopeAll": "全部来源",
         "ehrWorkbenchPage.moreEntries": "更多入口",
-        "ehrWorkbenchPage.docsEntry": "PRD 文档",
+        "ehrWorkbenchPage.docsEntry": "PRD 汇总",
         "ehrWorkbenchPage.hisLoginEntry": "启动 / 登录 HIS",
         "ehrWorkbenchPage.codeEntry": "ehr-platform 源码",
-        "ehrWorkbenchPage.drugEntry": "药品查询",
         "ehrWorkbenchPage.resultSource": "来源：",
       })[key] || key,
   }),
@@ -45,24 +44,26 @@ afterEach(() => {
 });
 
 describe("SearchHome", () => {
-  it("shows the PRD, HIS login, and code workspace as secondary links", () => {
+  it("links to the PRD summary beside the HIS login and code entries", () => {
     mocks.search.mockResolvedValue({ query: "", total: 0, results: [] });
-    const onOpenDrugQuery = vi.fn();
     render(
       <MemoryRouter>
-        <SearchHome onOpenDrugQuery={onOpenDrugQuery} />
+        <SearchHome />
       </MemoryRouter>,
     );
 
     const nav = within(screen.getByRole("navigation", { name: "更多入口" }));
     expect(nav.getAllByRole("link")).toHaveLength(3);
-    expect(nav.getByRole("link", { name: "PRD 文档" })).toHaveAttribute(
+    expect(nav.getByRole("link", { name: "PRD 汇总" })).toHaveAttribute(
       "href",
       "/ehr/prd",
     );
     expect(nav.getByRole("link", { name: "启动 / 登录 HIS" })).toHaveAttribute(
       "href",
-      "http://localhost:5190/login",
+      "http://localhost:5191/login",
+    );
+    expect(nav.getByRole("link", { name: "启动 / 登录 HIS" })).toHaveClass(
+      "ant-btn-primary",
     );
     expect(
       nav.getByRole("link", { name: "ehr-platform 源码" }),
@@ -70,8 +71,6 @@ describe("SearchHome", () => {
       "href",
       "https://github.com/xdguo-design/ehr-platform/tree/main",
     );
-    fireEvent.click(nav.getByRole("button", { name: "药品查询" }));
-    expect(onOpenDrugQuery).toHaveBeenCalledOnce();
   });
 
   it("defaults to clinical data and switches to indexed documents", async () => {
@@ -97,7 +96,6 @@ describe("SearchHome", () => {
           "frequency",
           "usage",
         ],
-        top_k: 12,
       });
     });
 
@@ -106,7 +104,6 @@ describe("SearchHome", () => {
     await waitFor(() => {
       expect(mocks.search).toHaveBeenLastCalledWith("阿司匹林禁忌症", {
         type: "doc",
-        top_k: 12,
       });
     });
   });

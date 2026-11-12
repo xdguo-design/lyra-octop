@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>门诊医嘱 · 医生工作站</title>
+<style>
+:root{font-family:Inter,"Microsoft YaHei",system-ui,sans-serif;color:#263b46;background:#f3f6f7;--ink:#263b46;--muted:#788b93;--line:#e2e9eb;--teal:#147c73;--paper:#fff;--shadow:0 12px 30px #223c4710}
+*{box-sizing:border-box}body{margin:0;min-width:900px}button,input,textarea,select{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid #61bdb080;outline-offset:1px}
+.top{height:58px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 28px;gap:14px}.brand{font-weight:750}.mark{display:inline-grid;place-items:center;background:var(--teal);color:white;border-radius:8px;width:30px;height:30px;margin-right:7px}.crumb{color:var(--muted);font-size:13px}.who{margin-left:auto;display:flex;align-items:center;gap:12px;color:#668078;font-size:12px}.avatar{width:29px;height:29px;border-radius:50%;background:#d7ede8;color:#26776e;display:grid;place-items:center;font-weight:700}
+.app{display:grid;grid-template-columns:220px 1fr;min-height:calc(100vh - 58px)}aside{background:#1d3432;color:#dce9e5;padding:20px 13px;display:flex;flex-direction:column}.label{font-size:10px;color:#93ada5;letter-spacing:.12em;margin-bottom:10px}.patient{background:#29433f;border:1px solid #385650;border-radius:11px;padding:14px;margin-bottom:22px}.pname{font-weight:650;font-size:14px}.pid,.pmeta{font-size:11px;color:#abc1ba;margin-top:4px}.pmeta{margin-top:12px;border-top:1px solid #3b5751;padding-top:10px;line-height:1.8;color:#bdd0ca}.navtitle{font-size:10px;letter-spacing:.14em;color:#87a198;margin:8px 9px}.nav{padding:10px;border-radius:8px;color:#b9cdc6;font-size:13px;margin:2px 0}.nav.active{background:#2e514a;color:#fff}.sidefoot{margin-top:auto;border-top:1px solid #355049;padding:14px 7px 0;font-size:11px;color:#9cb3ab;line-height:1.6}
+main{padding:25px 32px 42px;max-width:1420px;width:100%;margin:auto}.heading{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:19px}.eyebrow{font-size:10px;letter-spacing:.17em;color:#72938b;font-weight:700}h1{font-size:25px;margin:6px 0 0;color:#1f3738}.sub{font-size:12px;color:#65777f;margin-top:6px}.context{font-size:12px;color:#566e74}.dot{width:7px;height:7px;background:#35a477;border-radius:50%;display:inline-block;margin-right:5px}
+.strip{display:flex;align-items:center;gap:22px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:13px 16px;margin-bottom:16px;box-shadow:var(--shadow)}.strip span{font-size:12px;color:#71848b}.strip b{color:#354d55;font-weight:650;margin-left:5px}.alert{margin-left:auto;color:#92703b;background:#fbf6e9;border:1px solid #f0e5c7;padding:7px 10px;border-radius:6px;font-size:11px}
+.toolbar{display:flex;align-items:center;gap:9px;margin:0 0 11px}.toolbar b{font-size:14px;color:#314d52}.count{font-size:11px;color:#7a8c91;background:#edf2f3;border-radius:20px;padding:4px 8px}.spacer{flex:1}.search{height:33px;width:200px;border:1px solid var(--line);border-radius:7px;padding:0 10px;font-size:12px;background:white}
+.btn{border:1px solid #d9e2e4;background:#fff;color:#405861;padding:8px 13px;border-radius:7px;font-size:12px}.btn.primary{background:var(--teal);color:#fff;border-color:var(--teal);font-weight:650}.btn.small{padding:6px 9px;font-size:11px}.orders{background:#fff;border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);overflow:hidden}.section{padding:16px 19px 13px}.sectionhead{display:flex;align-items:center;gap:9px;margin-bottom:11px}.sectionhead h2{font-size:13px;margin:0}.sectionhead .rule{height:1px;background:#edf1f2;flex:1}.hint{font-size:11px;color:#66777c}.signed h2{color:#437d6d}.draft h2{color:#855b17}.divider{height:1px;background:#e8eeef;margin:0 19px}.rx{border:1px solid #e4ecec;border-radius:8px;margin:9px 0 10px;overflow:hidden}.rxhead{background:#f7f9f9;display:flex;align-items:center;gap:9px;padding:9px 12px;font-size:11px;color:#61747a}.rxbadge{font-size:10px;color:#277566;background:#e4f3ee;border-radius:4px;padding:4px 7px;font-weight:700}.rxname{font-weight:650;color:#44585f}.rxmeta{margin-left:auto;color:#5f7379}.status{font-size:10px;border-radius:4px;padding:4px 7px;background:#e8f4ed;color:#34765f}.status.draft{background:#fff4de;color:#855b17}
+.row{display:flex;align-items:flex-start;gap:12px;padding:11px 12px;border-top:1px solid #f0f3f3;cursor:pointer}.row:hover{background:#fbfdfd}.row.selected{background:#f5fbf9}.badge{width:20px;height:20px;border:1px solid #d4e3de;border-radius:6px;display:grid;place-items:center;color:#478374;font-size:10px;flex:none}.content{min-width:0;flex:1}.title{font-size:13px;font-weight:650;color:#334a51;display:flex;align-items:center;gap:7px}.kind{font-size:10px;font-weight:500;color:#6d8289;background:#eff3f4;border-radius:4px;padding:3px 6px}.detail{font-size:11px;color:#75888e;line-height:1.7;margin-top:5px;white-space:pre-line}.tail{display:flex;align-items:center;gap:10px;color:#65777f;font-size:11px;white-space:nowrap}.editlink{color:#397d72;font-size:11px;background:none;border:0;padding:4px}.editlink.danger{color:#a4685f}.medrow{display:grid;grid-template-columns:20px minmax(190px,1.1fr) minmax(90px,.55fr) minmax(420px,3fr) auto;align-items:center}.drugstack,.dose-stack{display:grid;gap:6px}.drug{font-size:12px;font-weight:650;color:#334a51}.dose-line{font-size:12px;color:#40575e}.regimen{display:grid;grid-template-columns:1fr 1.15fr .8fr 1.3fr;gap:8px}.regitem{min-width:0}.regitem strong{font-size:11px;font-weight:600;color:#40575e;white-space:nowrap}.rx-columns{display:grid;grid-template-columns:20px minmax(190px,1.1fr) minmax(90px,.55fr) minmax(420px,3fr) auto;align-items:center;gap:12px;background:#fbfcfc;padding:7px 12px;color:#596f75;font-size:11px}.regimen-head{display:grid;grid-template-columns:1fr 1.15fr .8fr 1.3fr;gap:8px}.group-label{font-size:11px;color:#5d7774;font-weight:700;margin:12px 0 8px}.editor-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.editor-grid .wide{grid-column:1/-1}.field textarea{min-height:62px}
+.editor{margin:4px 12px 12px 44px;padding:14px;border:1px solid #cfe4df;border-radius:9px;background:#fbfefd}.editor[hidden]{display:none}.edtop{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.edtitle{font-size:13px;font-weight:700;color:#31564e}.ednote{font-size:10px;color:#81938f;margin-top:3px}.grid{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:9px}.field label{display:block;font-size:10px;color:#75888a;margin-bottom:5px}.field input,.field select,.field textarea{width:100%;border:1px solid #dce6e5;border-radius:6px;background:#fff;padding:8px 9px;font-size:11px;color:#40545a;min-height:34px}.field textarea{resize:vertical;min-height:50px}.items{margin-top:10px;border:1px solid #e5eceb;border-radius:7px;overflow:hidden}.itemshead,.item{display:grid;grid-template-columns:2fr .7fr .7fr .85fr 30px;gap:8px;align-items:center;padding:7px 9px;font-size:10px}.itemshead{background:#f2f6f5;color:#75868a}.item{border-top:1px solid #eff3f2}.item input{width:100%;border:1px solid #e0e8e6;border-radius:5px;padding:6px 7px;font-size:10px;min-width:0}.remove{border:0;background:transparent;color:#aa7773;font-size:15px}.edfoot{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap}.edfoot .note{font-size:10px;color:#879697;margin-right:auto}
+.blank{border:1px dashed #bfd5d0;background:#fbfefd;border-radius:7px;margin:11px 12px 2px;min-height:43px;display:flex;align-items:center;gap:10px;padding:8px 12px;color:#67877f;font-size:11px;cursor:pointer}.blank:hover,.blank.open{border-color:#4a9b8d;background:#f1faf7}.plus{font-size:17px;color:#368578}.blankhint{margin-left:auto;color:#66777c;font-size:10px}.empty{display:none;color:#8b9b9d;font-size:11px;padding:14px;text-align:center}.empty.show{display:block}.footer{display:flex;align-items:center;gap:10px;padding:13px 18px;border-top:1px solid #e9eeee;background:#fbfcfc}.summary{font-size:11px;color:#75878b;margin-right:auto}.extra{padding:0 12px 3px}.toast{position:fixed;right:24px;bottom:22px;background:#203a37;color:#fff;border-radius:8px;padding:11px 15px;font-size:12px;box-shadow:var(--shadow);opacity:0;transform:translateY(8px);pointer-events:none;transition:.2s}.toast.show{opacity:1;transform:translateY(0)}
+.modalbg{position:fixed;inset:0;background:#f3f6f7;display:none;z-index:9}.modalbg.show{display:block}.modal{background:#fff;width:100%;height:100%;display:flex;flex-direction:column;overflow:auto}.modalbody{padding:24px 32px;flex:1}.modalfields{max-width:920px}.modalhead{padding:18px 30px}.modalfoot{padding:14px 30px}.modalhead{padding:17px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center}.modalhead h3{margin:0;font-size:15px}.modalhead button{margin-left:auto;border:0;background:none;color:#7b8d91;font-size:20px}.modalbody{padding:24px 32px;flex:1}.modalintro{font-size:11px;color:#74878c;margin:0 0 15px}.modalfields{display:grid;grid-template-columns:1fr 1fr;gap:11px}.modalfields .wide{grid-column:1/-1}.modalfoot{padding:13px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}.modaltip{margin-top:13px;background:#f5f8f8;border-radius:6px;padding:9px 10px;font-size:11px;color:#77898d;line-height:1.6}
+.loglist{display:flex;flex-direction:column}.logitem{display:flex;gap:10px;padding:9px 2px;border-top:1px solid #edf1ee;font-size:11px;color:#556d64}.logitem:first-child{border-top:0}.logitem time{color:#83948d;white-space:nowrap}.logitem b{color:#2f5648;min-width:52px;font-weight:650}
+@media(max-width:1080px){main{padding:22px 20px}.app{grid-template-columns:190px 1fr}.grid{grid-template-columns:1fr 1fr}.tail{gap:5px}}
+</style>
+<style>
+
+:root{--ink:#233b3a;--muted:#6e817d;--line:#e1e9e4;--teal:#216f62;--shadow:0 6px 20px #253b3210;background:#f3f5f1}
+body{background:#f3f5f1;color:#263b38}
+.top{background:#fff;border-bottom-color:#dce5df}.mark{background:#216f62}
+.side{background:#1c3430}.patient{background:#29453e;border-color:#3b5c52}
+main{max-width:1380px;padding:22px 30px 32px}.heading{margin-bottom:15px}h1{font-size:24px;letter-spacing:-.02em}.sub{color:#637972}.strip{box-shadow:none;border-color:#e3eae5;padding:11px 15px;margin-bottom:13px}
+.toolbar{margin-bottom:9px}.orders{box-shadow:none;border-color:#dfe7e2;border-radius:12px}.section{padding:14px 18px 12px}.sectionhead{margin-bottom:8px}.sectionhead h2{font-size:14px}.divider{margin:0 18px;background:#e6ece8}
+.rx{margin:8px 0 9px;border-color:#e0e8e3;border-radius:9px}.rxhead{padding:9px 13px;background:#eff5f0;color:#50655e}.signed .rxhead{background:#eaf2ec}.draft .rxhead{background:#f6f1e5}.rxbadge{background:#dcebe0;color:#356f57}.rxname{color:#304b40}
+.rx-columns{background:#f8faf8;color:#5e7469;padding:7px 13px;border-bottom:1px solid #edf1ee}.regimen-head{color:#5e7469}.medrow{padding:10px 13px;min-height:43px;gap:12px;border-top-color:#edf1ee}.drug{font-size:13px;color:#2d433d}.dose-line,.regitem strong{font-size:12px;color:#425b52}.regimen{gap:10px}.medrow .tail .status{display:none}.signed .rx-columns>span:last-child{visibility:hidden}.draft .rx-columns>span:last-child{font-size:0}.draft .rx-columns>span:last-child:after{content:"操作";font-size:11px}
+.draft .medrow.selected{background:#f1f7f2;box-shadow:inset 3px 0 #4b9070}.draft .medrow:not(.selected){background:#fff}
+.editor{margin:0 11px 10px 45px;padding:11px 13px;border:1px solid #dfe8e1;border-radius:0 0 9px 9px;background:#f8faf8;box-shadow:none}.edtop{margin-bottom:7px}.edtitle{font-size:13px;color:#294c3e}.ednote{color:#647970}.group-label{margin:8px 0 6px;color:#536e60;font-size:11px}.editor-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:7px 9px}.field label{font-size:11px;color:#596f66;margin-bottom:3px}.field input,.field select,.field textarea{min-height:32px;padding:6px 8px;border-color:#dce5df;border-radius:5px;font-size:11px}.field textarea{min-height:42px}.items{margin-top:5px;border-color:#e2e9e4}.itemshead,.item{padding:5px 8px}.item input{padding:5px 7px}.edfoot{margin-top:8px}.edfoot .note{color:#66796f}.btn{border-color:#d8e2dc}.btn.primary{background:#216f62;border-color:#216f62}.blank{margin-top:8px;min-height:38px;border-color:#cbd9ce;background:#f8faf8}.footer{padding:10px 16px;background:#f8faf8}
+.hide{display:none!important}
+.catbg{position:fixed;inset:0;background:rgba(244,246,249,.88);display:none;z-index:12;padding:64px 20px;overflow:auto}.catbg.show{display:block}.catbox{width:min(600px,100%);margin:0 auto;background:#fff;border:1px solid #eceff3;border-radius:10px;box-shadow:0 18px 48px #1f2b3d1f;padding:20px 22px 22px}.cathead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px}.cathead h3{margin:0;font-size:17px;font-weight:650;color:#1f2b3d}.cathead p{margin:6px 0 0;font-size:12px;color:#8a94a6}.cathead button{border:0;background:none;color:#9aa4b2;font-size:18px;line-height:1;padding:2px 4px}.cathead button:hover{color:#5c6675}.catgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.catcard{border:1px solid #e4e7ec;background:#fff;border-radius:7px;padding:10px 11px 11px;text-align:left}.catcard:hover{border-color:#2f6fed;box-shadow:0 2px 10px #2f6fed24}.catno{font-size:12px;font-weight:700;color:#2f6fed;letter-spacing:.04em}.catcard strong{display:block;margin-top:6px;font-size:14px;font-weight:650;color:#1f2b3d}.catcard small{display:block;margin-top:4px;font-size:11px;color:#8a94a6}@media(max-width:640px){.catgrid{grid-template-columns:1fr 1fr}}
+main{min-width:0}
+@media(max-width:1080px){
+  .medrow,.rx-columns{grid-template-columns:20px minmax(120px,1.2fr) minmax(54px,.5fr) minmax(228px,2.6fr) auto;gap:8px}
+  .regimen,.regimen-head{gap:6px}
+  .regitem strong{white-space:normal}
+  .editor{margin-left:11px}
+}
+</style>
+</head>
+<body>
+<header class="top"><span class="brand"><span class="mark">✚</span>HIS</span><span class="crumb">医院信息系统　/　门诊医生站　/　医嘱</span><div class="who"><span>工作组 · 内科门诊</span><span class="avatar">林</span><span>林医生　⌄</span></div></header>
+<div class="app">
+<aside><div class="label">CURRENT ENCOUNTER</div><div class="patient"><div class="pname">周晓梅　<span style="font-size:10px;color:#b4cbc3">女 · 42岁</span></div><div class="pid">门诊号 MZ-20261108-0216</div><div class="pmeta">就诊科室　内科门诊<br>就诊时间　2026-11-08 09:42<br>过敏史　青霉素（皮疹）</div></div><div class="navtitle">门诊接诊</div><div class="nav">接诊记录</div><div class="nav">诊断</div><div class="nav active">医嘱与申请</div><div class="nav">病历</div><div class="sidefoot">本次就诊<br>接诊中　·　未完成</div></aside>
+<main>
+<div class="heading"><div><div class="eyebrow">DOCTOR STATION · OUTPATIENT</div><h1>医嘱与申请</h1><div class="sub">按签发状态查看本次就诊医嘱；草稿可在原位置继续编辑。</div></div><div class="context"><span class="dot"></span>草稿自动保留　·　最后保存 <span id="lastSaved">09:48</span></div></div>
+<div class="strip"><span>主诉<b>咳嗽、咽部不适 3 天</b></span><span>诊断<b>急性上呼吸道感染</b></span><span>就诊人<b>周晓梅 / MZ-20261108-0216</b></span><span class="alert">过敏提醒：青霉素</span></div>
+<div class="toolbar"><b>本次就诊医嘱</b><span class="count" id="orderCount">4 条</span><span class="spacer"></span><input id="orderSearch" class="search" placeholder="⌕　筛选医嘱内容" aria-label="筛选医嘱内容"><button class="btn" id="newOrder">＋ 新开医嘱</button></div>
+<section class="orders">
+<div class="section signed"><div class="sectionhead"><h2>已签发</h2><span class="count" id="signedCount">2 条医嘱</span><span class="rule"></span><span class="hint">内容只读 · 状态随处方保持一致</span></div><div id="signedList"></div></div>
+<div class="divider"></div>
+<div class="section draft"><div class="sectionhead"><h2>草稿</h2><span class="count" id="draftCount">2 条医嘱</span><span class="rule"></span><span class="hint">双击底部空行开立新医嘱</span></div><div id="draftRx"></div><div class="empty" id="draftEmpty">暂无草稿医嘱，双击下方空行开立新医嘱。</div>
+<div class="blank" id="blank" role="button" tabindex="0"><span class="plus">＋</span><span>双击此处开立新医嘱</span><span class="blankhint">选择医嘱类别后继续</span></div>
+<div class="empty" id="searchEmpty">没有匹配的医嘱</div></div>
+<div class="footer"><span class="summary">草稿医嘱不会进入执行；签发后处方内医嘱统一变更状态。</span><button class="btn" id="viewLog">查看操作记录</button><button class="btn primary" id="saveAll">保存全部草稿</button></div>
+</section></main></div>
+<div class="catbg" id="catbg" role="dialog" aria-modal="true" aria-labelledby="catTitle"><div class="catbox"><div class="cathead"><div><h3 id="catTitle">选择医嘱类别</h3><p>选择后在列表下方填写医嘱内容</p></div><button id="catClose" aria-label="关闭">✕</button></div><div class="catgrid" id="catGrid"></div></div></div>
+<div class="modalbg" id="modalbg" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal"><div class="modalhead"><h3 id="modalTitle"></h3><button id="modalClose" aria-label="关闭">×</button></div><div class="modalbody"><p class="modalintro" id="modalIntro"></p><div class="modalfields" id="modalFields"></div><div class="modaltip" id="modalTip"></div></div><div class="modalfoot"><button class="btn" id="modalDelete" hidden>删除草稿</button><button class="btn" id="modalCancel">取消</button><button class="btn primary" id="modalSave">保存草稿</button></div></div></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script>
+"use strict";
+const TYPES={
+  medicine:{name:"西药",badge:"西药处方 Rx"},
+  herb:{name:"中草药",badge:"中药饮片处方"},
+  treatment:{name:"处置",badge:"处置申请"},
+  exam:{name:"检查",badge:"检查申请"},
+  lab:{name:"检验",badge:"检验申请"},
+  surgery:{name:"手术",badge:"手术申请"},
+  blood:{name:"输血",badge:"输血申请"}
+};
+const CATS=[
+  {no:"01",id:"western",name:"西药",desc:"西药处方",kind:"medicine",variant:"西药"},
+  {no:"02",id:"patent",name:"中成药",desc:"中成药处方",kind:"medicine",variant:"中成药"},
+  {no:"03",id:"herb",name:"中草药",desc:"中药饮片处方",kind:"herb"},
+  {no:"04",id:"treatment",name:"处置",desc:"治疗 / 处置",kind:"treatment"},
+  {no:"05",id:"exam",name:"检查",desc:"检查申请",kind:"exam"},
+  {no:"06",id:"lab",name:"检验",desc:"检验申请",kind:"lab"},
+  {no:"07",id:"surgery",name:"手术",desc:"手术 / 操作申请",kind:"surgery"},
+  {no:"08",id:"blood",name:"输血",desc:"输血申请",kind:"blood"}
+];
+const FORMS={
+  herb:{title:"中草药医嘱开立",intro:"中草药使用专用开立页面，按饮片明细录入处方内容；草稿状态与处方内其他医嘱保持一致。",tip:"饮片明细采用独立开立流程；不维护药房目录、库存或调剂状态。",fields:[
+    {key:"name",label:"处方名称",ph:"例如：疏风清热方",wide:true},
+    {key:"details",label:"药品 / 饮片明细",ph:"每行一味药与剂量，例如：金银花 10g",wide:true,textarea:true},
+    {key:"decoction",label:"煎服法",ph:"例如：水煎，早晚分服"}]},
+  lab:{title:"检验申请开立",intro:"检验申请使用独立页面，录入项目、样本类型和临床要求。",tip:"采集管 / 容器编码由外部检验系统提供；HIS 不维护其目录。",fields:[
+    {key:"item",label:"检验项目",ph:"搜索检验项目",wide:true},
+    {key:"specimen",label:"样本类型",ph:"例如：静脉血"},
+    {key:"collectedAt",label:"采集时间",ph:"例如：明晨空腹"},
+    {key:"requirement",label:"临床要求",ph:"补充说明",wide:true,textarea:true}]},
+  exam:{title:"检查申请开立",intro:"检查申请使用独立页面，可在同一申请中添加多个检查部位。",tip:"一张检查申请单可包含多个部位明细；每条医嘱对应一张申请单。",fields:[
+    {key:"item",label:"检查项目",ph:"搜索检查项目",wide:true},
+    {key:"site",label:"检查部位",ph:"输入或选择检查部位",wide:true},
+    {key:"purpose",label:"检查目的",ph:"填写检查目的",wide:true,textarea:true}]},
+  surgery:{title:"手术申请开立",intro:"手术申请使用独立页面，单台手术单独变更；需要时可关联连台信息。",tip:"术式选择需遵循院内授权目录；原型不提交真实手术申请。",fields:[
+    {key:"item",label:"手术名称 / 术式",ph:"搜索院内手术目录",wide:true},
+    {key:"scheduledAt",label:"计划时间",ph:"例如：2026-11-10 09:00"},
+    {key:"anesthesia",label:"麻醉要求",ph:"补充信息"},
+    {key:"purpose",label:"手术目的",ph:"填写手术目的",wide:true,textarea:true}]},
+  treatment:{title:"处置医嘱开立",intro:"填写处置内容与执行要求。",tip:"每条医嘱对应一张申请单，保存后先保持草稿状态。",fields:[
+    {key:"item",label:"处置项目",ph:"搜索治疗 / 处置项目",wide:true},
+    {key:"method",label:"执行方式",ph:"填写执行方式"},
+    {key:"freq",label:"频次 / 疗程",ph:"填写频次和疗程"},
+    {key:"content",label:"医嘱内容",ph:"补充说明",wide:true,textarea:true}]},
+  blood:{title:"输血申请开立",intro:"输血申请使用独立页面，录入血制品、用血量与输血指征。",tip:"血制品目录由输血科维护；原型不提交真实用血申请。",fields:[
+    {key:"product",label:"血制品",ph:"例如：去白细胞悬浮红细胞",wide:true},
+    {key:"amount",label:"用血量",ph:"例如：2 U"},
+    {key:"bloodType",label:"血型",ph:"例如：A 型 Rh 阳性"},
+    {key:"scheduledAt",label:"计划时间",ph:"例如：2026-11-09 09:00"},
+    {key:"indication",label:"输血指征",ph:"填写输血指征",wide:true,textarea:true}]}
+};
+const ROUTES=["口服","外用","吸入"];
+const FREQS=["每日1次","每日2次","每日3次","每日4次","必要时"];
+const PHARMACIES=["门诊药房","中药房","其他药房"];
+const DIAGNOSES=["急性上呼吸道感染","咽炎"];
+const TIMINGS=["饭前","饭后","必要时"];
+
+const $=s=>document.querySelector(s);
+const $$=s=>[...document.querySelectorAll(s)];
+const nowTime=()=>new Date().toTimeString().slice(0,5);
+const uid=p=>p+"-"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const esc=v=>String(v==null?"":v).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+let seq=2;
+const state={
+  lastSaved:"09:48",
+  openOrder:"order-a",
+  signed:[{
+    id:"rx-s1",type:"medicine",label:"西药处方 Rx",status:"signed",number:"20261108-01",at:"09:31",by:"林医生",
+    orders:[
+      {id:"order-s1",type:"medicine",shared:{route:"口服",freq:"每日2次",duration:"3 天",pharmacy:"门诊药房",diagnosis:"急性上呼吸道感染",timing:"饭后",note:""},drugs:[{name:"复方氨酚烷胺胶囊",dose:"2",unit:"粒",total:"12"}]},
+      {id:"order-s2",type:"medicine",shared:{route:"口服",freq:"每日3次",duration:"3 天",pharmacy:"门诊药房",diagnosis:"急性上呼吸道感染",timing:"饭后",note:""},drugs:[{name:"复方甘草片",dose:"2",unit:"片",total:"18"}]}
+    ]}],
+  drafts:[{
+    id:"rx-d1",type:"medicine",label:"西药处方 Rx",status:"draft",number:null,at:null,by:"林医生",
+    orders:[
+      {id:"order-a",type:"medicine",shared:{route:"口服",freq:"每日1次",duration:"5 天",pharmacy:"门诊药房",diagnosis:"急性上呼吸道感染",timing:"饭后",note:"如出现明显不适及时停药并复诊。"},drugs:[{name:"氯雷他定片 10mg",dose:"1",unit:"片",total:"5"},{name:"维生素C片 100mg",dose:"2",unit:"片",total:"30"}]},
+      {id:"order-b",type:"medicine",shared:{route:"口服",freq:"每日3次",duration:"3 天",pharmacy:"门诊药房",diagnosis:"急性上呼吸道感染",timing:"饭后",note:""},drugs:[{name:"复方板蓝根颗粒",dose:"1",unit:"袋",total:"9"}]}
+    ]}],
+  log:[
+    {time:"09:31",action:"签发",detail:"处方 20261108-01，2 条医嘱"},
+    {time:"09:42",action:"创建",detail:"草稿处方，2 条成药医嘱"},
+    {time:"09:48",action:"保存",detail:"草稿自动保留"}
+  ],
+  modal:{mode:null,type:null,order:null}
+};
+
+function findOrder(id){
+  for(const rx of [...state.signed,...state.drafts]){
+    const o=rx.orders.find(x=>x.id===id);
+    if(o)return o;
+  }
+  return null;
+}
+function findRxOf(orderId){
+  return [...state.signed,...state.drafts].find(rx=>rx.orders.some(o=>o.id===orderId))||null;
+}
+function findRx(rxId){
+  return [...state.signed,...state.drafts].find(rx=>rx.id===rxId)||null;
+}
+function describe(o){
+  if(o.type==="medicine"){const d=o.drugs[0];return d&&d.name?d.name:"成药医嘱";}
+  const f=FORMS[o.type].fields[0];
+  return o.fields[f.key]||TYPES[o.type].name+"医嘱";
+}
+function options(list,cur,empty){
+  const all=(cur&&!list.includes(cur))?[cur,...list]:list.slice();
+  const head=empty?`<option value="">${esc(empty)}</option>`:"";
+  return head+all.map(v=>`<option ${v===cur?"selected":""}>${esc(v)}</option>`).join("");
+}
+function reg(v){return `<div class="regitem"><strong>${esc(v||"待填写")}</strong></div>`;}
+function log(action,detail){
+  state.log.unshift({time:nowTime(),action,detail});
+  if(state.log.length>50)state.log.length=50;
+}
+function toast(msg){
+  const t=$("#toast");t.textContent=msg;t.classList.add("show");
+  clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove("show"),2200);
+}
+
+/* ---------- render ---------- */
+function searchText(o){
+  if(o.type==="medicine"){
+    const d=o.drugs.map(x=>[x.name,x.unit].join(" ")).join(" ");
+    const s=o.shared;
+    return [d,s.route,s.freq,s.duration,s.pharmacy,s.diagnosis,s.timing,s.note].join(" ");
+  }
+  return [TYPES[o.type].name,...Object.values(o.fields)].join(" ");
+}
+function renderItems(drugs){
+  return drugs.map(d=>`<div class="item"><input data-f="name" value="${esc(d.name)}" placeholder="输入药品名称及规格" aria-label="药品 / 规格"><input data-f="dose" value="${esc(d.dose)}" placeholder="用量" aria-label="每次用量"><input data-f="unit" value="${esc(d.unit)}" placeholder="单位" aria-label="剂量单位"><input data-f="total" value="${esc(d.total)}" placeholder="总量" aria-label="总量"><button class="remove" data-del-drug title="删除药品" aria-label="删除药品">×</button></div>`).join("");
+}
+function renderEditor(rx,o){
+  const s=o.shared;
+  return `<div class="editor" data-order="${o.id}" ${state.openOrder===o.id?"":"hidden"}>
+  <div class="edtop"><div><div class="edtitle">编辑成药医嘱</div><div class="ednote">西药与中成药统一归入成药；一条医嘱可包含多个药品明细。</div></div><button class="btn small" data-close>收起</button></div>
+  <div class="group-label">处方共用信息</div>
+  <div class="editor-grid">
+    <div class="field"><label>用法</label><select data-f="route">${options(ROUTES,s.route)}</select></div>
+    <div class="field"><label>频次</label><select data-f="freq">${options(FREQS,s.freq,"请选择频次")}</select></div>
+    <div class="field"><label>疗程</label><input data-f="duration" value="${esc(s.duration)}" placeholder="如：5 天"></div>
+    <div class="field"><label>领药药房</label><select data-f="pharmacy">${options(PHARMACIES,s.pharmacy)}</select></div>
+    <div class="field"><label>关联诊断</label><select data-f="diagnosis">${options(DIAGNOSES,s.diagnosis)}</select></div>
+    <div class="field"><label>用药时点</label><select data-f="timing">${options(TIMINGS,s.timing)}</select></div>
+    <div class="field wide"><label>处方备注 / 特殊说明</label><textarea data-f="note" placeholder="补充处方说明">${esc(s.note)}</textarea></div>
+  </div>
+  <div class="group-label">药品明细</div>
+  <div class="items"><div class="itemshead"><span>药品 / 规格</span><span>每次用量</span><span>单位</span><span>总量</span><span></span></div><div class="itemsbody">${renderItems(o.drugs)}</div></div>
+  <div class="edfoot"><button class="btn small" data-add-line="${o.id}">＋ 添加药品</button><span class="note">处方内医嘱状态一致；处方可包含多条医嘱。</span><button class="btn small" data-del-order="${o.id}">删除医嘱</button><button class="btn small" data-save-order="${o.id}">保存草稿</button><button class="btn small primary" data-sign-rx="${rx.id}">签发处方</button></div>
+  </div>`;
+}
+function renderMedicineOrder(rx,o){
+  const s=o.shared;
+  const tail=rx.status==="draft"
+    ?`<button class="editlink" data-edit-order="${o.id}">编辑</button><button class="editlink" data-del-order="${o.id}">删除</button>`
+    :"";
+  return `<div class="row medrow order-row${state.openOrder===o.id?" selected":""}" data-order="${o.id}" data-search="${esc(searchText(o))}">
+    <span class="badge">药</span>
+    <div class="drugstack">${o.drugs.map(d=>`<div class="drug">${esc(d.name||"待填写药品")}</div>`).join("")}</div>
+    <div class="dose-stack">${o.drugs.map(d=>`<div class="dose-line">${d.name?esc(d.dose||"－")+esc(d.unit||"")+" / 次":"待填写"}</div>`).join("")}</div>
+    <div class="regimen">${reg(s.route)}${reg(s.freq)}${reg(s.duration)}${reg(s.pharmacy)}</div>
+    <div class="tail">${tail}</div></div>${rx.status==="draft"?renderEditor(rx,o):""}`;
+}
+function renderSpecialOrder(rx,o){
+  const t=TYPES[o.type],fields=FORMS[o.type].fields,cat=CATS.find(c=>c.kind===o.type);
+  const main=o.fields[fields[0].key]||"待填写"+fields[0].label;
+  const detail=fields.slice(1).map(f=>o.fields[f.key]).filter(Boolean).join("　·　")||"待补充申请明细";
+  const tail=rx.status==="draft"
+    ?`<button class="editlink" data-edit-special="${o.id}">编辑</button><button class="editlink" data-sign-rx="${rx.id}">签发</button>`
+    :`<span class="status">已签发</span>`;
+  return `<div class="row order-row" data-order="${o.id}" data-search="${esc(searchText(o))}">
+    <span class="badge">${cat?cat.no:""}</span>
+    <div class="content"><div class="title">${esc(main)} <span class="kind">${esc(t.name)}医嘱</span></div><div class="detail">${esc(detail)}</div></div>
+    <div class="tail">${tail}</div></div>`;
+}
+function renderRx(rx){
+  const draft=rx.status==="draft";
+  const head=`<div class="rxhead"><span class="rxbadge" ${draft?'style="background:#fff2d9;color:#94631c"':""}>${esc(rx.label)}</span><span class="rxname">${rx.number?"处方 "+esc(rx.number):"新处方 · 未编号"}</span><span>·</span><span>${rx.orders.length} 条医嘱</span><span class="rxmeta">${esc(rx.by)}　${draft?"编辑中":esc(rx.at)}　<span class="status ${draft?"draft":""}">${draft?"草稿":"已签发"}</span></span></div>`;
+  if(rx.type==="medicine"){
+    const cols=`<div class="rx-columns"><span></span><span>药品</span><span>每次用量</span><div class="regimen-head"><span>用法</span><span>频次</span><span>疗程</span><span>领药药房</span></div><span>操作</span></div>`;
+    return `<div class="rx" data-rx="${rx.id}">${head}${cols}${rx.orders.map(o=>renderMedicineOrder(rx,o)).join("")}</div>`;
+  }
+  return `<div class="rx" data-rx="${rx.id}">${head}${rx.orders.map(o=>renderSpecialOrder(rx,o)).join("")}</div>`;
+}
+function render(){
+  $("#signedList").innerHTML=state.signed.length?state.signed.map(renderRx).join(""):'<div class="empty show">暂无已签发医嘱。</div>';
+  $("#draftRx").innerHTML=state.drafts.map(renderRx).join("");
+  $("#draftEmpty").classList.toggle("show",state.drafts.length===0);
+  $("#lastSaved").textContent=state.lastSaved;
+  updateCounts();
+  applySearch();
+}
+function updateCounts(){
+  const n=list=>list.reduce((sum,rx)=>sum+rx.orders.length,0);
+  $("#orderCount").textContent=(n(state.signed)+n(state.drafts))+" 条";
+  $("#signedCount").textContent=n(state.signed)+" 条医嘱";
+  $("#draftCount").textContent=n(state.drafts)+" 条医嘱";
+}
+function applySearch(){
+  const q=($("#orderSearch").value||"").trim().toLowerCase();
+  let visible=0;
+  $$(".order-row").forEach(row=>{
+    const hit=!q||(row.dataset.search||"").toLowerCase().includes(q);
+    row.classList.toggle("hide",!hit);
+    if(hit)visible++;
+  });
+  $$(".rx").forEach(rx=>{
+    const rows=[...rx.querySelectorAll(".order-row")];
+    rx.classList.toggle("hide",!!q&&!rows.some(r=>!r.classList.contains("hide")));
+  });
+  $$(".editor").forEach(ed=>{ed.hidden=q?true:ed.dataset.order!==state.openOrder;});
+  $("#searchEmpty").classList.toggle("show",!!q&&visible===0);
+}
+
+/* ---------- editor state ---------- */
+function readEditor(editor,o){
+  editor.querySelectorAll("[data-f]").forEach(el=>{
+    if(el.closest(".itemsbody"))return;
+    o.shared[el.dataset.f]=el.value.trim();
+  });
+  o.drugs=[...editor.querySelectorAll(".itemsbody .item")].map(it=>({
+    name:it.querySelector('[data-f="name"]').value.trim(),
+    dose:it.querySelector('[data-f="dose"]').value.trim(),
+    unit:it.querySelector('[data-f="unit"]').value.trim(),
+    total:it.querySelector('[data-f="total"]').value.trim()
+  }));
+}
+function collectOpenEditor(){
+  const ed=document.querySelector(".editor:not([hidden])");
+  if(!ed)return;
+  const o=findOrder(ed.dataset.order);
+  if(o)readEditor(ed,o);
+}
+function setOpenOrder(id){
+  if(state.openOrder&&state.openOrder!==id)collectOpenEditor();
+  state.openOrder=id;
+  $$(".editor").forEach(ed=>{ed.hidden=ed.dataset.order!==id;});
+  $$(".order-row").forEach(row=>{
+    const rx=findRxOf(row.dataset.order);
+    row.classList.toggle("selected",rx&&rx.status==="draft"&&row.dataset.order===id);
+  });
+}
+function validate(o){
+  if(o.type==="medicine"){
+    if(!o.drugs.length)return "每条医嘱至少需要一条药品明细";
+    for(let i=0;i<o.drugs.length;i++){
+      const d=o.drugs[i];
+      if(!d.name)return `第 ${i+1} 条药品未填写名称`;
+      if(!(Number(d.dose)>0))return `第 ${i+1} 条药品每次用量需大于 0`;
+      if(!d.unit)return `第 ${i+1} 条药品未填写单位`;
+      if(!(Number(d.total)>0))return `第 ${i+1} 条药品总量需大于 0`;
+    }
+    if(!o.shared.freq)return "请选择频次";
+    if(!o.shared.duration)return "请填写疗程";
+    return "";
+  }
+  const first=FORMS[o.type].fields[0];
+  if(!o.fields[first.key])return `请填写${first.label}`;
+  return "";
+}
+
+/* ---------- actions ---------- */
+function saveOrder(orderId){
+  const ed=document.querySelector(`.editor[data-order="${orderId}"]`);
+  if(!ed)return true;
+  const o=findOrder(orderId);
+  readEditor(ed,o);
+  const err=validate(o);
+  if(err){toast(err);return false;}
+  state.lastSaved=nowTime();
+  log("保存",`保存草稿：${describe(o)}`);
+  render();
+  setOpenOrder(orderId);
+  toast("草稿已保存");
+  return true;
+}
+function signRx(rxId){
+  collectOpenEditor();
+  const rx=findRx(rxId);
+  if(!rx||rx.status!=="draft")return;
+  for(const o of rx.orders){
+    const err=validate(o);
+    if(err){toast(`无法签发：${err}`);setOpenOrder(o.id);return;}
+  }
+  rx.status="signed";
+  rx.number=`20261108-${String(seq++).padStart(2,"0")}`;
+  rx.at=nowTime();
+  state.signed.unshift(rx);
+  state.drafts=state.drafts.filter(r=>r!==rx);
+  state.openOrder=null;
+  log("签发",`处方 ${rx.number}，${rx.orders.length} 条医嘱`);
+  render();
+  toast("处方已签发，处方内医嘱状态已同步");
+}
+function deleteOrder(orderId){
+  collectOpenEditor();
+  const rx=findRxOf(orderId);
+  if(!rx||rx.status!=="draft")return;
+  const o=findOrder(orderId);
+  const label=describe(o);
+  rx.orders=rx.orders.filter(x=>x.id!==orderId);
+  if(!rx.orders.length)state.drafts=state.drafts.filter(r=>r!==rx);
+  if(state.openOrder===orderId)state.openOrder=null;
+  log("删除",`删除草稿医嘱：${label}`);
+  render();
+  toast("已删除草稿医嘱");
+}
+function addMedicineOrder(variant="西药"){
+  collectOpenEditor();
+  const rx={id:uid("rx"),type:"medicine",label:`${variant}处方 Rx`,status:"draft",number:null,at:null,by:"林医生",
+    orders:[{id:uid("order"),type:"medicine",shared:{route:"口服",freq:"",duration:"",pharmacy:"门诊药房",diagnosis:"急性上呼吸道感染",timing:"饭后",note:""},drugs:[{name:"",dose:"1",unit:"",total:""}]}]};
+  state.drafts.push(rx);
+  state.openOrder=rx.orders[0].id;
+  log("创建",`新建${variant}草稿处方`);
+  render();
+  const ed=document.querySelector(`.editor[data-order="${rx.orders[0].id}"]`);
+  ed?.scrollIntoView({behavior:"smooth",block:"center"});
+  toast("已添加草稿医嘱，请填写处方信息与药品明细");
+}
+function addDrugLine(orderId){
+  const ed=document.querySelector(`.editor[data-order="${orderId}"]`);
+  if(!ed)return;
+  const o=findOrder(orderId);
+  collectOpenEditor();
+  o.drugs.push({name:"",dose:"1",unit:"",total:""});
+  render();
+  setOpenOrder(orderId);
+  const body=document.querySelector(`.editor[data-order="${orderId}"] .itemsbody`);
+  body?.lastElementChild?.querySelector('[data-f="name"]')?.focus();
+}
+function deleteDrug(btn){
+  const body=btn.closest(".itemsbody");
+  if(!body)return;
+  if(body.children.length===1){toast("每条医嘱至少保留一条药品明细");return;}
+  btn.closest(".item").remove();
+}
+function saveAllDrafts(){
+  collectOpenEditor();
+  for(const rx of state.drafts){
+    for(const o of rx.orders){
+      const err=validate(o);
+      if(err){toast(`保存失败：${err}`);setOpenOrder(o.id);return;}
+    }
+  }
+  state.lastSaved=nowTime();
+  log("保存",`保存全部草稿，共 ${state.drafts.reduce((n,rx)=>n+rx.orders.length,0)} 条医嘱`);
+  render();
+  toast("全部草稿已保存");
+}
+
+/* ---------- category picker ---------- */
+function renderCats(){
+  $("#catGrid").innerHTML=CATS.map(c=>`<button class="catcard" data-cat="${c.id}"><span class="catno">${c.no}</span><strong>${esc(c.name)}</strong><small>${esc(c.desc)}</small></button>`).join("");
+}
+function openPicker(){
+  renderCats();
+  $("#catbg").classList.add("show");
+  $("#blank").classList.add("open");
+  $("#catClose").focus();
+}
+function closePicker(){
+  $("#catbg").classList.remove("show");
+  $("#blank").classList.remove("open");
+}
+
+/* ---------- modal ---------- */
+function openModal(){
+  $("#modalbg").classList.add("show");
+}
+function closeModal(){
+  $("#modalbg").classList.remove("show");
+  $("#modalSave").hidden=false;
+  $("#modalDelete").hidden=true;
+  $("#modalCancel").textContent="取消";
+  state.modal={mode:null,type:null,order:null};
+}
+function openSpecial(type,orderId){
+  const def=FORMS[type];
+  const values=orderId?findOrder(orderId).fields:{};
+  state.modal={mode:"special",type,order:orderId||null};
+  $("#modalTitle").textContent=def.title;
+  $("#modalIntro").textContent=def.intro;
+  $("#modalTip").textContent=def.tip;
+  $("#modalFields").innerHTML=def.fields.map(f=>{
+    const val=esc(values[f.key]||"");
+    const cls="field"+(f.wide?" wide":"");
+    return f.textarea
+      ?`<div class="${cls}"><label>${esc(f.label)}</label><textarea data-sf="${f.key}" placeholder="${esc(f.ph||"")}">${val}</textarea></div>`
+      :`<div class="${cls}"><label>${esc(f.label)}</label><input data-sf="${f.key}" value="${val}" placeholder="${esc(f.ph||"")}"></div>`;
+  }).join("");
+  $("#modalDelete").hidden=!orderId;
+  $("#modalCancel").textContent="取消";
+  $("#modalSave").hidden=false;
+  openModal();
+}
+function saveSpecial(){
+  collectOpenEditor();
+  const {type,order}=state.modal;
+  if(!type)return;
+  const def=FORMS[type];
+  const vals={};
+  $$("#modalFields [data-sf]").forEach(el=>{vals[el.dataset.sf]=el.value.trim();});
+  const first=def.fields[0];
+  if(!vals[first.key]){toast(`请填写${first.label}`);return;}
+  if(order){
+    const o=findOrder(order);
+    o.fields=vals;
+    log("编辑",`${TYPES[type].name}医嘱：${vals[first.key]}`);
+    closeModal();
+    render();
+    toast("草稿已保存");
+    return;
+  }
+  const rx={id:uid("rx"),type,label:TYPES[type].badge,status:"draft",number:null,at:null,by:"林医生",
+    orders:[{id:uid("order"),type,fields:vals}]};
+  state.drafts.push(rx);
+  log("创建",`${TYPES[type].name}草稿医嘱：${vals[first.key]}`);
+  closeModal();
+  render();
+  toast("已保存为草稿");
+}
+function openLog(){
+  state.modal={mode:"log",type:null,order:null};
+  $("#modalTitle").textContent="操作记录";
+  $("#modalIntro").textContent="本次演示会话内的医嘱操作轨迹（仅浏览器本地，不入库）。";
+  $("#modalTip").textContent="真实系统需与业务变更同事务写入追加式审计日志；此处仅演示操作记录。";
+  $("#modalFields").innerHTML=`<div class="field wide"><div class="loglist">${state.log.map(e=>`<div class="logitem"><time>${esc(e.time)}</time><b>${esc(e.action)}</b><span>${esc(e.detail)}</span></div>`).join("")||"暂无操作记录"}</div></div>`;
+  $("#modalSave").hidden=true;
+  $("#modalDelete").hidden=true;
+  $("#modalCancel").textContent="关闭";
+  openModal();
+}
+
+/* ---------- events ---------- */
+$("#blank").addEventListener("dblclick",openPicker);
+$("#blank").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openPicker();}});
+$("#newOrder").onclick=()=>{$("#blank").scrollIntoView({behavior:"smooth",block:"center"});openPicker();};
+$("#catClose").onclick=closePicker;
+$("#catbg").onclick=e=>{if(e.target.id==="catbg")closePicker();};
+$("#catGrid").addEventListener("click",e=>{
+  const b=e.target.closest("[data-cat]");
+  if(!b)return;
+  const cat=CATS.find(c=>c.id===b.dataset.cat);
+  if(!cat)return;
+  closePicker();
+  if(cat.kind==="medicine")addMedicineOrder(cat.variant);
+  else openSpecial(cat.kind);
+});
+$("#orderSearch").oninput=()=>{collectOpenEditor();applySearch();};
+
+document.addEventListener("click",e=>{
+  const t=e.target;
+  const editOrder=t.closest("[data-edit-order]");
+  if(editOrder){setOpenOrder(editOrder.dataset.editOrder);document.querySelector(`.editor[data-order="${editOrder.dataset.editOrder}"]`)?.scrollIntoView({behavior:"smooth",block:"center"});return;}
+  const editSpecial=t.closest("[data-edit-special]");
+  if(editSpecial){const o=findOrder(editSpecial.dataset.editSpecial);openSpecial(o.type,o.id);return;}
+  const signBtn=t.closest("[data-sign-rx]");
+  if(signBtn){signRx(signBtn.dataset.signRx);return;}
+  const saveBtn=t.closest("[data-save-order]");
+  if(saveBtn){saveOrder(saveBtn.dataset.saveOrder);return;}
+  const delOrder=t.closest("[data-del-order]");
+  if(delOrder){deleteOrder(delOrder.dataset.delOrder);return;}
+  const addLine=t.closest("[data-add-line]");
+  if(addLine){addDrugLine(addLine.dataset.addLine);return;}
+  if(t.classList.contains("remove")&&t.closest(".itemsbody")){deleteDrug(t);return;}
+  const close=t.closest("[data-close]");
+  if(close){setOpenOrder(null);return;}
+  const row=t.closest(".order-row");
+  if(row&&!t.closest("button")){
+    const rx=findRxOf(row.dataset.order);
+    if(rx&&rx.status==="draft"){
+      const o=findOrder(row.dataset.order);
+      if(o.type!=="medicine"){openSpecial(o.type,o.id);return;}
+      if(state.openOrder===o.id)setOpenOrder(null);
+      else setOpenOrder(o.id);
+    }
+  }
+});
+
+$("#modalClose").onclick=closeModal;
+$("#modalCancel").onclick=closeModal;
+$("#modalDelete").onclick=()=>{
+  if(state.modal.mode==="special"&&state.modal.order){
+    const id=state.modal.order;
+    closeModal();
+    deleteOrder(id);
+  }
+};
+$("#modalbg").onclick=e=>{if(e.target.id==="modalbg")closeModal();};
+$("#modalSave").onclick=()=>{if(state.modal.mode==="special")saveSpecial();};
+$("#viewLog").onclick=openLog;
+$("#saveAll").onclick=saveAllDrafts;
+
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){closePicker();closeModal();}
+});
+
+render();
+</script>
+</body></html>

@@ -1,0 +1,213 @@
+/* PD 门诊收费设计包：浅色医疗参考风格
+   仅覆盖门诊收费设计包页面；保留现有内容、路由、导航状态和交互脚本。 */
+.outpatient-theme{
+  --side-w:184px;
+  --op-nav:#fff;
+  --op-nav-2:#f7fbff;
+  --op-brand:#2c7df0;
+  --op-ink:#0d2142;
+  --op-muted:#7186a0;
+  --op-line:#dfe9f5;
+  min-width:0;
+  color:var(--op-ink);
+  background:
+    radial-gradient(circle at 73% -10%,rgba(121,190,255,.22),transparent 32%),
+    radial-gradient(circle at 15% 4%,rgba(211,236,255,.72),transparent 28%),
+    linear-gradient(180deg,#f7fbff 0,#f4f9ff 36%,#f8fbff 100%)!important;
+}
+.outpatient-theme .portal{
+  display:grid!important;
+  width:100%!important;
+  max-width:none!important;
+  min-height:100vh;
+  margin:0!important;
+  border:0!important;
+  border-radius:0!important;
+  overflow:visible!important;
+  box-shadow:none!important;
+  background:transparent!important;
+  grid-template-columns:var(--side-w) minmax(0,1fr)!important;
+}
+.outpatient-theme .portal-main{min-width:0!important;background:transparent!important}
+.outpatient-theme .side-nav{
+  position:sticky;top:0;align-self:start;min-height:100vh;
+  padding:14px 12px 18px!important;
+  color:#4b6380!important;
+  background:rgba(255,255,255,.94)!important;
+  border-right:1px solid #dce8f4!important;
+  box-shadow:8px 0 28px rgba(42,84,132,.035)!important;
+  backdrop-filter:blur(14px);
+}
+.outpatient-theme .side-brand{border-bottom:1px solid #e8eff7!important;padding:4px 7px 14px!important}
+.outpatient-theme .brand-mark{
+  width:34px!important;height:34px!important;border-radius:10px!important;
+  background:linear-gradient(145deg,#62b7ff,#2b76df)!important;
+  box-shadow:0 6px 18px rgba(43,118,223,.22)!important;
+}
+.outpatient-theme .side-brand b{color:#12315f!important;font-size:13.5px!important}
+.outpatient-theme .side-brand span{color:#8da0b8!important}
+.outpatient-theme .nav-item{
+  color:#58708d!important;border-radius:10px!important;
+  padding:10px 11px!important;font-size:12.5px!important;
+}
+.outpatient-theme .nav-item:hover{background:#f0f7ff!important;color:#1e61bd!important}
+.outpatient-theme .nav-item.active{
+  color:#216bd1!important;background:linear-gradient(90deg,#e5f1ff,#f2f8ff)!important;
+  box-shadow:inset 3px 0 0 #4d96ff!important;font-weight:760!important;
+}
+.outpatient-theme .nav-icon{color:#5b83ba!important}
+.outpatient-theme .nav-sub{border-left:1px solid #dce8f5!important}
+.outpatient-theme .nav-sub-label{color:#91a1b5!important}
+.outpatient-theme .nav-sub a{color:#6f8298!important}
+.outpatient-theme .nav-sub a:hover,
+.outpatient-theme .nav-sub a.active{color:#216bd1!important;background:#eff6ff!important}
+.outpatient-theme .side-footer{border-top:1px solid #e8eff7!important}
+.outpatient-theme .context-bar{
+  position:sticky;top:0;z-index:40;min-height:62px;
+  padding:10px 24px!important;
+  background:rgba(255,255,255,.88)!important;
+  border-bottom:1px solid rgba(211,224,238,.9)!important;
+  backdrop-filter:blur(16px);
+}
+.outpatient-theme .context-title{color:#102c56!important;font-size:16px!important}
+.outpatient-theme .breadcrumb{color:#8a9bb0!important}
+.outpatient-theme .avatar{background:linear-gradient(145deg,#dbe9f7,#b9cce2)!important}
+.outpatient-theme .prd-center{
+  width:100%;max-width:1540px;margin:0 auto;
+  padding:24px clamp(20px,3vw,46px) 72px!important;
+  background:transparent!important;
+}
+.outpatient-theme .package-intro{
+  position:relative;overflow:hidden;margin-bottom:14px;
+  padding:26px 30px 24px!important;
+  border:1px solid rgba(194,218,241,.8)!important;border-radius:24px!important;
+  background:
+    radial-gradient(circle at 83% 26%,rgba(255,255,255,.88) 0 7%,transparent 7.5%),
+    radial-gradient(circle at 72% 70%,rgba(255,255,255,.72) 0 11%,transparent 11.5%),
+    linear-gradient(120deg,rgba(231,245,255,.98),rgba(244,250,255,.95) 52%,rgba(229,242,255,.9))!important;
+  box-shadow:0 18px 42px rgba(49,97,151,.07)!important;
+}
+.outpatient-theme .package-intro:after{
+  content:"+";position:absolute;right:44px;top:12px;
+  color:rgba(68,139,228,.11);font:800 82px/1 ui-rounded,system-ui,sans-serif;
+  transform:rotate(2deg);pointer-events:none;
+}
+.outpatient-theme .package-intro h1{
+  position:relative;z-index:1;color:#0f2b55!important;
+  font-size:30px!important;letter-spacing:-.045em!important;
+}
+.outpatient-theme .package-intro p{
+  position:relative;z-index:1;max-width:900px!important;
+  color:#5e748f!important;font-size:12px!important;line-height:1.75!important;
+}
+.outpatient-theme .package-tabs{
+  gap:6px!important;margin:0 0 14px!important;padding:7px!important;
+  border:1px solid #dce8f4!important;border-radius:14px!important;
+  background:rgba(255,255,255,.82)!important;
+  box-shadow:0 8px 24px rgba(50,86,128,.045)!important;
+}
+.outpatient-theme .package-tab{
+  border:0!important;border-radius:9px!important;padding:8px 12px!important;
+  color:#617792!important;font-size:11.5px!important;
+}
+.outpatient-theme .package-tab:hover{background:#f2f7fd!important;color:#2b6fc9!important}
+.outpatient-theme .package-tab.active{
+  color:#236bd1!important;background:#eaf4ff!important;
+  box-shadow:inset 0 0 0 1px #cfe2fb!important;font-weight:800!important;
+}
+.outpatient-theme .package-view{padding-top:0!important}
+.outpatient-theme .prd-document{
+  min-width:0!important;max-width:none!important;
+  padding:24px clamp(18px,2.4vw,34px) 64px!important;
+  border:1px solid #dfe9f4!important;border-radius:20px!important;
+  background:rgba(255,255,255,.96)!important;
+  box-shadow:0 14px 38px rgba(42,82,128,.065)!important;
+}
+.outpatient-theme .prd-document h1{color:#102b55!important;font-size:25px!important}
+.outpatient-theme .prd-document h2{color:#183b68!important;border-top-color:#e7eef6!important}
+.outpatient-theme .prd-document .card,
+.outpatient-theme .diagram-card,
+.outpatient-theme .proto-card,
+.outpatient-theme .search-panel,
+.outpatient-theme .patient-panel,
+.outpatient-theme .tool-panel,
+.outpatient-theme .table-panel,
+.outpatient-theme .inspector{
+  border-color:#dfe9f3!important;border-radius:14px!important;
+  box-shadow:0 8px 24px rgba(52,87,128,.045)!important;
+}
+.outpatient-theme .view-toolbar{
+  padding:6px!important;border:1px solid #dfe9f4!important;border-radius:12px!important;
+  background:rgba(255,255,255,.82)!important;
+}
+.outpatient-theme .seg{
+  border-color:#d8e5f2!important;border-radius:8px!important;
+  background:#fff!important;color:#667d97!important;padding:7px 10px!important;
+}
+.outpatient-theme .seg.active{
+  background:#eaf4ff!important;color:#236bd1!important;border-color:#c3dcfb!important;
+}
+.outpatient-theme .prd-document table{
+  width:100%;border-color:#dfe9f3!important;
+}
+.outpatient-theme .prd-document th{
+  background:#f3f8fe!important;color:#486581!important;border-color:#e2ebf4!important;
+}
+.outpatient-theme .prd-document td{border-color:#e8eff6!important}
+.outpatient-theme .prd-document tr:nth-child(even) td{background:#fbfdff!important}
+.outpatient-theme .diagram-card,
+.outpatient-theme .dgm{
+  background:
+    linear-gradient(rgba(255,255,255,.94),rgba(255,255,255,.94)),
+    radial-gradient(#d5e8f6 .8px,transparent .8px)!important;
+  background-size:auto,18px 18px!important;
+}
+.outpatient-theme .banner{
+  border:1px solid #f1dfbc!important;border-radius:12px!important;
+  background:linear-gradient(90deg,#fff9eb,#fffdfa)!important;
+}
+@media(max-width:980px){
+  .outpatient-theme .portal{grid-template-columns:1fr!important}
+  .outpatient-theme .side-nav{
+    position:sticky;top:0;z-index:40;width:100%;height:auto;min-height:0;
+    padding:8px 10px!important;overflow-x:auto;
+    background:rgba(255,255,255,.96)!important;
+  }
+  .outpatient-theme .side-brand{padding:3px 5px!important;margin:0;border:0!important}
+  .outpatient-theme .side-menu{flex-direction:row!important;gap:2px!important;min-width:max-content}
+  .outpatient-theme .nav-item{min-height:34px;padding:7px 9px!important;font-size:11px!important}
+  .outpatient-theme .nav-item.active{box-shadow:inset 0 -2px 0 #4d96ff!important;background:#eff6ff!important}
+  .outpatient-theme .nav-item.nav-parent-open{
+    color:#58708d!important;background:transparent!important;box-shadow:none!important;
+  }
+  .outpatient-theme .nav-item.nav-parent-open::after{display:none!important}
+  .outpatient-theme .nav-sub{display:none!important}
+  .outpatient-theme .side-footer{display:none!important}
+  .outpatient-theme .context-bar{
+    position:static;min-height:auto;padding:10px 14px!important;
+  }
+  .outpatient-theme .mobile-business-current{
+    display:inline-flex;align-items:center;width:max-content;margin-top:5px;
+    padding:3px 8px;border:1px solid #bdd5fb;border-radius:999px;
+    background:#eef5ff;color:#155bd7;font-size:9.5px;font-weight:800;line-height:1.2;
+  }
+  .outpatient-theme .prd-center{padding:14px 12px 44px!important}
+  .outpatient-theme .package-intro{min-height:auto;padding:20px 18px!important}
+  .outpatient-theme .package-intro:before,
+  .outpatient-theme .package-intro:after{display:none}
+  .outpatient-theme .package-intro h1{font-size:24px!important}
+  .outpatient-theme .package-tabs{margin-bottom:10px;padding:6px!important;border-radius:11px!important}
+  .outpatient-theme .package-tab{padding:7px 10px!important;font-size:10.5px!important}
+}
+@media(max-width:640px){
+  .outpatient-theme .side-brand .brand-text{display:none!important}
+  .outpatient-theme .nav-icon{width:auto!important}
+  .outpatient-theme .nav-item{gap:5px!important;font-size:11px!important}
+  .outpatient-theme .context-bar .scope-row{display:none!important}
+  .outpatient-theme .context-title{font-size:15px!important}
+  .outpatient-theme .prd-center{padding:10px 8px 38px!important}
+  .outpatient-theme .package-intro{padding:18px 16px!important;border-radius:15px!important}
+  .outpatient-theme .package-intro h1{font-size:22px!important}
+  .outpatient-theme .package-intro p{font-size:11px!important}
+  .outpatient-theme .package-tabs{overflow-x:auto!important;white-space:nowrap}
+}

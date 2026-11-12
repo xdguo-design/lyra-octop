@@ -405,6 +405,8 @@
       "admissionDemoDescription": "AI-assisted self-service admission flow with identity verification, details, voice interaction, and confirmation.",
       "admissionRegistration": "Smart Admission Registration",
       "admissionRegistrationDescription": "Vue prototype with mock identity verification, form entry, voice interaction, and admission submission.",
+      "patientAppointment": "Patient Appointment Mini Program",
+      "patientAppointmentDescription": "An independent Vue 3 H5 appointment demo that can be deployed in HIS, with department, doctor, slot, confirmation, and cancellation steps.",
       "speechRecognition": "Speech recognition",
       "speechRecognitionDescription": "Tap the mic to jump into a chat and start voice input.",
       "planet": "Planet Park",
