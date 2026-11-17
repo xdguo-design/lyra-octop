@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>今日课 CareToday · 视觉方向三稿</title>
+<style>
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:#EDEAE4;
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+    color:#1c1a17; padding:56px 40px 80px;
+  }
+  .page-head{max-width:1320px; margin:0 auto 44px;}
+  .kicker{font-size:12px; letter-spacing:.22em; text-transform:uppercase; color:#8a8378; font-weight:600;}
+  h1{font-family:"Songti SC","Noto Serif SC",Georgia,serif; font-size:34px; font-weight:600; margin:14px 0 10px; letter-spacing:-.01em;}
+  .sub{font-size:14px; line-height:1.75; color:#5c5750; max-width:780px;}
+  .grid{display:grid; grid-template-columns:repeat(3,1fr); gap:36px; max-width:1320px; margin:0 auto;}
+  .col-head{margin-bottom:18px;}
+  .col-tag{display:inline-block; font-size:11px; font-weight:700; letter-spacing:.14em; padding:4px 9px; border-radius:2px;}
+  .col-name{font-size:19px; font-weight:600; margin:12px 0 6px; letter-spacing:-.01em;}
+  .col-desc{font-size:12.5px; line-height:1.7; color:#6b6560; min-height:84px;}
+  .swatches{display:flex; gap:6px; margin-top:10px;}
+  .sw{width:26px; height:26px; border-radius:3px; border:1px solid rgba(0,0,0,.08);}
+  .phone{
+    width:375px; height:812px; border-radius:26px; overflow:hidden; position:relative;
+    box-shadow:0 18px 44px -18px rgba(40,34,26,.42), 0 0 0 1px rgba(0,0,0,.06);
+    background:#fff;
+  }
+  .scroll{height:100%; overflow:hidden;}
+  .notch{position:absolute; top:0; left:50%; transform:translateX(-50%); width:104px; height:22px; background:currentColor; border-radius:0 0 12px 12px; opacity:.92; z-index:5;}
+  .statusbar{height:44px; display:flex; align-items:center; justify-content:space-between; padding:0 20px; font-size:12px; font-weight:600; position:relative; z-index:6;}
+  .body{padding:0 20px 84px;}
+  .navbar{display:flex; justify-content:space-between; align-items:center; padding:10px 0 6px; font-size:13px;}
+  .cap{font-size:11px; color:#8a8378; text-align:center; margin-top:14px; letter-spacing:.02em;}
+
+  /* ============ A ============ */
+  .dirA .phone{background:#FAF7F2; color:#2A2724;}
+  .dirA .notch{color:#FAF7F2;}
+  .dirA .statusbar{color:#2F5A4A;}
+  .dirA .navbar{color:#6E7F73; border-bottom:1px solid #E3DCD0; padding-bottom:12px;}
+  .dirA .date{font-size:11.5px; letter-spacing:.14em; color:#8C8478; margin-top:16px;}
+  .dirA .greet{font-family:"Songti SC","Noto Serif SC",serif; font-size:27px; line-height:1.28; margin-top:16px; letter-spacing:-.01em;}
+  .dirA .greet em{font-style:normal; color:#2F5A4A;}
+  .dirA .streak{display:flex; align-items:baseline; gap:7px; margin-top:10px; font-size:12px; color:#8C8478;}
+  .dirA .streak b{font-family:"Songti SC",serif; font-size:19px; color:#A8623C; font-weight:600;}
+  .dirA .rule{height:1px; background:#E3DCD0; margin:20px 0 0;}
+  .dirA .task{display:flex; gap:14px; padding:15px 0; border-bottom:1px solid #E3DCD0;}
+  .dirA .num{font-family:"Songti SC",serif; font-size:13px; color:#B0A695; width:16px; flex:none; padding-top:2px;}
+  .dirA .tk-name{font-size:16px; font-weight:600; letter-spacing:-.01em;}
+  .dirA .tk-meta{font-size:12px; color:#8C8478; margin-top:4px; line-height:1.5;}
+  .dirA .tk-state{margin-left:auto; font-size:11.5px; color:#2F5A4A; border:1px solid #C3D2C6; padding:4px 9px; border-radius:2px; height:fit-content; white-space:nowrap; flex:none;}
+  .dirA .tk-state.done{background:#2F5A4A; color:#FAF7F2; border-color:#2F5A4A;}
+  .dirA .chartbox{margin-top:18px; border:1px solid #E3DCD0; padding:14px;}
+  .dirA .charthead{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;}
+  .dirA .charthead span{font-size:11px; letter-spacing:.12em; color:#8C8478;}
+  .dirA .charthead b{font-family:"Songti SC",serif; font-size:17px; font-weight:600; color:#2A2724;}
+  .dirA .ai{margin-top:18px; display:flex; align-items:center; gap:12px; padding:14px; background:#F0EBE1;}
+  .dirA .ai-ic{width:28px; height:28px; border-radius:50%; background:#2F5A4A; flex:none; display:grid; place-items:center; color:#FAF7F2; font-size:12px; font-family:"Songti SC",serif;}
+  .dirA .ai-t{font-size:13.5px; font-weight:600;}
+  .dirA .ai-s{font-size:11.5px; color:#8C8478; margin-top:3px;}
+  .dirA .tabbar{position:absolute; bottom:0; left:0; right:0; height:58px; background:#FAF7F2; border-top:1px solid #E3DCD0; display:flex;}
+  .dirA .tab{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; font-size:10.5px; color:#A79E8F;}
+  .dirA .tab.on{color:#2F5A4A; font-weight:700;}
+  .dirA .tab i{width:16px; height:16px; border:1.4px solid currentColor; border-radius:50%; display:block;}
+
+  /* ============ B ============ */
+  .dirB .phone{background:#F1F2EF; color:#14201E;}
+  .dirB .notch{color:#F1F2EF;}
+  .dirB .statusbar{color:#14201E;}
+  .dirB .navbar{color:#5C6B67; padding-bottom:8px;}
+  .dirB .hero{background:#12211F; color:#EEF2F0; margin:0 -20px; padding:22px 20px 24px; position:relative;}
+  .dirB .hero .lbl{font-size:11px; letter-spacing:.16em; color:#7E948E;}
+  .dirB .big{font-size:44px; font-weight:200; letter-spacing:-.03em; margin-top:8px; font-variant-numeric:tabular-nums;}
+  .dirB .big small{font-size:15px; font-weight:400; color:#8FA7A1; margin-left:6px; letter-spacing:0;}
+  .dirB .delta{font-size:12px; color:#7FD6A8; margin-top:6px;}
+  .dirB .hero svg{margin-top:10px; display:block;}
+  .dirB .ring{position:absolute; right:16px; top:18px; width:60px; height:60px; border-radius:50%; background:#1E3531; color:#CFE2DA; display:grid; place-items:center; font-size:10px; letter-spacing:.06em; text-align:center; line-height:1.3;}
+  .dirB .sec{margin-top:22px; display:flex; justify-content:space-between; align-items:baseline;}
+  .dirB .sec h3{font-size:14px; font-weight:700; letter-spacing:-.01em;}
+  .dirB .sec span{font-size:11.5px; color:#7C8A86;}
+  .dirB .card{background:#FBFBF9; border-radius:16px; padding:15px 16px; margin-top:10px;}
+  .dirB .row{display:flex; align-items:center; gap:12px;}
+  .dirB .row + .row{margin-top:12px; padding-top:12px; border-top:1px solid #E7E9E4;}
+  .dirB .dot{width:8px; height:8px; border-radius:50%; flex:none;}
+  .dirB .rn{font-size:14px; font-weight:600;}
+  .dirB .rm{font-size:11.5px; color:#7C8A86; margin-top:2px; line-height:1.45;}
+  .dirB .pill{margin-left:auto; font-size:11px; padding:5px 11px; border-radius:100px; background:#E7EFEA; color:#1B6B57; font-weight:600; flex:none;}
+  .dirB .pill.gray{background:#EDEEEA; color:#7C8A86;}
+  .dirB .tabbar{position:absolute; bottom:0; left:0; right:0; height:58px; background:#FBFBF9; border-top:1px solid #E7E9E4; display:flex;}
+  .dirB .tab{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; font-size:10.5px; color:#9AA5A1;}
+  .dirB .tab.on{color:#12211F; font-weight:700;}
+  .dirB .tab i{width:14px; height:14px; border-radius:4px; border:1.5px solid currentColor; display:block;}
+
+  /* ============ C ============ */
+  .dirC .phone{background:#F7F7F7; color:#191919;}
+  .dirC .notch{color:#0AAE55;}
+  .dirC .statusbar{color:#fff; position:absolute; left:0; right:0; top:0;}
+  .dirC .hd{background:linear-gradient(160deg,#0FBF63 0%,#08A24C 100%); padding:52px 20px 26px; color:#fff;}
+  .dirC .hd .who{font-size:13px; opacity:.9;}
+  .dirC .hd h2{font-size:23px; font-weight:600; margin-top:8px; letter-spacing:-.01em;}
+  .dirC .hd .badge{display:inline-block; margin-top:12px; font-size:12px; background:rgba(255,255,255,.2); padding:5px 11px; border-radius:100px;}
+  .dirC .card{background:#fff; border-radius:12px; padding:16px; margin-top:12px;}
+  .dirC .card.first{margin-top:-14px; position:relative; box-shadow:0 4px 16px -8px rgba(0,0,0,.14);}
+  .dirC .card h3{font-size:15px; font-weight:600; margin-bottom:2px;}
+  .dirC .task{display:flex; align-items:center; gap:12px; padding:13px 0; border-bottom:1px solid #F0F0F0;}
+  .dirC .task:last-of-type{border-bottom:0; padding-bottom:2px;}
+  .dirC .ck{width:22px; height:22px; border-radius:50%; border:2px solid #D5D5D5; flex:none; display:grid; place-items:center; font-size:12px; color:#fff;}
+  .dirC .ck.on{background:#0AAE55; border-color:#0AAE55;}
+  .dirC .tn{font-size:17px; font-weight:500; letter-spacing:-.01em;}
+  .dirC .tm{font-size:12.5px; color:#8A8A8A; margin-top:2px;}
+  .dirC .btn{width:100%; margin-top:14px; background:#0AAE55; color:#fff; border:0; border-radius:10px; padding:14px; font-size:17px; font-weight:600; font-family:inherit;}
+  .dirC .kv{display:flex; justify-content:space-between; font-size:14px; padding:9px 0;}
+  .dirC .kv span{color:#8A8A8A;}
+  .dirC .kv b{font-weight:600; font-variant-numeric:tabular-nums;}
+  .dirC .tabbar{position:absolute; bottom:0; left:0; right:0; height:58px; background:#fff; border-top:1px solid #EBEBEB; display:flex;}
+  .dirC .tab{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; font-size:10.5px; color:#9E9E9E;}
+  .dirC .tab.on{color:#0AAE55; font-weight:600;}
+  .dirC .tab i{width:17px; height:17px; border:1.6px solid currentColor; border-radius:5px; display:block;}
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <div class="kicker">CareToday · Visual Direction v0</div>
+  <h1>三个方向，同一屏，同一份数据</h1>
+  <p class="sub">同一张「今日课」首页在三种视觉语法下的样子。判断标准只有三条：<b>68 岁能不能看清</b>、<b>信不信得过</b>、<b>会不会被当成又一个打卡小程序</b>。下方为真实渲染稿，可直接对比。</p>
+</div>
+
+<div class="grid">
+
+  <div class="dirA">
+    <div class="col-head">
+      <span class="col-tag" style="background:#E4EDE6;color:#2F5A4A">方向 A</span>
+      <div class="col-name">处方笺 · 印刷感档案</div>
+      <div class="col-desc">暖白纸底 + 墨绿 + 宋体标题，1px 发丝线分栏，零阴影零圆角装饰。读起来像一张真正的门诊档案；代价是「不够互联网」，换来的是中老年信任感。</div>
+      <div class="swatches">
+        <div class="sw" style="background:#FAF7F2"></div>
+        <div class="sw" style="background:#2F5A4A"></div>
+        <div class="sw" style="background:#A8623C"></div>
+        <div class="sw" style="background:#E3DCD0"></div>
+      </div>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="scroll">
+        <div class="statusbar"><span>7:28</span><span>●●● ⌁ ▮</span></div>
+        <div class="body">
+          <div class="navbar"><span>11 月 14 日 · 周五</span><span>李护士</span></div>
+          <div class="date">第 87 天</div>
+          <div class="greet">张阿姨，<br>今天<em>三件事</em>。</div>
+          <div class="streak"><span>已坚持</span><b>12</b><span>天 · 别断</span></div>
+          <div class="rule"></div>
+          <div class="tasklist">
+            <div class="task">
+              <div class="num">01</div>
+              <div><div class="tk-name">量血压 · 早</div><div class="tk-meta">起床后 1 小时内 · 坐 5 分钟</div></div>
+              <div class="tk-state done">已完成 138/86</div>
+            </div>
+            <div class="task">
+              <div class="num">02</div>
+              <div><div class="tk-name">吃药 · 3 种</div><div class="tk-meta">氨氯地平 1 片 · 二甲双胍 2 片 · 阿托伐他汀 1 片</div></div>
+              <div class="tk-state">待打卡</div>
+            </div>
+            <div class="task">
+              <div class="num">03</div>
+              <div><div class="tk-name">走动 30 分钟</div><div class="tk-meta">饭后慢走 · 心率别超 110</div></div>
+              <div class="tk-state">待打卡</div>
+            </div>
+          </div>
+          <div class="chartbox">
+            <div class="charthead"><span>近 7 天血压</span><b>平均 138/86</b></div>
+            <svg width="100%" height="66" viewBox="0 0 300 66" preserveAspectRatio="none">
+              <line x1="0" y1="18" x2="300" y2="18" stroke="#E3DCD0" stroke-dasharray="3 3"/>
+              <polyline points="10,40 58,34 106,44 154,30 202,36 250,26 292,31" fill="none" stroke="#2F5A4A" stroke-width="1.6"/>
+              <circle cx="292" cy="31" r="3" fill="#2F5A4A"/>
+              <text x="2" y="14" font-size="8" fill="#B0A695">150</text>
+              <text x="2" y="62" font-size="8" fill="#B0A695">120</text>
+            </svg>
+          </div>
+          <div class="ai">
+            <div class="ai-ic">问</div>
+            <div><div class="ai-t">问 AI 管家</div><div class="ai-s">「他汀能不能晚上吃？」· 已答 3 次</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab on"><i></i>今天</div>
+        <div class="tab"><i></i>指标</div>
+        <div class="tab"><i></i>用药</div>
+        <div class="tab"><i></i>我的</div>
+      </div>
+    </div>
+    <div class="cap">A · 处方笺</div>
+  </div>
+
+  <div class="dirB">
+    <div class="col-head">
+      <span class="col-tag" style="background:#DFEDE8;color:#0F5A50">方向 B</span>
+      <div class="col-name">曲线 · 数据优先</div>
+      <div class="col-desc">浅灰底 + 深墨绿数据块，超大细体数值 + 折线当主角，圆角 16px。适合「看趋势」的患者和「看异常」的医护；代价是对不爱看数字的人不友好。</div>
+      <div class="swatches">
+        <div class="sw" style="background:#F1F2EF"></div>
+        <div class="sw" style="background:#12211F"></div>
+        <div class="sw" style="background:#0F6E6A"></div>
+        <div class="sw" style="background:#7FD6A8"></div>
+      </div>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="scroll">
+        <div class="statusbar"><span>7:28</span><span>●●● ⌁ ▮</span></div>
+        <div class="body">
+          <div class="navbar"><span>11 月 14 日</span><span>第 87 天</span></div>
+          <div class="hero">
+            <div class="ring">82<br>依从</div>
+            <div class="lbl">今日血压 · 07:20</div>
+            <div class="big">138<small>/ 86 mmHg</small></div>
+            <div class="delta">↓ 4 mmHg · 连续 12 天在目标内</div>
+            <svg width="100%" height="84" viewBox="0 0 335 84">
+              <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#7FD6A8" stop-opacity=".26"/><stop offset="1" stop-color="#7FD6A8" stop-opacity="0"/>
+              </linearGradient></defs>
+              <path d="M6,48 L58,42 L110,54 L162,36 L214,44 L266,28 L320,34 L320,84 L6,84 Z" fill="url(#g1)"/>
+              <polyline points="6,48 58,42 110,54 162,36 214,44 266,28 320,34" fill="none" stroke="#7FD6A8" stroke-width="2"/>
+              <circle cx="320" cy="34" r="4" fill="#12211F" stroke="#7FD6A8" stroke-width="2.5"/>
+              <line x1="6" y1="24" x2="320" y2="24" stroke="#3C4F4B" stroke-dasharray="4 4"/>
+              <text x="6" y="19" font-size="9" fill="#6E8580">目标上限 140</text>
+            </svg>
+          </div>
+          <div class="sec"><h3>今天还有 2 件</h3><span>12 天连击</span></div>
+          <div class="card">
+            <div class="row">
+              <div class="dot" style="background:#0F6E6A"></div>
+              <div><div class="rn">服药 · 3 种</div><div class="rm">氨氯地平 1 片 · 二甲双胍 2 片</div></div>
+              <div class="pill">去打卡</div>
+            </div>
+            <div class="row">
+              <div class="dot" style="background:#C9A227"></div>
+              <div><div class="rn">走动 30 分钟</div><div class="rm">建议 18:30 后 · 心率 &lt;110</div></div>
+              <div class="pill gray">未开始</div>
+            </div>
+            <div class="row">
+              <div class="dot" style="background:#D8694B"></div>
+              <div><div class="rn">阿托伐他汀剩 6 天</div><div class="rm">该约复诊了</div></div>
+              <div class="pill gray">约复诊</div>
+            </div>
+          </div>
+          <div class="sec"><h3>异常提醒</h3><span>近 30 天 2 次</span></div>
+          <div class="card">
+            <div class="row">
+              <div class="dot" style="background:#D8694B"></div>
+              <div><div class="rn">10/28 178/108 已处置</div><div class="rm">李护士 15 分钟内回电 · 复测 142/88</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab on"><i></i>今天</div>
+        <div class="tab"><i></i>趋势</div>
+        <div class="tab"><i></i>用药</div>
+        <div class="tab"><i></i>我的</div>
+      </div>
+    </div>
+    <div class="cap">B · 曲线</div>
+  </div>
+
+  <div class="dirC">
+    <div class="col-head">
+      <span class="col-tag" style="background:#DDF5E7;color:#07843F">方向 C</span>
+      <div class="col-name">原生 · 微信绿色</div>
+      <div class="col-desc">沿用微信生态的视觉惯例：品牌绿头部、12px 圆角卡、17px 基准字、实心绿主按钮。学习成本最低、最像「官方服务号」；代价是辨识度弱、容易被当成普通小工具。</div>
+      <div class="swatches">
+        <div class="sw" style="background:#0AAE55"></div>
+        <div class="sw" style="background:#F7F7F7"></div>
+        <div class="sw" style="background:#FFFFFF"></div>
+        <div class="sw" style="background:#8A8A8A"></div>
+      </div>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="scroll">
+        <div class="statusbar"><span>7:28</span><span>●●● ⌁ ▮</span></div>
+        <div class="body" style="padding:0 16px 84px">
+          <div class="hd">
+            <div class="who">张桂芳 · 高血压 · 2 型糖尿病</div>
+            <h2>早上好，今天 3 件事</h2>
+            <div class="badge">已连续管理 87 天</div>
+          </div>
+          <div class="card first">
+            <div class="task">
+              <div class="ck on">✓</div>
+              <div><div class="tn">量血压</div><div class="tm">07:20 已记录 138/86</div></div>
+            </div>
+            <div class="task">
+              <div class="ck"></div>
+              <div><div class="tn">吃药（3 种）</div><div class="tm">早饭后 · 氨氯地平 1 片等</div></div>
+            </div>
+            <div class="task">
+              <div class="ck"></div>
+              <div><div class="tn">走动 30 分钟</div><div class="tm">饭后慢走即可</div></div>
+            </div>
+            <button class="btn">一键打卡</button>
+          </div>
+          <div class="card">
+            <h3 style="margin-bottom:6px">这周怎么样</h3>
+            <div class="kv"><span>平均血压</span><b>138 / 86</b></div>
+            <div class="kv"><span>打卡天数</span><b>12 天</b></div>
+            <div class="kv"><span>下次复诊</span><b style="color:#0AAE55">还有 7 天</b></div>
+          </div>
+          <div class="card">
+            <h3>有问题问我</h3>
+            <div class="kv" style="padding-top:12px"><span>药能不能空腹吃？</span><b style="color:#0AAE55">问</b></div>
+          </div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tab on"><i></i>今天</div>
+        <div class="tab"><i></i>数据</div>
+        <div class="tab"><i></i>用药</div>
+        <div class="tab"><i></i>我的</div>
+      </div>
+    </div>
+    <div class="cap">C · 原生</div>
+  </div>
+
+</div>
+
+<hr style="max-width:1320px;margin:52px auto 0;border:0;border-top:1px solid #D9D4CA">
+<div style="max-width:1320px;margin:26px auto 0;display:grid;grid-template-columns:1fr 1fr 1fr;gap:36px;font-size:13px;line-height:1.8;color:#4E4942">
+  <div><b style="color:#2F5A4A">A 的判断</b><br>老年可读性最好；发丝线 + 宋体让信息有「档案」重量，能压住「又一个打卡工具」的轻浮感。风险：年轻家属觉得旧。</div>
+  <div><b style="color:#0F5A50">B 的判断</b><br>最像数据产品，医护端可以直接复用这套语法。风险：患者看不懂「138/86 比上次降 4」意味着什么；情感连接弱。</div>
+  <div><b style="color:#07843F">C 的判断</b><br>上手最快、最不吓人。风险：绿色是微信的，不是你产品的；三个月后没人记得它长什么样。</div>
+</div>
+
+</body>
+</html>

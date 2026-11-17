@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>今日课 CareToday · 可交互原型</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="masthead">
+  <div>
+    <div class="kicker">CareToday · 微信生态慢病随访管理</div>
+    <h1>今日课 —— 把「知晓规范、难以践行」<br>拆成<em>今天要做的三件小事</em></h1>
+    <p class="lede">
+      患者端 12 屏 + 医护工作台 5 张视图，全部可点。三条主线：<b>首次使用（建档 → 设任务）</b>、<b>每天 40 秒（打卡 → 判级 → 人工接住）</b>、<b>每月一次（报告 → 复诊）</b>。
+      交互重点：录入 178/108 触发红灯、血糖 6.8 判绿、现象多选触发心衰规则、AI 命中拒答词、工作台把待办关掉、以及四张医护视图的切换。
+    </p>
+  </div>
+  <div class="meta-box">
+    <div><b>示例数据</b> <span class="warnflag">非真实患者</span></div>
+    <div>张桂芳 · 68 岁 · 女</div>
+    <div>高血压 2 级 / 2 型糖尿病</div>
+    <div>在管第 <b>87</b> 天 · 责任护士 李静</div>
+    <div style="margin-top:8px;font-size:11px">阈值按机构规则可配，此处用通用口径</div>
+  </div>
+</header>
+
+<!-- ========================= 患者端 ========================= -->
+<section class="section">
+  <div class="section-head">
+    <span class="idx">01 / 患者端</span>
+    <h2>十二屏：从建档第一分钟，到第八十七天</h2>
+    <span class="note">01–06 日常主线 · 07 建档 · 08–09 其他打卡 · 10–12 复诊与设置</span>
+  </div>
+
+  <div class="phones">
+
+    <!-- ---------- 1 今天 ---------- -->
+    <div class="frame-cell" id="screen-today">
+      <div class="frame-label"><span class="n">01</span><span class="t">今天</span><span class="d">首屏只有三件事</span></div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="statusbar"><span>7:28</span><span>●●● ⌁ ▮</span></div>
+        <div class="screen">
+          <div class="scroll">
+            <div class="navbar"><span>11 月 14 日 · 周五</span><span class="who">李护士 · 在线</span></div>
+            <div class="daytag">第 87 天</div>
+            <div class="greet">张阿姨，<br>今天<em>三件事</em>。</div>
+            <div class="streak"><span>已坚持</span><b id="streak-n">12</b><span>天 · 别断</span></div>
+            <div class="rule"></div>
+
+            <div class="tasklist" id="tasklist">
+              <div class="task done" data-task="bp">
+                <div class="idx">01</div>
+                <div class="body">
+                  <div class="name">量血压 · 早</div>
+                  <div class="meta">起床后 1 小时内 · 坐 5 分钟再测</div>
+                </div>
+                <div class="state done">已记录 138/86</div>
+              </div>
+              <div class="task" data-task="med">
+                <div class="idx">02</div>
+                <div class="body">
+                  <div class="name">吃药 · 3 种</div>
+                  <div class="meta">早饭后 · 氨氯地平 1 片 · 二甲双胍 2 片 · 阿托伐他汀 1 片（晚）</div>
+                </div>
+                <div class="state">待打卡</div>
+              </div>
+              <div class="task" data-task="walk">
+                <div class="idx">03</div>
+                <div class="body">
+                  <div class="name">走动 30 分钟</div>
+                  <div class="meta">饭后慢走 · 心率别超 110</div>
+                </div>
+                <div class="state">待打卡</div>
+              </div>
+            </div>
+
+            <div class="card-line">
+              <div class="head"><span>近 2 周血压</span><b>平均 139/85</b></div>
+              <svg id="mini-spark" style="width:100%;display:block;margin-top:8px"></svg>
+            </div>
+
+            <button class="ai-entry" onclick="goto('screen-ai')">
+              <div class="ic">问</div>
+              <div>
+                <div class="t">问 AI 管家</div>
+                <div class="s">「他汀能不能晚上吃？」· 已答 3 次</div>
+              </div>
+              <span class="arrow">›</span>
+            </button>
+          </div>
+        </div>
+        <div class="tabbar">
+          <button class="tab on" onclick="goto('screen-today')"><i></i>今天</button>
+          <button class="tab" onclick="goto('screen-metrics')"><i></i>指标</button>
+          <button class="tab" onclick="goto('screen-meds')"><i></i>用药</button>
+          <button class="tab" onclick="goto('screen-report')"><i></i>报告</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 2 打卡 ---------- -->
+    <div class="frame-cell" id="screen-checkin">
+      <div class="frame-label"><span class="n">02</span><span class="t">打卡</span><span class="d">40 秒完成 · 试输入 178/108</span></div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="statusbar"><span>7:31</span><span>●●● ⌁ ▮</span></div>
+        <div class="screen">
+          <div class="scroll">
+            <div class="navbar"><span>‹ 返回</span><span class="who">血压 · 早</span></div>
+            <div class="screen-title">今天的血压</div>
+            <div class="screen-sub">起床后 1 小时内，坐 5 分钟，手臂与心脏同高。<br>把袖带绑在上臂，别隔着衣服。</div>
+
+            <div class="input-pair">
+              <div class="input-box">
+                <label>收缩压 / 高压</label>
+                <input id="in-sbp" type="tel" inputmode="numeric" value="138" maxlength="3">
+                <div class="unit">mmHg</div>
+              </div>
+              <div class="input-box">
+                <label>舒张压 / 低压</label>
+                <input id="in-dbp" type="tel" inputmode="numeric" value="86" maxlength="3">
+                <div class="unit">mmHg</div>
+              </div>
+            </div>
+
+            <div class="hint-row"><span class="dotmark"></span>上次 138/86 · 目标 &lt; 140/90</div>
+            <div class="hint-row"><span class="dotmark"></span>看不清屏幕？可以拍血压计照片，我来读</div>
+
+            <button class="btn-primary" id="btn-submit" onclick="submitBP()">提交记录</button>
+            <button class="btn-ghost" onclick="toast('示例原型：拍照识别在真实产品中由 OCR 完成')">拍照识别血压计</button>
+
+            <div id="bp-result"></div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <button class="tab on" onclick="goto('screen-today')"><i></i>今天</button>
+          <button class="tab" onclick="goto('screen-metrics')"><i></i>指标</button>
+          <button class="tab" onclick="goto('screen-meds')"><i></i>用药</button>
+          <button class="tab" onclick="goto('screen-report')"><i></i>报告</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 3 指标 ---------- -->
+    <div class="frame-cell" id="screen-metrics">
+      <div class="frame-label"><span class="n">03</span><span class="t">指标</span><span class="d">只看趋势，不看单点</span></div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="statusbar"><span>7:34</span><span>●●● ⌁ ▮</span></div>
+        <div class="screen">
+          <div class="scroll">
+            <div class="navbar"><span>我的指标</span><span class="who">近 30 天</span></div>
+            <div class="seg" id="metric-seg">
+              <button class="on" data-m="bp">血压</button>
+              <button data-m="glu">血糖</button>
+              <button data-m="wt">体重</button>
+            </div>
+            <div class="big-metric">
+              <span class="v num" id="mv">138/86</span>
+              <span class="u" id="mu">mmHg · 今早</span>
+              <span class="d" id="md">↓ 4</span>
+            </div>
+            <div class="chart-wrap">
+              <svg id="chart" viewBox="0 0 320 150"></svg>
+            </div>
+            <div class="stats-grid">
+              <div><div class="k">平均</div><div class="v" id="s-avg">138/86</div></div>
+              <div><div class="k">最高</div><div class="v" id="s-max">152/94</div></div>
+              <div><div class="k">达标率</div><div class="v" id="s-rate">78%</div></div>
+            </div>
+            <div class="rec-list" id="rec-list"></div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <button class="tab" onclick="goto('screen-today')"><i></i>今天</button>
+          <button class="tab on" onclick="goto('screen-metrics')"><i></i>指标</button>
+          <button class="tab" onclick="goto('screen-meds')"><i></i>用药</button>
+          <button class="tab" onclick="goto('screen-report')"><i></i>报告</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 4 用药 ---------- -->
+    <div class="frame-cell" id="screen-meds">
+      <div class="frame-label"><span class="n">04</span><span class="t">用药</span><span class="d">剩余药量 = 复诊触发器</span></div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="statusbar"><span>7:36</span><span>●●● ⌁ ▮</span></div>
+        <div class="screen">
+          <div class="scroll">
+            <div class="navbar"><span>我的用药</span><span class="who">3 种 · 长期</span></div>
+            <div class="screen-title" style="font-size:22px">今天吃了吗</div>
+
+            <div class="today-dose">
+              <div class="dose taken">早 ✓</div>
+              <div class="dose">中 —</div>
+              <div class="dose">晚 —</div>
+            </div>
+
+            <div class="hint-row" style="margin-top:10px"><span class="dotmark"></span>近 30 天依从 82% · 漏服 5 次，多在周末晚</div>
+
+            <div class="med">
+              <div class="top">
+                <div>
+                  <div class="nm">苯磺酸氨氯地平片 5mg</div>
+                  <div class="ds">每日 1 次 · 每次 1 片 · 早饭后</div>
+                </div>
+                <div class="tag">降压</div>
+              </div>
+              <div class="bar"><i style="width:60%"></i></div>
+              <div class="foot"><span>剩余 18 天</span><span>发药 30 片</span></div>
+            </div>
+
+            <div class="med">
+              <div class="top">
+                <div>
+                  <div class="nm">盐酸二甲双胍片 0.5g</div>
+                  <div class="ds">每日 2 次 · 每次 1 片 · 早晚饭后</div>
+                </div>
+                <div class="tag">降糖</div>
+              </div>
+              <div class="bar"><i style="width:73%"></i></div>
+              <div class="foot"><span>剩余 22 天</span><span>发药 60 片</span></div>
+            </div>
+
+            <div class="med" style="border-color:#e6d3b4;background:#fdfaf4">
+              <div class="top">
+                <div>
+                  <div class="nm">阿托伐他汀钙片 20mg</div>
+                  <div class="ds">每晚 1 次 · 每次 1 片 · 睡前</div>
+                </div>
+                <div class="tag warn">剩 6 天</div>
+              </div>
+              <div class="bar"><i class="warn" style="width:20%"></i></div>
+              <div class="foot"><span style="color:#b07d20">该续方了 · 停药会反弹</span><span>发药 30 片</span></div>
+              <button class="btn-primary" style="margin-top:12px;padding:12px;font-size:14px" onclick="bookVisit()">预约复诊 · 续方</button>
+            </div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <button class="tab" onclick="goto('screen-today')"><i></i>今天</button>
+          <button class="tab" onclick="goto('screen-metrics')"><i></i>指标</button>
+          <button class="tab on" onclick="goto('screen-meds')"><i></i>用药</button>
+          <button class="tab" onclick="goto('screen-report')"><i></i>报告</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 5 报告 ---------- -->
+    <div class="frame-cell" id="screen-report">
+      <div class="frame-label"><span class="n">05</span><span class="t">报告解读</span><span class="d">AI 出草稿，医生确认才发</span></div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="statusbar"><span>9:02</span><span>●●● ⌁ ▮</span></div>
+        <div class="screen">
+          <div class="scroll">
+            <div class="navbar"><span>报告解读</span><span class="who">本月</span></div>
+            <div class="screen-title" style="font-size:22px">把化验单拍给我</div>
+            <div class="screen-sub">我看得懂的部分会讲给你听，拿不准的会转给王医生。</div>
+
+            <div class="upload-zone" id="upload-zone" onclick="runOCR()">
+              <div class="ic"></div>
+              <div class="t" id="up-t">拍照上传化验单</div>
+              <div class="s" id="up-s">支持血常规、生化、糖化、尿检</div>
+            </div>
+
+            <div id="report-out">
+              <div class="report-item" style="margin-top:16px">
+                <div class="rh"><span>最近一次 · 10/12 生化</span><span>已解读 · 王立群</span></div>
+                <div class="ri"><span class="k">糖化血红蛋白</span><span class="v">8.2<span class="ref">%</span></span></div>
+                <div class="ri"><span class="k">肌酐</span><span class="v">70<span class="ref">μmol/L</span></span></div>
+                <div class="ri"><span class="k">尿微量白蛋白/肌酐</span><span class="v">24<span class="ref">mg/g</span></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <button class="tab" onclick="goto('screen-today')"><i></i>今天</button>
+          <button class="tab" onclick="goto('screen-metrics')"><i></i>指标</button>
+          <button class="tab" onclick="goto('screen-meds')"><i></i>用药</button>
+          <button class="tab on" onclick="goto('screen-report')"><i></i>报告</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 6 AI 管家 ---------- -->
+    <div class="frame-cell" id="screen-ai">
+      <div class="frame-label"><span class="n">06</span><span class="t">AI 管家</span><span class="d">试问「我能不能停药」</span></div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="statusbar"><span>9:10</span><span>●●● ⌁ ▮</span></div>
+        <div class="screen">
+          <div class="scroll chat-scroll">
+            <div class="navbar"><span>AI 管家</span><span class="who">内容仅供参考</span></div>
+            <div class="chat" id="chat">
+              <div class="bubble ai">
+                张阿姨早。今早血压 <b>138/86</b>，比昨天低了 4，挺好的。
+                <span class="src">来源：你的血压记录 11/14</span>
+              </div>
+              <div class="bubble ai">
+                有想问的随时说 —— 药怎么吃、报告怎么看、哪天复查，我都能查。
+                <span class="src">我不会给你改药，那得王医生说了算</span>
+              </div>
+            </div>
+            <div class="chips" id="chips">
+              <button class="chip" onclick="ask('他汀能不能晚上吃？')">他汀能不能晚上吃？</button>
+              <button class="chip" onclick="ask('我能不能停药了？')">我能不能停药了？</button>
+              <button class="chip" onclick="ask('今天血压 178/108 怎么办？')">血压 178/108 怎么办</button>
+            </div>
+          </div>
+        </div>
+        <div class="composer">
+          <input id="chat-in" placeholder="说点什么…" onkeydown="if(event.key==='Enter')sendChat()">
+          <button onclick="sendChat()">发送</button>
+        </div>
+        <div class="tabbar">
+          <button class="tab" onclick="goto('screen-today')"><i></i>今天</button>
+          <button class="tab" onclick="goto('screen-metrics')"><i></i>指标</button>
+          <button class="tab" onclick="goto('screen-meds')"><i></i>用药</button>
+          <button class="tab" onclick="goto('screen-report')"><i></i>报告</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 7 建档 ---------- -->
+    <div class="frame-cell" id="screen-onboard">
+      <div class="frame-label"><span class="n">07</span><span class="t">建档</span><span class="d">Day 0 · 现场 3 分钟</span></div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="statusbar"><span>15:02</span><span>●●● ⌁ ▮</span></div>
+        <div class="screen">
+          <div class="scroll">
+            <div class="navbar"><span>建立档案</span><span class="who">第 1 步 / 共 3 步</span></div>
+            <div class="steps">
+              <i class="on"></i><i></i><i></i>
+            </div>
+            <div class="greet sm">先从微信带过来<br>剩下的<em>我们问三句</em>。</div>
+
+            <div class="field">
+              <label>姓名</label>
+              <div class="val locked">张桂芳 <span class="from">来自微信</span></div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>性别</label>
+                <div class="val locked">女</div>
+              </div>
+              <div class="field">
+                <label>年龄</label>
+                <div class="val locked">68</div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label>我要管哪些病 <span class="req">可多选</span></label>
+              <div class="picks">
+                <button class="pick on" onclick="this.classList.toggle('on')">高血压</button>
+                <button class="pick on" onclick="this.classList.toggle('on')">2 型糖尿病</button>
+                <button class="pick" onclick="this.classList.toggle('on')">冠心病</button>
+                <button class="pick" onclick="this.classList.toggle('on')">心衰</button>
+                <button class="pick" onclick="this.classList.toggle('on')">慢阻肺</button>
+                <button class="pick" onclick="this.classList.toggle('on')">血脂异常</button>
+              </div>
+            </div>
+
+            <div class="field">
+              <label>现在在吃的药</label>
+              <div class="medmini">
+                <div class="mi"><b>氨氯地平</b><span>5mg · 早 1 片</span></div>
+                <div class="mi"><b>二甲双胍</b><span>0.5g · 早晚各 2 片</span></div>
+                <div class="mi"><b>阿托伐他汀</b><span>20mg · 晚 1 片</span></div>
+              </div>
+              <button class="linkbtn" onclick="toast('拍药盒：识别出 3 种，已自动填好剂量')">拍药盒自动填 ›</button>
+            </div>
+
+            <div class="field">
+              <label>紧急时打给谁</label>
+              <div class="val">女儿 张敏 · 138****6621</div>
+            </div>
+
+            <div class="hintline">建档后自动分层：按你的血压和血糖，先归到<b>黄灯</b>，护士明天会打第一通电话。</div>
+          </div>
+        </div>
+        <div class="footbar">
+          <button class="btn-primary" onclick="goto('screen-today')">下一步 · 设今天的任务</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 8 血糖打卡 ---------- -->
+    <div class="frame-cell" id="screen-glu">
+      <div class="frame-label"><span class="n">08</span><span class="t">血糖打卡</span><span class="d">空腹 / 餐后分开记</span></div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="statusbar"><span>7:36</span><span>●●● ⌁ ▮</span></div>
+        <div class="screen">
+          <div class="scroll">
+            <div class="navbar"><span class="back">‹ 返回</span><span class="who">血糖 · 空腹</span></div>
+            <div class="greet sm">今天的<em>血糖</em></div>
+
+            <div class="seg4" id="glu-seg">
+              <button class="on" onclick="pickSeg(this)">空腹</button>
+              <button onclick="pickSeg(this)">早餐后</button>
+              <button onclick="pickSeg(this)">午餐后</button>
+              <button onclick="pickSeg(this)">睡前</button>
+            </div>
+
+            <div class="biginput">
+              <input id="glu-in" inputmode="decimal" value="6.8">
+              <span class="u">mmol/L</span>
+            </div>
+
+            <ul class="hints">
+              <li>上次空腹 6.8 · 目标 4.4–7.0</li>
+              <li>指尖血，第一滴擦掉，用第二滴</li>
+            </ul>
+
+            <button class="btn-primary" onclick="submitGlu()">提交记录</button>
+            <button class="btn-ghost" onclick="toast('对准血糖仪屏幕拍一张，我来读数')">拍照识别血糖仪</button>
+
+            <div id="glu-out"></div>
+
+            <div class="fold">
+              <div class="foldhead" onclick="this.parentNode.classList.toggle('open')">试纸批号 · 选填 <span>›</span></div>
+              <div class="foldbody">
+                <div class="field"><label>批号</label><div class="val">2026-08 · 未过期</div></div>
+                <div class="hintline">批号用于召回问题试纸，不影响判级。</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <button class="tab" onclick="goto('screen-today')"><i></i>今天</button>
+          <button class="tab" onclick="goto('screen-metrics')"><i></i>指标</button>
+          <button class="tab" onclick="goto('screen-meds')"><i></i>用药</button>
+          <button class="tab" onclick="goto('screen-report')"><i></i>报告</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 9 体重与症状 ---------- -->
+    <div class="frame-cell" id="screen-weight">
+      <div class="frame-label"><span class="n">09</span><span class="t">体重与症状</span><span class="d">心衰患者的关键一步</span></div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="statusbar"><span>7:40</span><span>●●● ⌁ ▮</span></div>
+        <div class="screen">
+          <div class="scroll">
+            <div class="navbar"><span class="back">‹ 返回</span><span class="who">体重 · 晨起</span></div>
+            <div class="greet sm">称一下<em>再睡回笼觉</em>。</div>
+            <p class="sub">同样时间、同样衣服、排空后称。数字涨得快比数字大小更重要。</p>
+
+            <div class="biginput">
+              <input id="wt-in" inputmode="decimal" value="68.4">
+              <span class="u">kg</span>
+            </div>
+            <ul class="hints">
+              <li>上周 68.0 · 7 天涨 0.4，还在安全区</li>
+              <li>心衰患者 3 天涨 2kg 以上要报</li>
+            </ul>
+
+            <div class="field">
+              <label>有没有这些情况 <span class="req">可多选</span></label>
+              <div class="picks" id="symptom-picks">
+                <button class="pick" onclick="toggleSym(this)">夜里憋醒</button>
+                <button class="pick" onclick="toggleSym(this)">躺平就喘</button>
+                <button class="pick" onclick="toggleSym(this)">脚踝水肿</button>
+                <button class="pick" onclick="toggleSym(this)">走两步就累</button>
+                <button class="pick on" onclick="toggleSym(this)">都没有</button>
+              </div>
+            </div>
+
+            <button class="btn-primary" onclick="submitWeight()">提交记录</button>
+            <div id="wt-out"></div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <button class="tab" onclick="goto('screen-today')"><i></i>今天</button>
+          <button class="tab" onclick="goto('screen-metrics')"><i></i>指标</button>
+          <button class="tab" onclick="goto('screen-meds')"><i></i>用药</button>
+          <button class="tab" onclick="goto('screen-report')"><i></i>报告</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 10 复诊预约 ---------- -->
+    <div class="frame-cell" id="screen-visit">
+      <div class="frame-label"><span class="n">10</span><span class="t">复诊预约</span><span class="d">到期前 7 天开始推</span></div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="statusbar"><span>20:14</span><span>●●● ⌁ ▮</span></div>
+        <div class="screen">
+          <div class="scroll">
+            <div class="navbar"><span class="back">‹ 返回</span><span class="who">复诊</span></div>
+            <div class="greet sm">6 天后<em>该见王医生了</em>。</div>
+            <p class="sub">他在城南中心周四上午出诊。你上次是 10/16，隔了 5 周。</p>
+
+            <div class="visitcard">
+              <div class="vc-head">
+                <div>
+                  <div class="vc-doc">王立群 <span class="ttl">主任医师 · 全科</span></div>
+                  <div class="vc-fee">诊查费 ¥20 · 医保报销后自付 ¥6</div>
+                </div>
+                <div class="vc-day"><b>11/20</b><span>周四</span></div>
+              </div>
+              <div class="slots" id="slots">
+                <button class="slot on" onclick="pickSlot(this)">09:00</button>
+                <button class="slot" onclick="pickSlot(this)">09:30</button>
+                <button class="slot full" disabled>10:00</button>
+                <button class="slot" onclick="pickSlot(this)">10:30</button>
+                <button class="slot" onclick="pickSlot(this)">11:00</button>
+                <button class="slot full" disabled>11:30</button>
+              </div>
+              <div class="vc-foot">带三样东西：医保卡、正在吃的药、这 30 天的记录（我已经打包好了）</div>
+            </div>
+
+            <button class="btn-primary" onclick="confirmVisit()">确认 09:00 的号</button>
+
+            <div class="fold">
+              <div class="foldhead" onclick="this.parentNode.classList.toggle('open')">换了时间怎么办 <span>›</span></div>
+              <div class="foldbody">
+                <p class="sub">提前 24 小时可以自己在小程序改约，不扣号。24 小时内改约，系统会把号让给排队的人，并自动帮你排下一场。</p>
+                <p class="sub">连续两次爽约，会转成电话预约 —— 不是惩罚，是因为号本来就紧张。</p>
+              </div>
+            </div>
+
+            <div class="grouplist" style="margin-top:18px">
+              <div class="ghead">这次复诊大概会做三件事</div>
+              <div class="grow"><span>量血压 + 听心肺</span><b class="muted">5 分钟</b></div>
+              <div class="grow"><span>抽血查糖化血红蛋白</span><b class="muted">不用空腹</b></div>
+              <div class="grow"><span>看脚（糖尿病足筛查）</span><b class="muted">2 分钟</b></div>
+            </div>
+
+            <div class="hintline" id="visit-hint">这 30 天的血压、血糖、用药记录会生成一页纸，医生 30 秒能看完。</div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <button class="tab" onclick="goto('screen-today')"><i></i>今天</button>
+          <button class="tab" onclick="goto('screen-metrics')"><i></i>指标</button>
+          <button class="tab" onclick="goto('screen-meds')"><i></i>用药</button>
+          <button class="tab on" onclick="goto('screen-report')"><i></i>报告</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 11 我的档案 ---------- -->
+    <div class="frame-cell" id="screen-profile">
+      <div class="frame-label"><span class="n">11</span><span class="t">我的档案</span><span class="d">家属能看什么，这里定</span></div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="statusbar"><span>20:22</span><span>●●● ⌁ ▮</span></div>
+        <div class="screen">
+          <div class="scroll">
+            <div class="navbar"><span class="back">‹ 返回</span><span class="who">我的</span></div>
+
+            <div class="pcard">
+              <div class="av serif">芳</div>
+              <div>
+                <div class="pn">张桂芳</div>
+                <div class="ps">女 · 68 岁 · 在管 87 天 · 责任护士 李静</div>
+              </div>
+              <span class="level amber">黄灯</span>
+            </div>
+
+            <div class="grouplist">
+              <div class="ghead">基础信息</div>
+              <div class="grow"><span>手机</span><b>138****6621</b></div>
+              <div class="grow"><span>住址</span><b>城南街道 幸福里 3 栋</b></div>
+              <div class="grow"><span>既往史</span><b>高血压 8 年 · 糖尿病 5 年</b></div>
+              <div class="grow"><span>过敏</span><b>青霉素（皮试阳性）</b></div>
+            </div>
+
+            <div class="grouplist">
+              <div class="ghead">谁可以看我的数据</div>
+              <div class="grow"><span>女儿 张敏 <em style="font-style:normal;color:var(--muted);font-size:11px">· 可看指标与趋势，报告原文仍由医生解释</em></span><b class="ok">已授权</b></div>
+              <div class="grow"><span>儿子 张伟</span><b class="muted">未授权</b></div>
+              <div class="grow act" onclick="toast('已生成 24 小时有效的邀请链接，发给家属后由她确认')">＋ 邀请家属共同管理</div>
+            </div>
+
+            <div class="grouplist">
+              <div class="ghead">怎么找我</div>
+              <div class="grow"><span>微信消息</span><b class="sw on">开</b></div>
+              <div class="grow"><span>企微消息</span><b class="sw on">开</b></div>
+              <div class="grow"><span>电话</span><b class="sw">仅紧急</b></div>
+              <div class="grow"><span>免打扰</span><b>21:30 – 07:00</b></div>
+            </div>
+
+            <div class="hintline">这些设置随时能改。关掉微信消息，护士就只能打电话找你 —— 红灯时她一定会打。</div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <button class="tab" onclick="goto('screen-today')"><i></i>今天</button>
+          <button class="tab" onclick="goto('screen-metrics')"><i></i>指标</button>
+          <button class="tab" onclick="goto('screen-meds')"><i></i>用药</button>
+          <button class="tab" onclick="goto('screen-report')"><i></i>报告</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 12 消息中心 ---------- -->
+    <div class="frame-cell" id="screen-msg">
+      <div class="frame-label"><span class="n">12</span><span class="t">消息</span><span class="d">订阅消息不是营销位</span></div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="statusbar"><span>20:30</span><span>●●● ⌁ ▮</span></div>
+        <div class="screen">
+          <div class="scroll">
+            <div class="navbar"><span>消息</span><span class="who">全部已读</span></div>
+
+            <div class="msglist">
+              <div class="msg unread" onclick="goto('screen-report')">
+                <div class="mi red"></div>
+                <div>
+                  <div class="mt">王医生审核了你的化验单</div>
+                  <div class="mb">糖化血红蛋白 7.8%，比三个月前降了 0.4。点开看解读。</div>
+                  <div class="mtime">今天 11:20 · 报告</div>
+                </div>
+              </div>
+              <div class="msg unread" onclick="goto('screen-visit')">
+                <div class="mi amber"></div>
+                <div>
+                  <div class="mt">6 天后该复诊了</div>
+                  <div class="mb">王立群 11/20 周四上午还有 4 个号，先到先得。</div>
+                  <div class="mtime">今天 20:14 · 复诊</div>
+                </div>
+              </div>
+              <div class="msg" onclick="goto('screen-meds')">
+                <div class="mi"></div>
+                <div>
+                  <div class="mt">阿托伐他汀还剩 6 天</div>
+                  <div class="mb">按现在的吃法，11/20 吃完。复诊时一起开，别单独跑一趟。</div>
+                  <div class="mtime">今天 08:02 · 用药</div>
+                </div>
+              </div>
+              <div class="msg" onclick="toast('这是上周的周报')">
+                <div class="mi"></div>
+                <div>
+                  <div class="mt">你上周的周报出来了</div>
+                  <div class="mb">打卡 6/7 天，血压平均 139/85，比前一周低 3。</div>
+                  <div class="mtime">11/10 09:00 · 周报</div>
+                </div>
+              </div>
+              <div class="msg quiet">
+                <div class="mi"></div>
+                <div>
+                  <div class="mt">李护士给你留了句话</div>
+                  <div class="mb">「这周咸菜先停一停，其他都挺好，继续保持。」</div>
+                  <div class="mtime">11/09 16:40 · 随访</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="hintline">订阅消息只发四类：报告出结果、该复诊、药快吃完、异常要处理。其余都走企微，不进这里。</div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <button class="tab on" onclick="goto('screen-today')"><i></i>今天</button>
+          <button class="tab" onclick="goto('screen-metrics')"><i></i>指标</button>
+          <button class="tab" onclick="goto('screen-meds')"><i></i>用药</button>
+          <button class="tab" onclick="goto('screen-report')"><i></i>报告</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ========================= 医护端 ========================= -->
+<section class="section">
+  <div class="section-head">
+    <span class="idx">02 / 医护端</span>
+    <h2>工作台：今天先打这 30 个电话</h2>
+    <span class="note">点左侧待办，右侧切换患者；点「记录随访」关掉一条</span>
+  </div>
+
+  <div class="workbench">
+    <!-- 侧栏 -->
+    <aside class="wb-side">
+      <div class="wb-logo">
+        <div class="n serif">今日课</div>
+        <div class="s">城南社区卫生服务中心</div>
+      </div>
+      <nav class="wb-nav" id="wb-nav">
+        <a href="#" class="on" data-view="todo" onclick="wbView('todo');return false">今日待办 <span class="cnt" id="nav-todo">47</span></a>
+        <a href="#" data-view="patients" onclick="wbView('patients');return false">在管患者 <span class="cnt">312</span></a>
+        <a href="#" data-view="follow" onclick="wbView('follow');return false">随访记录</a>
+        <a href="#" data-view="reports" onclick="wbView('reports');return false">报告审阅 <span class="cnt">9</span></a>
+        <a href="#" data-view="board" onclick="wbView('board');return false">数据看板</a>
+        <a href="#" data-view="rules" onclick="wbView('rules');return false">规则配置</a>
+      </nav>
+      <div class="wb-user">
+        <div class="nm">李静</div>
+        <div class="rl">主管护师 · 在管 186 人</div>
+      </div>
+    </aside>
+
+    <!-- 队列 -->
+    <div class="wb-queue">
+      <div class="wb-q-head">
+        <h3>今日待办</h3>
+        <p>按「红灯 &gt; 逾期随访 &gt; 未打卡 &gt; 到期复诊」自动排序</p>
+      </div>
+      <div class="wb-filters">
+        <button class="on">全部 47</button>
+        <button>红灯 3</button>
+        <button>逾期 8</button>
+        <button>未打卡 21</button>
+        <button>复诊 15</button>
+      </div>
+      <div class="wb-list" id="queue"></div>
+    </div>
+
+    <!-- 详情 -->
+    <div class="wb-detail" id="wb-detail"></div>
+
+    <!-- 其他四张视图（覆盖队列+详情） -->
+    <div class="wb-view" id="wb-view" hidden></div>
+  </div>
+</section>
+
+<div class="footnote">
+  <b>关于这张原型：</b>所有数据为合成示例（张桂芳为虚构患者），用于演示信息结构与交互逻辑，不含任何真实个人健康信息。
+  阈值、任务频次、拒答词库、审批链路均为「可配置」对象，落地时按机构规则与指南口径校准。
+  <b>合规结构：</b>本产品内不存在开处方入口；AI 输出全部落在「医护确认」这一步；红灯判级只升不降；急救场景固定跳转 120。
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
