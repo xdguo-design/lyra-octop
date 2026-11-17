@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type KeyboardEventHandler,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
 import { Button, Input, Tooltip } from "antd";
@@ -24,7 +25,10 @@ import type {
   BrowserTab as StreamTab,
 } from "../../hooks/useBrowserStream";
 import { useBrowserCanvasInteraction } from "../../hooks/useBrowserCanvasInteraction";
-import { paintBase64JpegToCanvas } from "../../utils/browserCanvas";
+import {
+  getCanvasCoords,
+  paintBase64JpegToCanvas,
+} from "../../utils/browserCanvas";
 import { normalizeUrl } from "../../utils/normalizeUrl";
 import { ChromeTabBar } from "../ChromeTabBar";
 import StreamConnectingIndicator from "../StreamConnectingIndicator";
@@ -73,6 +77,13 @@ interface BrowserViewerProps {
 
   /** Page-specific hint shown under the connecting placeholder. */
   connectingHint?: ReactNode;
+
+  /**
+   * "Select page element" mode: the canvas stops forwarding input and a click
+   * reports the element's viewport coordinates instead.
+   */
+  pickMode?: boolean;
+  onPickPoint?: (coords: { x: number; y: number }) => void;
 }
 
 function activeTabTitle(tabs: StreamTab[]): string {
@@ -111,6 +122,8 @@ export const BrowserViewer = forwardRef<
     onFrameReadyChange,
     onReconnect,
     connectingHint,
+    pickMode = false,
+    onPickPoint,
   },
   ref,
 ) {
@@ -179,6 +192,17 @@ export const BrowserViewer = forwardRef<
       }
     },
     [handleGo],
+  );
+
+  // Pick mode: report the clicked viewport point instead of forwarding input.
+  const handlePickClick = useCallback(
+    (e: ReactMouseEvent<HTMLCanvasElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const coords = getCanvasCoords(canvasRef.current, e);
+      onPickPoint?.(coords);
+    },
+    [onPickPoint],
   );
 
   const activeKey =
@@ -319,11 +343,18 @@ export const BrowserViewer = forwardRef<
             tabIndex={0}
             className={`${styles.canvas} ${
               interactive ? styles.canvasInteractive : ""
-            } ${!frameReady ? styles.canvasHidden : ""}`}
+            } ${pickMode ? styles.canvasPick : ""} ${
+              !frameReady ? styles.canvasHidden : ""
+            }`}
             style={{
-              cursor: isDragging ? "grabbing" : "default",
+              cursor: pickMode
+                ? "crosshair"
+                : isDragging
+                ? "grabbing"
+                : "default",
               ...pointerStyle,
             }}
+            onClick={pickMode ? handlePickClick : undefined}
             onPointerDown={handlePanPointerDown}
             onPointerMove={handlePointerMove}
             onPointerLeave={handlePointerLeave}

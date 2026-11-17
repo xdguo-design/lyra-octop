@@ -76,6 +76,13 @@
   cursor: grab;
 }
 
+/* "Select page element": the canvas reports a pick instead of forwarding input. */
+.canvasPick {
+  cursor: crosshair !important;
+  outline: 2px solid #1677ff;
+  outline-offset: -2px;
+}
+
 .canvasHidden {
   visibility: hidden;
 }

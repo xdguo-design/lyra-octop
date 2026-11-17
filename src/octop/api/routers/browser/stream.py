@@ -13,6 +13,7 @@ Client → Server::
   {"type": "mousemove", "x": 150, "y": 250, "button": "left", "buttons": 1}
   {"type": "mousemove", "x": 160, "y": 260, "button": "none", "buttons": 0}
   {"type": "mouseup", "x": 150, "y": 250, "button": "left", "buttons": 0}
+  {"type": "inspect", "x": 100, "y": 200, "request_id": "pick-1"}
   {"type": "stop"}
 
 Server → Client::
@@ -21,7 +22,14 @@ Server → Client::
   {"type": "frame", "data": "<base64 jpeg>"}
   {"type": "tabs", "tabs": [{id, url, title, active}]}
   {"type": "session_update", "session_id": "...", "current_url": "...", ...}
+  {"type": "element_inspected", "request_id": "pick-1", "element": {...},
+   "error": null}
   {"type": "error", "message": "..."}
+
+``element_inspected`` answers an ``inspect`` pick: the page element under the
+given viewport coordinates, described as ``{tag, label, selector, text, rect,
+styles, ...}`` for the dashboard's "select page element" tool. ``element`` is
+``null`` when nothing could be resolved.
 
 Auth: ``?token=<JWT>`` query param (browsers cannot set Authorization on WS).
 Listen-only (``?listen_only=1``): still requires ``start``, but never launches
@@ -216,6 +224,158 @@ async def _dispatch_mouse(
     await sess._internal.client.send("Input.dispatchMouseEvent", params)  # noqa: SLF001
 
 
+# Read-only element probe for the dashboard "select page element" tool.
+# Runs in the page's main world, returns a plain object (``returnByValue``) and
+# briefly outlines the picked node so the user sees what was captured.
+_ELEMENT_INSPECT_JS = r"""
+(() => {
+  const x = __X__;
+  const y = __Y__;
+  const el = document.elementFromPoint(x, y);
+  if (!el) return null;
+  try {
+    if (window.__octopPickNode) {
+      window.__octopPickNode.style.outline = window.__octopPickPrev || "";
+    }
+    if (window.__octopPickTimer) clearTimeout(window.__octopPickTimer);
+    window.__octopPickNode = el;
+    window.__octopPickPrev = el.style.outline || "";
+    el.style.outline = "2px solid #1677ff";
+    window.__octopPickTimer = setTimeout(() => {
+      try {
+        el.style.outline = window.__octopPickPrev || "";
+      } catch (err) {
+        /* node detached */
+      }
+      window.__octopPickNode = null;
+    }, 1600);
+  } catch (err) {
+    /* styling is best-effort */
+  }
+  const rect = el.getBoundingClientRect();
+  const cs = getComputedStyle(el);
+  const styles = {};
+  [
+    "color",
+    "background-color",
+    "border-color",
+    "border-radius",
+    "font-size",
+    "font-weight",
+    "display",
+    "position",
+  ].forEach((key) => {
+    const value = cs.getPropertyValue(key);
+    if (value) styles[key] = String(value).slice(0, 60);
+  });
+  const attrs = {};
+  Array.from(el.attributes || [])
+    .slice(0, 14)
+    .forEach((attr) => {
+      attrs[attr.name] = String(attr.value).slice(0, 120);
+    });
+  const esc = (value) =>
+    window.CSS && CSS.escape
+      ? CSS.escape(String(value))
+      : String(value).replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+  const cssPath = (node) => {
+    const parts = [];
+    let cur = node;
+    while (cur && cur.nodeType === 1 && cur !== document.documentElement) {
+      if (cur.id) {
+        parts.unshift("#" + esc(cur.id));
+        break;
+      }
+      let part = cur.tagName.toLowerCase();
+      const cls = Array.from(cur.classList || [])
+        .slice(0, 2)
+        .map((name) => "." + esc(name))
+        .join("");
+      if (cls) part += cls;
+      const parent = cur.parentElement;
+      if (parent) {
+        const sibs = Array.from(parent.children).filter(
+          (sib) => sib.tagName === cur.tagName,
+        );
+        if (sibs.length > 1) part += ":nth-of-type(" + (sibs.indexOf(cur) + 1) + ")";
+      }
+      parts.unshift(part);
+      cur = cur.parentElement;
+      if (parts.length >= 6) break;
+    }
+    return parts.join(" > ").slice(0, 240);
+  };
+  const tag = el.tagName.toLowerCase();
+  const textOf = (node) => {
+    const raw =
+      tag === "input" || tag === "textarea" || tag === "select"
+        ? node.value || node.getAttribute("placeholder") || ""
+        : node.innerText || node.textContent || "";
+    return String(raw).replace(/\s+/g, " ").trim().slice(0, 160);
+  };
+  const label =
+    tag +
+    (el.id ? "#" + el.id : "") +
+    Array.from(el.classList || [])
+      .slice(0, 2)
+      .map((name) => "." + name)
+      .join("");
+  return {
+    tag: tag,
+    label: label.slice(0, 80),
+    id: el.id || "",
+    classes: Array.from(el.classList || []).slice(0, 8),
+    role: el.getAttribute("role") || "",
+    type: el.getAttribute("type") || "",
+    name: el.getAttribute("name") || "",
+    placeholder: el.getAttribute("placeholder") || "",
+    text: textOf(el),
+    selector: cssPath(el),
+    rect: {
+      x: Math.round(rect.left),
+      y: Math.round(rect.top),
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+    },
+    styles: styles,
+    attrs: attrs,
+    url: location.href,
+    title: document.title,
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+  };
+})()
+"""
+
+
+def _element_inspect_js(x: int, y: int) -> str:
+    return _ELEMENT_INSPECT_JS.replace("__X__", str(int(x))).replace("__Y__", str(int(y)))
+
+
+async def _inspect_element(sess: Any, x: int, y: int) -> dict[str, Any] | None:
+    """Return the page element at viewport (x, y) as a plain dict, or None."""
+    client = getattr(getattr(sess, "_internal", None), "client", None)
+    if client is None:
+        return None
+    try:
+        result = await asyncio.wait_for(
+            client.send(
+                "Runtime.evaluate",
+                {
+                    "expression": _element_inspect_js(x, y),
+                    "returnByValue": True,
+                    "awaitPromise": False,
+                },
+            ),
+            timeout=4.0,
+        )
+    except Exception as exc:  # pragma: no cover - CDP/connection failures
+        logger.debug("inspect element failed: %s", exc)
+        return None
+    payload = result.get("result") if isinstance(result, dict) else None
+    value = payload.get("value") if isinstance(payload, dict) else None
+    return value if isinstance(value, dict) else None
+
+
 def _cdp_click_count(msg: dict[str, Any]) -> int:
     raw = msg.get("clickCount", msg.get("click_count", 1))
     try:
@@ -224,7 +384,12 @@ def _cdp_click_count(msg: dict[str, Any]) -> int:
         return 1
 
 
-async def _handle_client_event(sess: Any, msg: dict[str, Any]) -> None:
+async def _handle_client_event(
+    sess: Any,
+    msg: dict[str, Any],
+    *,
+    send_json: Any | None = None,
+) -> None:
     t = msg.get("type")
     if t == "navigate":
         url = _normalize_nav_url(str(msg.get("url") or ""))
@@ -316,6 +481,20 @@ async def _handle_client_event(sess: Any, msg: dict[str, Any]) -> None:
             await sess.close_tab(str(tab_id))
     elif t == "tab_new":
         await sess.new_tab()
+    elif t == "inspect":
+        # "Select page element": resolve the node under the click and answer
+        # the requester with a description (no page interaction).
+        x, y = int(msg.get("x") or 0), int(msg.get("y") or 0)
+        element = await _inspect_element(sess, x, y)
+        if send_json is not None:
+            await send_json(
+                {
+                    "type": "element_inspected",
+                    "request_id": msg.get("request_id"),
+                    "element": element,
+                    "error": None if element else "not_found",
+                }
+            )
     elif t == "resize":
         w = int(msg.get("width") or 0)
         h = int(msg.get("height") or 0)
@@ -465,7 +644,7 @@ async def run_browser_stream_session(
                 break
             if sess is not None:
                 with contextlib.suppress(Exception):
-                    await _handle_client_event(sess, msg)
+                    await _handle_client_event(sess, msg, send_json=send_json)
     except TimeoutError:
         await send_json({"type": "error", "message": "timed out waiting for start"})
     except WebSocketDisconnect:

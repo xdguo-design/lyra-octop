@@ -5,19 +5,24 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Button, Select, Tag, Tooltip, Space } from "antd";
+import { Button, Select, Spin, Tag, Tooltip, Space } from "antd";
 import { useTranslation } from "react-i18next";
 import {
   AlertTriangle,
   ArrowLeftRight,
+  Check,
+  Copy,
   Globe,
   Monitor,
+  MousePointerClick,
   RefreshCw,
   User,
+  X,
 } from "lucide-react";
 import { api } from "../../api";
 import { bridgeApi } from "../../api/modules/bridge";
 import type {
+  BrowserElementInfo,
   BrowserSession,
   DisplayEnvironment,
 } from "../../api/types/browser";
@@ -33,6 +38,11 @@ import {
 } from "../../hooks/useViewportMode";
 import { normalizeUrl } from "../../utils/normalizeUrl";
 import { viewportModeLabel } from "../../utils/browserViewport";
+import {
+  browserElementLabel,
+  describeBrowserElement,
+} from "../../utils/browserElement";
+import { insertComposerText } from "../../utils/composerInsert";
 import { showApiError } from "../../utils/showApiToast";
 import BrowserViewer, { type BrowserViewerHandle } from "../BrowserViewer";
 import styles from "./index.module.less";
@@ -40,6 +50,16 @@ import styles from "./index.module.less";
 export type PanelMode = "hidden" | "bottom" | "right" | "popup";
 
 const DEFAULT_URL = "https://cloud.tencent.com";
+
+/** Card shown under the canvas after a "select page element" attempt. */
+type PickNote =
+  | {
+      kind: "element";
+      info: BrowserElementInfo;
+      text: string;
+      inserted: boolean;
+    }
+  | { kind: "miss" };
 
 interface BrowserWorkspaceProps {
   /** Harness profile for the current user. Server enforces the same mapping. */
@@ -86,6 +106,9 @@ const BrowserWorkspace: React.FC<BrowserWorkspaceProps> = ({
     closeTab,
     newTab,
     disconnect,
+    pickElement,
+    pickResult,
+    clearPickResult,
   } = useBrowserStream();
 
   const viewerRef = useRef<BrowserViewerHandle>(null);
@@ -96,6 +119,10 @@ const BrowserWorkspace: React.FC<BrowserWorkspaceProps> = ({
   const urlEditingRef = useRef(false);
   const [session, setSession] = useState<BrowserSession | null>(null);
   const [authAlert, setAuthAlert] = useState<string | null>(null);
+  // "Select page element": pick mode, in-flight request, and the result card.
+  const [picking, setPicking] = useState(false);
+  const [pickPending, setPickPending] = useState(false);
+  const [pickNote, setPickNote] = useState<PickNote | null>(null);
 
   const isStreaming = status === "streaming";
 
@@ -231,7 +258,7 @@ const BrowserWorkspace: React.FC<BrowserWorkspaceProps> = ({
 
   // Keyboard input — only forward when the user is in control.
   useEffect(() => {
-    if (!isStreaming || !isInteractive) return;
+    if (!isStreaming || !isInteractive || picking) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       // Only when the panel itself is focused (avoids capturing chat input).
       if (!panelRef.current?.contains(document.activeElement)) return;
@@ -245,7 +272,74 @@ const BrowserWorkspace: React.FC<BrowserWorkspaceProps> = ({
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isStreaming, isInteractive, sendEvent]);
+  }, [isStreaming, isInteractive, picking, sendEvent]);
+
+  // -------------------------------------------------------------------------
+  // "Select page element" — click a spot in the preview, get a description of
+  // the DOM node under it, and append that description to the chat composer.
+  // -------------------------------------------------------------------------
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
+
+  const togglePicker = useCallback(() => {
+    setPickNote(null);
+    setPickPending(false);
+    clearPickResult();
+    setPicking((prev) => !prev);
+  }, [clearPickResult]);
+
+  const handlePickPoint = useCallback(
+    (coords: { x: number; y: number }) => {
+      setPicking(false);
+      const sent = isStreaming && pickElement(coords.x, coords.y);
+      setPickPending(sent);
+      if (!sent) setPickNote({ kind: "miss" });
+    },
+    [isStreaming, pickElement],
+  );
+
+  // One place turns the inspected node into composer text, so the toolbar
+  // button and the canvas click behave identically.
+  useEffect(() => {
+    if (!pickResult) return;
+    setPickPending(false);
+    if (!pickResult.info) {
+      setPickNote({ kind: "miss" });
+      return;
+    }
+    const text = describeBrowserElement(pickResult.info, tRef.current);
+    setPickNote({
+      kind: "element",
+      info: pickResult.info,
+      text,
+      inserted: insertComposerText(text),
+    });
+  }, [pickResult]);
+
+  // Esc leaves pick mode without touching the page.
+  useEffect(() => {
+    if (!picking) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setPicking(false);
+    };
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
+  }, [picking]);
+
+  const handleCopyPick = useCallback(() => {
+    if (pickNote?.kind !== "element") return;
+    void navigator.clipboard?.writeText(pickNote.text);
+  }, [pickNote]);
+
+  const dismissPickNote = useCallback(() => {
+    setPickNote(null);
+    clearPickResult();
+  }, [clearPickResult]);
 
   // -------------------------------------------------------------------------
   // Top URL bar — "Go" button so the user can navigate the agent's browser.
@@ -379,7 +473,21 @@ const BrowserWorkspace: React.FC<BrowserWorkspaceProps> = ({
           navUrl={url}
           onNavUrlChange={setUrl}
           onNavigate={handleNavigate}
-          interactive={isStreaming && isInteractive}
+          interactive={isStreaming && isInteractive && !picking}
+          pickMode={picking}
+          onPickPoint={handlePickPoint}
+          addressBarExtra={
+            <Tooltip title={t("browserWorkspace.elementPick")}>
+              <Button
+                size="small"
+                type={picking ? "primary" : "default"}
+                icon={<MousePointerClick size={14} />}
+                disabled={!isStreaming}
+                onClick={togglePicker}
+                aria-label={t("browserWorkspace.elementPick")}
+              />
+            </Tooltip>
+          }
           onReconnect={handleRetry}
           bookmarked={bookmarked}
           onToggleBookmark={onToggleBookmark}
@@ -390,6 +498,80 @@ const BrowserWorkspace: React.FC<BrowserWorkspaceProps> = ({
           }
         />
       </div>
+
+      {/* Picked element — description that was appended to the chat composer */}
+      {(picking || pickPending || pickNote) && (
+        <div className={styles.pickBar}>
+          {picking ? (
+            <span className={styles.pickHint}>
+              <MousePointerClick size={13} />
+              {t("browserWorkspace.elementPickActive")}
+            </span>
+          ) : pickPending ? (
+            <span className={styles.pickHint}>
+              <Spin size="small" />
+              {t("browserWorkspace.elementPickResolving")}
+            </span>
+          ) : pickNote?.kind === "miss" ? (
+            <>
+              <span className={styles.pickWarn}>
+                <AlertTriangle size={13} />
+                {t("browserWorkspace.elementPickFailed")}
+              </span>
+              <Space size={4}>
+                <Button size="small" type="text" onClick={dismissPickNote}>
+                  {t("browserWorkspace.elementPickDismiss")}
+                </Button>
+                <Button size="small" type="primary" onClick={togglePicker}>
+                  {t("browserWorkspace.elementPickReselect")}
+                </Button>
+              </Space>
+            </>
+          ) : pickNote?.kind === "element" ? (
+            <>
+              <div className={styles.pickSummary}>
+                <span className={styles.pickLeading}>
+                  <Check size={13} />
+                  {pickNote.inserted
+                    ? t("browserWorkspace.elementPickInserted")
+                    : t("browserWorkspace.elementPickBuffered")}
+                </span>
+                <code className={styles.pickSelector}>
+                  {browserElementLabel(pickNote.info)}
+                </code>
+                {pickNote.info.text && (
+                  <span className={styles.pickText}>
+                    “{pickNote.info.text}”
+                  </span>
+                )}
+              </div>
+              <Space size={4}>
+                <Tooltip title={t("browserWorkspace.elementPickCopy")}>
+                  <Button
+                    size="small"
+                    type="text"
+                    icon={<Copy size={13} />}
+                    onClick={handleCopyPick}
+                    aria-label={t("browserWorkspace.elementPickCopy")}
+                  />
+                </Tooltip>
+                <Button size="small" type="text" onClick={togglePicker}>
+                  {t("browserWorkspace.elementPickReselect")}
+                </Button>
+                <Tooltip title={t("browserWorkspace.elementPickDismiss")}>
+                  <Button
+                    size="small"
+                    type="text"
+                    icon={<X size={13} />}
+                    onClick={dismissPickNote}
+                    aria-label={t("browserWorkspace.elementPickDismiss")}
+                  />
+                </Tooltip>
+              </Space>
+            </>
+          ) : null}
+        </div>
+      )}
 
       {/* Footer — control / stream / resolution, then handoff actions */}
       <div className={styles.footer}>

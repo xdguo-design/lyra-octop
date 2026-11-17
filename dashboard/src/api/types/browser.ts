@@ -109,3 +109,37 @@ export interface BrowserSkillContentResponse {
   skillName?: string | null;
   skillExists: boolean;
 }
+
+/** Bounding box of a picked page element, in page viewport pixels. */
+export interface BrowserElementRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Page element resolved by a browser-stream ``inspect`` pick — the payload of
+ * the "select page element" tool (``element_inspected`` WebSocket reply).
+ */
+export interface BrowserElementInfo {
+  tag: string;
+  /** Short display handle, e.g. ``button#submit.primary``. */
+  label: string;
+  id: string;
+  classes: string[];
+  role: string;
+  type: string;
+  name: string;
+  placeholder: string;
+  /** Visible text (or value/placeholder for form controls), truncated. */
+  text: string;
+  /** Best-effort CSS selector from the document root. */
+  selector: string;
+  rect: BrowserElementRect;
+  styles: Record<string, string>;
+  attrs: Record<string, string>;
+  url: string;
+  title: string;
+  viewport: { width: number; height: number };
+}

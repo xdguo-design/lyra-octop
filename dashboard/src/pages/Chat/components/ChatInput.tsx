@@ -17,6 +17,10 @@ import {
 } from "../../../hooks/viewport";
 import { useKeepInVisualViewport } from "../../../hooks/useKeepInVisualViewport";
 import { useSlashCommands } from "../../../hooks/useSlashCommands";
+import {
+  consumePendingComposerInsert,
+  subscribeComposerInsert,
+} from "../../../utils/composerInsert";
 import SlashCommandMenu from "./SlashCommandMenu";
 import { agentChatApi } from "../../../api/modules/agentChat";
 import type { ChatAttachment } from "../hooks/useChat";
@@ -271,6 +275,37 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       onText: applyVoiceText,
     });
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    // External surfaces (e.g. the browser panel's "select page element" tool)
+    // append a description to this composer; text produced before mount is
+    // buffered by the bridge and flushed below.
+    const appendComposerText = useCallback(
+      (chunk: string) => {
+        const addition = chunk.trim();
+        if (!addition) return;
+        userHasEditedRef.current = true;
+        ignoreInitialTextRef.current = null;
+        setText((prev) => {
+          const base = prev.replace(/\s+$/, "");
+          return base ? `${base}\n\n${addition}` : addition;
+        });
+        onUserInput?.();
+        window.setTimeout(() => {
+          const el = textareaRef.current;
+          if (!el) return;
+          el.focus();
+          el.setSelectionRange(el.value.length, el.value.length);
+        }, 0);
+      },
+      [onUserInput],
+    );
+
+    useEffect(() => {
+      const unsubscribe = subscribeComposerInsert(appendComposerText);
+      const buffered = consumePendingComposerInsert();
+      if (buffered) appendComposerText(buffered);
+      return unsubscribe;
+    }, [appendComposerText]);
     const {
       items: uploadItems,
       attachments,

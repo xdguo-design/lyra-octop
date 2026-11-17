@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { getAuthToken } from "../api/request";
+import type { BrowserElementInfo } from "../api/types/browser";
 import { normalizeUrl } from "../utils/normalizeUrl";
 import {
   closeBrowserTabOptimistic,
@@ -72,6 +73,12 @@ export interface StreamSessionInfo {
   channel_source: string;
 }
 
+/** Result of an "inspect" pick: a page element description or a miss. */
+export interface BrowserPickResult {
+  info: BrowserElementInfo | null;
+  error: string | null;
+}
+
 export function useBrowserStream() {
   const wsRef = useRef<WebSocket | null>(null);
   const callbacksRef = useRef<BrowserStreamCallbacks | null>(null);
@@ -79,6 +86,7 @@ export function useBrowserStream() {
   const [status, setStatus] = useState<BrowserStreamState>("idle");
   const [currentUrl, setCurrentUrl] = useState("");
   const [tabs, setTabs] = useState<BrowserTab[]>([]);
+  const [pickResult, setPickResult] = useState<BrowserPickResult | null>(null);
   const [sessionInfo, setSessionInfo] = useState<StreamSessionInfo | null>(
     null,
   );
@@ -139,6 +147,8 @@ export function useBrowserStream() {
             status?: string;
             message?: string;
             tabs?: BrowserTab[];
+            element?: unknown;
+            error?: string;
           };
 
           if (msg.type === "frame" && msg.data) {
@@ -175,6 +185,11 @@ export function useBrowserStream() {
                 "dashboard",
             };
             setSessionInfo(info);
+          } else if (msg.type === "element_inspected") {
+            setPickResult({
+              info: (msg.element as BrowserElementInfo | null) ?? null,
+              error: msg.error ?? null,
+            });
           }
         } catch {
           // Non-JSON frames — ignore
@@ -245,6 +260,23 @@ export function useBrowserStream() {
     sendEvent({ type: "tab_new" });
   }, [sendEvent]);
 
+  /**
+   * Resolve the page element at viewport (x, y) — the "select page element"
+   * tool. The answer arrives asynchronously via ``pickResult``.
+   */
+  const pickElement = useCallback(
+    (x: number, y: number) => {
+      setPickResult(null);
+      return sendEvent({ type: "inspect", x, y });
+    },
+    [sendEvent],
+  );
+
+  /** Drop the last pick result (closing the element card). */
+  const clearPickResult = useCallback(() => {
+    setPickResult(null);
+  }, []);
+
   /** Stop the remote browser. */
   const stop = useCallback(() => {
     sendEvent({ type: "stop" });
@@ -289,6 +321,9 @@ export function useBrowserStream() {
     switchTab,
     closeTab,
     newTab,
+    pickElement,
+    pickResult,
+    clearPickResult,
     stop,
     disconnect,
   };
