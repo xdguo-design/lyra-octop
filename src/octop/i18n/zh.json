@@ -990,6 +990,10 @@
         "unavailable": "登记服务暂不可用，请检查独立 Demo 后端。",
         "invalid_response": "登记服务返回异常，请检查独立 Demo 后端。"
     },
+    "planet_proxy": {
+        "timeout": "儿童应用服务响应超时，请稍后重试。",
+        "unavailable": "儿童应用服务暂不可用，请检查星球乐园后端。"
+    },
     "ldap": {
         "test": {
             "ok": "已连接 LDAP 目录服务",

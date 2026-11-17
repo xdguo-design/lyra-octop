@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Literal, cast
 from urllib.parse import urlsplit
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -32,6 +33,7 @@ _BUILT_IN_APPS = {
     "speech-recognition",
     "admission-demo",
     "admission-registration",
+    "patient-appointment",
     "planet",
     "manus-refund",
     "manus-clinicemr",
@@ -87,6 +89,31 @@ class CreationThumbnailRefreshResult(BaseModel):
 
 class ProjectUpdateResult(BaseModel):
     updated: bool
+
+
+class RepositoryJobStatus(BaseModel):
+    status: Literal["idle", "running", "done", "failed", "cancelled"]
+    percent: int = 0
+    message: str | None = None
+    logs: str | None = None
+
+
+class ProjectDeployStatus(RepositoryJobStatus):
+    url: str | None = None
+    kind: str | None = None
+
+
+class RepositoryLookupBody(BaseModel):
+    url: str = Field(min_length=1, max_length=2048)
+
+
+class RepositoryLookup(BaseModel):
+    url: str
+    name: str | None = None
+    description: str | None = None
+    default_branch: str | None = None
+    language: str | None = None
+    stars: int | None = None
 
 
 class FolderBody(BaseModel):
@@ -247,8 +274,19 @@ def _launchable_item(server: Any, user: Any, item_id: str) -> dict[str, Any]:
     return cast(dict[str, Any], row)
 
 
-def _cnb_access_token(server: Any, user: Any, repository_url: str) -> str | None:
-    if urlsplit(repository_url).hostname != "cnb.cool":
+_REPOSITORY_CONNECTORS = {"github.com": "github", "cnb.cool": "cnb"}
+
+
+def _repository_access_token(server: Any, user: Any, repository_url: str) -> str | None:
+    """Resolve the bound connector token for a repository host.
+
+    Public GitHub repositories clone anonymously, so a missing GitHub token is
+    not an error; CNB keeps requiring a token because its repositories are
+    private by default.
+    """
+    host = urlsplit(repository_url).hostname or ""
+    kind = _REPOSITORY_CONNECTORS.get(host)
+    if kind is None:
         return None
     service = ConnectorService(
         repo=server.services.repos.connector_repo,
@@ -256,13 +294,15 @@ def _cnb_access_token(server: Any, user: Any, repository_url: str) -> str | None
         settings_repo=server.services.settings_repo,
         config=server.services.config,
     )
-    token = str(service.active_credentials_for_user_kind(user.id, "cnb").get("token") or "")
-    if not token:
+    token = str(service.active_credentials_for_user_kind(user.id, kind).get("token") or "")
+    if token:
+        return token
+    if kind == "cnb":
         raise OctopError(
             ErrorCode.CONNECTOR_INVALID_CREDENTIALS,
             "connect a CNB connector before using this repository",
         )
-    return token
+    return None
 
 
 async def _stop_item_runtime(server: Any, item: dict[str, Any]) -> None:
@@ -301,7 +341,7 @@ async def start_project_preview(
 ) -> ProjectLaunchStatus:
     row = _launchable_item(server, user, item_id)
     manager = server.project_service_manager
-    access_token = _cnb_access_token(server, user, row["url"])
+    access_token = _repository_access_token(server, user, row["url"])
     try:
         status = await manager.start(row["url"], item_id, access_token=access_token)
     except RuntimeError:
@@ -350,11 +390,169 @@ async def update_project_code(
     row = _launchable_item(server, user, item_id)
     try:
         await server.project_service_manager.update(
-            row["url"], item_id, access_token=_cnb_access_token(server, user, row["url"])
+            row["url"], item_id, access_token=_repository_access_token(server, user, row["url"])
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail="Project code update failed") from exc
     return ProjectUpdateResult(updated=True)
+
+
+def _repository_item(server: Any, user: Any, item_id: str) -> dict[str, Any]:
+    row = next(
+        (
+            item
+            for item in server.services.creation_repo.list_items(user.id)
+            if item["item_id"] == item_id
+        ),
+        None,
+    )
+    manager = server.project_service_manager
+    if (
+        row is None
+        or row["kind"] != "service"
+        or not row["url"]
+        or normalize_repository_url(row["url"]) is None
+        or manager is None
+    ):
+        raise OctopError(ErrorCode.NOT_FOUND, "creation repository not found")
+    return cast(dict[str, Any], row)
+
+
+@router.get(
+    "/creations/items/{item_id}/download",
+    summary="Read the code download progress of a bound repository",
+    response_model=RepositoryJobStatus,
+)
+async def get_download_status(
+    item_id: str,
+    user: Any = Depends(require_admin()),
+    server: Any = Depends(get_server),
+) -> RepositoryJobStatus:
+    row = _repository_item(server, user, item_id)
+    return RepositoryJobStatus(
+        **server.project_service_manager.download_status(row["url"], item_id)
+    )
+
+
+@router.post(
+    "/creations/items/{item_id}/download",
+    summary="Download a bound repository into the Octop project directory",
+    response_model=RepositoryJobStatus,
+)
+async def start_download(
+    item_id: str,
+    user: Any = Depends(require_admin()),
+    server: Any = Depends(get_server),
+) -> RepositoryJobStatus:
+    row = _repository_item(server, user, item_id)
+    status = await server.project_service_manager.start_download(
+        row["url"], item_id, access_token=_repository_access_token(server, user, row["url"])
+    )
+    return RepositoryJobStatus(**status)
+
+
+@router.delete(
+    "/creations/items/{item_id}/download",
+    summary="Cancel a running code download",
+    response_model=RepositoryJobStatus,
+)
+async def cancel_download(
+    item_id: str,
+    user: Any = Depends(require_admin()),
+    server: Any = Depends(get_server),
+) -> RepositoryJobStatus:
+    row = _repository_item(server, user, item_id)
+    status = await server.project_service_manager.cancel_download(row["url"], item_id)
+    return RepositoryJobStatus(**status)
+
+
+@router.get(
+    "/creations/items/{item_id}/install",
+    summary="Read the install progress of a bound repository",
+    response_model=ProjectDeployStatus,
+)
+async def get_install_status(
+    item_id: str,
+    user: Any = Depends(require_admin()),
+    server: Any = Depends(get_server),
+) -> ProjectDeployStatus:
+    row = _repository_item(server, user, item_id)
+    return ProjectDeployStatus(**server.project_service_manager.deploy_status(row["url"], item_id))
+
+
+@router.post(
+    "/creations/items/{item_id}/install",
+    summary="Install dependencies and serve a bound repository",
+    response_model=ProjectDeployStatus,
+)
+async def install_project(
+    item_id: str,
+    user: Any = Depends(require_admin()),
+    server: Any = Depends(get_server),
+) -> ProjectDeployStatus:
+    row = _repository_item(server, user, item_id)
+    status = await server.project_service_manager.start_deploy(
+        row["url"], item_id, access_token=_repository_access_token(server, user, row["url"])
+    )
+    return ProjectDeployStatus(**status)
+
+
+@router.delete(
+    "/creations/items/{item_id}/install",
+    summary="Stop an installed repository service",
+    response_model=ProjectDeployStatus,
+)
+async def stop_installed_project(
+    item_id: str,
+    user: Any = Depends(require_admin()),
+    server: Any = Depends(get_server),
+) -> ProjectDeployStatus:
+    row = _repository_item(server, user, item_id)
+    await server.project_service_manager.stop(row["url"], item_id)
+    return ProjectDeployStatus(**server.project_service_manager.deploy_status(row["url"], item_id))
+
+
+@router.post(
+    "/creations/repositories/lookup",
+    summary="Read repository metadata with the bound GitHub connector",
+    response_model=RepositoryLookup,
+)
+async def lookup_repository(
+    body: RepositoryLookupBody,
+    user: Any = Depends(current_user),
+    server: Any = Depends(get_server),
+) -> RepositoryLookup:
+    normalized = normalize_repository_url(body.url)
+    if normalized is None:
+        raise HTTPException(status_code=422, detail="Enter an HTTPS GitHub or CNB repository URL")
+    if urlsplit(normalized).hostname == "cnb.cool":
+        return RepositoryLookup(url=normalized, name=normalized.rsplit("/", 1)[-1])
+    headers = {"Accept": "application/vnd.github+json"}
+    token = _repository_access_token(server, user, normalized)
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    path = urlsplit(normalized).path.strip("/")
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"https://api.github.com/repos/{path}", headers=headers)
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail="Cannot reach GitHub") from exc
+    if response.status_code == 404:
+        raise HTTPException(status_code=404, detail="Repository not found or not accessible")
+    if response.status_code in {403, 429}:
+        raise HTTPException(status_code=429, detail="GitHub rate limit reached")
+    if response.status_code >= 400:
+        raise HTTPException(status_code=502, detail="GitHub lookup failed")
+    payload = response.json()
+    stars = payload.get("stargazers_count")
+    return RepositoryLookup(
+        url=normalized,
+        name=str(payload.get("name") or "")[:120] or None,
+        description=str(payload.get("description") or "")[:2000] or None,
+        default_branch=str(payload.get("default_branch") or "") or None,
+        language=str(payload.get("language") or "") or None,
+        stars=int(stars) if isinstance(stars, int) else None,
+    )
 
 
 async def _refresh_thumbnail(item: dict[str, Any], root: Path, owner_user_id: int) -> bool:
@@ -681,7 +879,7 @@ async def update_card_code(
         await manager.update(
             repository_url,
             f"app:{user.id}:{card_id}",
-            access_token=_cnb_access_token(server, user, repository_url),
+            access_token=_repository_access_token(server, user, repository_url),
             source_only=True,
             repository_branch=repository_branch,
         )

@@ -17,7 +17,9 @@ export type BuiltInExternalCreation = BuiltInCreationBase & {
 };
 export type BuiltInCreation = BuiltInAppCreation | BuiltInExternalCreation;
 
-export const PLANET_URL = "http://127.0.0.1:8130/";
+// Same-origin subpath proxied by the backend to the local planet service
+// (public pages can no longer iframe 127.0.0.1 — browsers block it).
+export const PLANET_URL = "/planet/";
 
 export const BUILT_IN_CREATIONS: BuiltInCreation[] = [
   {

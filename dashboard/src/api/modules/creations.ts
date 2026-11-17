@@ -58,6 +58,27 @@ export interface ProjectUpdateResult {
   updated: boolean;
 }
 
+export interface RepositoryJobStatus {
+  status: "idle" | "running" | "done" | "failed" | "cancelled";
+  percent: number;
+  message: string | null;
+  logs: string | null;
+}
+
+export interface ProjectDeployStatus extends RepositoryJobStatus {
+  url: string | null;
+  kind: string | null;
+}
+
+export interface RepositoryLookup {
+  url: string;
+  name: string | null;
+  description: string | null;
+  default_branch: string | null;
+  language: string | null;
+  stars: number | null;
+}
+
 export const creationsApi = {
   list: () => request<CreationsIndex>("/creations"),
   launchStatus: (itemId: string) =>
@@ -84,6 +105,39 @@ export const creationsApi = {
       `/creations/cards/${cardType}/${encodeURIComponent(cardId)}/update`,
       { method: "POST" },
     ),
+  downloadStatus: (itemId: string) =>
+    request<RepositoryJobStatus>(
+      `/creations/items/${encodeURIComponent(itemId)}/download`,
+    ),
+  startDownload: (itemId: string) =>
+    request<RepositoryJobStatus>(
+      `/creations/items/${encodeURIComponent(itemId)}/download`,
+      { method: "POST" },
+    ),
+  cancelDownload: (itemId: string) =>
+    request<RepositoryJobStatus>(
+      `/creations/items/${encodeURIComponent(itemId)}/download`,
+      { method: "DELETE" },
+    ),
+  installStatus: (itemId: string) =>
+    request<ProjectDeployStatus>(
+      `/creations/items/${encodeURIComponent(itemId)}/install`,
+    ),
+  installProject: (itemId: string) =>
+    request<ProjectDeployStatus>(
+      `/creations/items/${encodeURIComponent(itemId)}/install`,
+      { method: "POST" },
+    ),
+  stopInstalled: (itemId: string) =>
+    request<ProjectDeployStatus>(
+      `/creations/items/${encodeURIComponent(itemId)}/install`,
+      { method: "DELETE" },
+    ),
+  lookupRepository: (url: string) =>
+    request<RepositoryLookup>("/creations/repositories/lookup", {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    }),
   createFolder: (name: string) =>
     request<CreationFolder>("/creations/folders", {
       method: "POST",

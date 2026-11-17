@@ -5,14 +5,17 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   Camera,
+  Download,
   ExternalLink,
   Folder,
   FolderPlus,
   Github,
   Pencil,
+  Play,
   Plus,
   RefreshCw,
   Smartphone,
+  Square,
   Star,
   Trash2,
   X,
@@ -25,7 +28,8 @@ import {
   type CreationFolder,
   type CreationItem,
   type CreationItemInput,
-  type ProjectLaunchStatus,
+  type ProjectDeployStatus,
+  type RepositoryJobStatus,
 } from "../../api/modules/creations";
 import {
   BUILT_IN_CREATIONS,
@@ -168,9 +172,17 @@ export default function CreationsPage() {
   const [selectedFolder, setSelectedFolder] = useState("all");
   const [starred, setStarred] = useState<Set<string>>(loadStarred);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [launchStatuses, setLaunchStatuses] = useState<
-    Record<string, ProjectLaunchStatus>
+  const [downloads, setDownloads] = useState<
+    Record<string, RepositoryJobStatus>
   >({});
+  const [installs, setInstalls] = useState<Record<string, ProjectDeployStatus>>(
+    {},
+  );
+  const [jobView, setJobView] = useState<{
+    itemId: string;
+    kind: "download" | "install";
+    title: string;
+  } | null>(null);
   const [folders, setFolders] = useState<CreationFolder[]>([]);
   const [items, setItems] = useState<CreationItem[]>([]);
   const [cardFolders, setCardFolders] = useState<Record<string, string>>({});
@@ -256,26 +268,67 @@ export default function CreationsPage() {
     );
     void Promise.all(
       targets.map(async (item) => {
-        try {
-          return [
-            item.item_id,
-            await creationsApi.launchStatus(item.item_id),
-          ] as const;
-        } catch {
-          return null;
-        }
+        const [download, install] = await Promise.all([
+          creationsApi.downloadStatus(item.item_id).catch(() => null),
+          creationsApi.installStatus(item.item_id).catch(() => null),
+        ]);
+        return [item.item_id, download, install] as const;
       }),
-    ).then((results) => {
+    ).then((rows) => {
       if (!alive) return;
-      setLaunchStatuses((previous) => ({
-        ...previous,
-        ...Object.fromEntries(results.filter((result) => result !== null)),
-      }));
+      const nextDownloads: Record<string, RepositoryJobStatus> = {};
+      const nextInstalls: Record<string, ProjectDeployStatus> = {};
+      for (const [itemId, download, install] of rows) {
+        if (download) nextDownloads[itemId] = download;
+        if (install) nextInstalls[itemId] = install;
+      }
+      setDownloads((previous) => ({ ...previous, ...nextDownloads }));
+      setInstalls((previous) => ({ ...previous, ...nextInstalls }));
     });
     return () => {
       alive = false;
     };
   }, [isAdmin, items]);
+
+  useEffect(() => {
+    const running = Object.keys(downloads).filter(
+      (itemId) => downloads[itemId]?.status === "running",
+    );
+    if (running.length === 0) return;
+    const timer = window.setTimeout(() => {
+      void Promise.all(
+        running.map(async (itemId) => {
+          try {
+            const status = await creationsApi.downloadStatus(itemId);
+            setDownloads((previous) => ({ ...previous, [itemId]: status }));
+          } catch {
+            /* keep the last known progress */
+          }
+        }),
+      );
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [downloads]);
+
+  useEffect(() => {
+    const running = Object.keys(installs).filter(
+      (itemId) => installs[itemId]?.status === "running",
+    );
+    if (running.length === 0) return;
+    const timer = window.setTimeout(() => {
+      void Promise.all(
+        running.map(async (itemId) => {
+          try {
+            const status = await creationsApi.installStatus(itemId);
+            setInstalls((previous) => ({ ...previous, [itemId]: status }));
+          } catch {
+            /* keep the last known progress */
+          }
+        }),
+      );
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [installs]);
 
   const creations = useMemo<Creation[]>(() => {
     const apps = BUILT_IN_CREATIONS.filter((app) => app.type === "app").map(
@@ -369,61 +422,34 @@ export default function CreationsPage() {
       message.error(t("creationsPage.messages.githubRefInvalid"));
       return;
     }
-    if (ref.startsWith("https://cnb.cool/")) {
-      if (!isManagedRepositoryUrl(ref)) {
-        message.error(t("creationsPage.messages.githubRefInvalid"));
-        return;
-      }
-      const parts = new URL(ref).pathname.split("/").filter(Boolean);
-      const repoName = parts[parts.length - 1];
-      setFormName((repoName || "").replace(/\.git$/i, ""));
-      setFormUrl(ref);
-      return;
-    }
-    const match = ref
-      .replace(/^https?:\/\/(www\.)?github\.com\//i, "")
-      .replace(/\.git$/i, "")
-      .match(/^([\w.-]+)\/([\w.-]+)$/);
-    if (!match) {
+    const candidate = /^[\w.-]+\/[\w.-]+$/.test(ref)
+      ? `https://github.com/${ref}`
+      : ref.replace(/\.git$/i, "");
+    if (!isManagedRepositoryUrl(candidate)) {
       message.error(t("creationsPage.messages.githubRefInvalid"));
       return;
     }
     setGithubBusy(true);
     try {
-      const resp = await fetch(
-        `https://api.github.com/repos/${match[1]}/${match[2]}`,
-        { headers: { Accept: "application/vnd.github+json" } },
-      );
-      if (resp.status === 404) {
-        message.error(t("creationsPage.messages.githubRefNotFound"));
-        return;
-      }
-      if (resp.status === 403 || resp.status === 429) {
-        message.error(t("creationsPage.messages.githubRefRateLimited"));
-        return;
-      }
-      if (!resp.ok) {
-        message.error(t("creationsPage.messages.githubRefFailed"));
-        return;
-      }
-      const repo = await resp.json();
-      const fullName = String(repo.full_name ?? `${match[1]}/${match[2]}`);
-      const name = String(
-        (repo.name && String(repo.name).slice(0, 120)) || fullName,
-      );
-      const url = repo.html_url || `https://github.com/${match[1]}/${match[2]}`;
+      const repo = await creationsApi.lookupRepository(candidate);
+      setFormName(repo.name ?? candidate.replace(/^https:\/\//, ""));
+      setFormUrl(repo.url);
       const bits: string[] = [];
-      if (repo.description) bits.push(String(repo.description));
+      if (repo.description) bits.push(repo.description);
       const meta: string[] = [];
-      if (repo.language) meta.push(String(repo.language));
-      if (typeof repo.stargazers_count === "number")
-        meta.push(`★ ${repo.stargazers_count}`);
+      if (repo.language) meta.push(repo.language);
+      if (typeof repo.stars === "number") meta.push(`★ ${repo.stars}`);
       if (meta.length > 0) bits.push(meta.join(" · "));
-      setFormName(name);
-      setFormUrl(url);
       setFormDescription(bits.join(" — ").slice(0, 2000));
-    } catch {
-      message.error(t("creationsPage.messages.githubRefFailed"));
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "";
+      if (detail.includes(" 404 ")) {
+        message.error(t("creationsPage.messages.githubRefNotFound"));
+      } else if (detail.includes(" 429 ")) {
+        message.error(t("creationsPage.messages.githubRefRateLimited"));
+      } else {
+        message.error(t("creationsPage.messages.githubRefFailed"));
+      }
     } finally {
       setGithubBusy(false);
     }
@@ -576,7 +602,7 @@ export default function CreationsPage() {
 
   const openCreation = (creation: Creation) => {
     if (creation.type === "service" && isLaunchableProjectUrl(creation.url)) {
-      if (isAdmin) void openProjectPreview(creation);
+      if (isAdmin) openProjectPreview(creation.itemId, creation.title);
       else if (creation.url)
         window.open(creation.url, "_blank", "noopener,noreferrer");
       return;
@@ -604,42 +630,48 @@ export default function CreationsPage() {
     }
   };
 
-  const launchProject = async (itemId: string, stop = false) => {
-    if (!stop) {
-      setLaunchStatuses((previous) => ({
-        ...previous,
-        [itemId]: {
-          status: "starting",
-          url: null,
-          logs: null,
-          thumbnail_url: null,
-        },
-      }));
-    }
+  const startDownload = async (itemId: string, title: string) => {
+    setJobView({ itemId, kind: "download", title });
     try {
-      const status = stop
-        ? await creationsApi.stopProject(itemId)
-        : await creationsApi.startProject(itemId);
-      setLaunchStatuses((previous) => ({ ...previous, [itemId]: status }));
-      if (status.thumbnail_url) {
-        setItems((previous) =>
-          previous.map((item) =>
-            item.item_id === itemId
-              ? { ...item, thumbnail_url: status.thumbnail_url }
-              : item,
-          ),
-        );
-      }
-      if (status.status === "failed")
-        message.error(
-          `${t("creationsPage.actions.previewFailed")}${
-            status.logs ? `: ${status.logs}` : ""
-          }`,
-        );
-      return status;
+      const status = await creationsApi.startDownload(itemId);
+      setDownloads((previous) => ({ ...previous, [itemId]: status }));
     } catch {
-      message.error(t("creationsPage.actions.previewFailed"));
-      return null;
+      message.error(t("creationsPage.job.downloadFailed"));
+    }
+  };
+
+  const startInstall = async (itemId: string, title: string) => {
+    setJobView({ itemId, kind: "install", title });
+    try {
+      const status = await creationsApi.installProject(itemId);
+      setInstalls((previous) => ({ ...previous, [itemId]: status }));
+    } catch {
+      message.error(t("creationsPage.job.installFailed"));
+    }
+  };
+
+  const cancelJob = async () => {
+    if (!jobView) return;
+    try {
+      if (jobView.kind === "download") {
+        const status = await creationsApi.cancelDownload(jobView.itemId);
+        setDownloads((previous) => ({ ...previous, [jobView.itemId]: status }));
+      } else {
+        const status = await creationsApi.stopInstalled(jobView.itemId);
+        setInstalls((previous) => ({ ...previous, [jobView.itemId]: status }));
+      }
+    } catch {
+      /* the modal still closes; the next poll reflects the real state */
+    }
+    setJobView(null);
+  };
+
+  const stopInstalled = async (itemId: string) => {
+    try {
+      const status = await creationsApi.stopInstalled(itemId);
+      setInstalls((previous) => ({ ...previous, [itemId]: status }));
+    } catch {
+      message.error(t("creationsPage.job.stopFailed"));
     }
   };
 
@@ -666,30 +698,29 @@ export default function CreationsPage() {
     }
   };
 
-  const openProjectPreview = async (creation: UserCreation) => {
-    const current = launchStatuses[creation.itemId];
-    if (current?.status === "starting") return;
-    const status =
-      current?.status === "running" && current.url
-        ? current
-        : await launchProject(creation.itemId);
-    if (status?.status === "running" && status.url) {
+  const openProjectPreview = (itemId: string, title: string) => {
+    const status = installs[itemId];
+    if (status?.status === "done" && status.url) {
       setOpenId(null);
-      setProjectPreview({ title: creation.title, url: status.url });
+      setProjectPreview({ title, url: status.url });
+      return;
     }
+    void startInstall(itemId, title);
   };
 
   const updateProject = async (creation: UserCreation) => {
     setUpdatingProjectId(creation.itemId);
     try {
       await creationsApi.updateProject(creation.itemId);
-      setLaunchStatuses((previous) => ({
+      setInstalls((previous) => ({
         ...previous,
         [creation.itemId]: {
-          status: "stopped",
-          url: null,
+          status: "idle",
+          percent: 0,
+          message: null,
           logs: null,
-          thumbnail_url: null,
+          url: null,
+          kind: null,
         },
       }));
       message.success(t("creationsPage.messages.projectUpdated"));
@@ -810,6 +841,40 @@ export default function CreationsPage() {
         desc: t(openedSource.descriptionKey),
       }
     : null;
+  const activeJob = jobView
+    ? jobView.kind === "download"
+      ? downloads[jobView.itemId]
+      : installs[jobView.itemId]
+    : undefined;
+  const jobPercent = activeJob?.percent ?? 0;
+  const jobTitle = (() => {
+    if (!jobView) return "";
+    const failed = activeJob?.status === "failed";
+    if (jobView.kind === "download") {
+      if (activeJob?.status === "done") {
+        return t("creationsPage.job.downloadDone", { name: jobView.title });
+      }
+      if (failed) {
+        return t("creationsPage.job.downloadFailedTitle", {
+          name: jobView.title,
+        });
+      }
+      return t("creationsPage.job.downloading", {
+        name: jobView.title,
+        percent: jobPercent,
+      });
+    }
+    if (activeJob?.status === "done") {
+      return t("creationsPage.job.installDone", { name: jobView.title });
+    }
+    if (failed) {
+      return t("creationsPage.job.installFailedTitle", { name: jobView.title });
+    }
+    return t("creationsPage.job.installing", {
+      name: jobView.title,
+      percent: jobPercent,
+    });
+  })();
   const activePreview = opened ?? projectPreview;
 
   return (
@@ -1075,43 +1140,73 @@ export default function CreationsPage() {
                           ? t("creationsPage.actions.updatingCode")
                           : t("creationsPage.actions.updateCode")}
                       </button>
-                      {launchStatuses[creation.itemId]?.status === "running" ? (
+                      {installs[creation.itemId]?.status === "done" &&
+                      installs[creation.itemId]?.url ? (
+                        <>
+                          <button
+                            type="button"
+                            className="cr-act cr-act-primary"
+                            onClick={() =>
+                              openProjectPreview(
+                                creation.itemId,
+                                creation.title,
+                              )
+                            }
+                          >
+                            <Play size={13} />
+                            {t("creationsPage.actions.openApp")}
+                          </button>
+                          <button
+                            type="button"
+                            className="cr-act"
+                            onClick={() => void stopInstalled(creation.itemId)}
+                          >
+                            <Square size={13} />
+                            {t("creationsPage.actions.stopApp")}
+                          </button>
+                        </>
+                      ) : (
                         <>
                           <button
                             type="button"
                             className="cr-act"
-                            onClick={() => {
-                              const url = launchStatuses[creation.itemId]?.url;
-                              if (url) void openProjectPreview(creation);
-                            }}
+                            disabled={
+                              downloads[creation.itemId]?.status === "running"
+                            }
+                            onClick={() =>
+                              void startDownload(
+                                creation.itemId,
+                                creation.title,
+                              )
+                            }
                           >
-                            {t("creationsPage.actions.openPreview")}
+                            <Download size={13} />
+                            {downloads[creation.itemId]?.status === "running"
+                              ? t("creationsPage.actions.downloading", {
+                                  percent:
+                                    downloads[creation.itemId]?.percent ?? 0,
+                                })
+                              : downloads[creation.itemId]?.status === "done"
+                              ? t("creationsPage.actions.downloadAgain")
+                              : t("creationsPage.actions.download")}
                           </button>
                           <button
                             type="button"
-                            className="cr-act"
+                            className="cr-act cr-act-primary"
+                            title={t("creationsPage.job.installHint")}
+                            disabled={
+                              installs[creation.itemId]?.status === "running"
+                            }
                             onClick={() =>
-                              void launchProject(creation.itemId, true)
+                              void startInstall(creation.itemId, creation.title)
                             }
                           >
-                            {t("creationsPage.actions.stopPreview")}
+                            <Play size={13} />
+                            {installs[creation.itemId]?.status === "running"
+                              ? t("creationsPage.actions.installing")
+                              : t("creationsPage.actions.install")}
                           </button>
                         </>
-                      ) : (
-                        <button
-                          type="button"
-                          className="cr-act"
-                          disabled={
-                            launchStatuses[creation.itemId]?.status ===
-                            "starting"
-                          }
-                          onClick={() => void launchProject(creation.itemId)}
-                        >
-                          {launchStatuses[creation.itemId]?.status ===
-                          "starting"
-                            ? t("creationsPage.actions.startingPreview")
-                            : t("creationsPage.actions.startPreview")}
-                        </button>
                       )}
                     </>
                   )}
@@ -1476,6 +1571,105 @@ export default function CreationsPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {jobView && activeJob && (
+        <div className="cr-dialog-backdrop">
+          <div
+            className="cr-job"
+            role="dialog"
+            aria-modal="true"
+            aria-label={jobTitle}
+          >
+            <div className="cr-job-head">
+              <strong>{jobTitle}</strong>
+              <button
+                type="button"
+                aria-label={t("creationsPage.job.close")}
+                onClick={() => setJobView(null)}
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <div
+              className="cr-job-track"
+              role="progressbar"
+              aria-valuenow={jobPercent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              <span style={{ width: `${jobPercent}%` }} />
+            </div>
+            <p className="cr-job-message">
+              {activeJob.message || t("creationsPage.job.waiting")}
+            </p>
+            {activeJob.logs && (
+              <pre className="cr-job-logs">{activeJob.logs}</pre>
+            )}
+            <div className="cr-job-actions">
+              {activeJob.status === "running" && (
+                <button
+                  type="button"
+                  className="cr-act"
+                  onClick={() => void cancelJob()}
+                >
+                  {t("creationsPage.job.cancel")}
+                </button>
+              )}
+              {activeJob.status === "failed" && (
+                <button
+                  type="button"
+                  className="cr-act"
+                  onClick={() =>
+                    void (jobView.kind === "download"
+                      ? startDownload(jobView.itemId, jobView.title)
+                      : startInstall(jobView.itemId, jobView.title))
+                  }
+                >
+                  {t("creationsPage.job.retry")}
+                </button>
+              )}
+              {activeJob.status === "done" && jobView.kind === "download" && (
+                <button
+                  type="button"
+                  className="cr-act cr-act-primary"
+                  onClick={() => {
+                    const target = jobView;
+                    setJobView(null);
+                    void startInstall(target.itemId, target.title);
+                  }}
+                >
+                  {t("creationsPage.actions.install")}
+                </button>
+              )}
+              {activeJob.status === "done" && jobView.kind === "install" && (
+                <button
+                  type="button"
+                  className="cr-act cr-act-primary"
+                  onClick={() => {
+                    const url = installs[jobView.itemId]?.url;
+                    setJobView(null);
+                    if (url) {
+                      setOpenId(null);
+                      setProjectPreview({ title: jobView.title, url });
+                    }
+                  }}
+                >
+                  {t("creationsPage.actions.openApp")}
+                </button>
+              )}
+              {activeJob.status !== "running" && (
+                <button
+                  type="button"
+                  className="cr-act"
+                  onClick={() => setJobView(null)}
+                >
+                  {t("creationsPage.job.close")}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

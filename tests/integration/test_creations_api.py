@@ -320,3 +320,175 @@ async def test_trusted_project_launch_requires_admin_and_owned_profile(
     assert (
         await client.post(f"/api/creations/items/{unknown['item_id']}/launch", headers=admin_auth)
     ).status_code == 404
+
+
+async def test_repository_download_and_install_jobs(env: Any) -> None:
+    client, server, admin_auth = env
+    repo_url = "https://github.com/xdguo-design/data-upload-product"
+    item = (
+        await client.post(
+            "/api/creations/items",
+            headers=admin_auth,
+            json={"kind": "service", "name": "数据转换平台", "url": repo_url},
+        )
+    ).json()
+    platform = (
+        await client.post(
+            "/api/creations/items",
+            headers=admin_auth,
+            json={"kind": "platform", "name": "计划中的平台"},
+        )
+    ).json()
+
+    class ManagerStub:
+        def __init__(self) -> None:
+            self.download_tokens: list[str | None] = []
+            self.install_tokens: list[str | None] = []
+            self.stopped: list[str] = []
+
+        def has_profile(self, url: str) -> bool:
+            return url == repo_url
+
+        def download_status(
+            self, _url: str, _item_id: str | None = None
+        ) -> dict[str, str | int | None]:
+            return {
+                "status": "running",
+                "percent": 42,
+                "message": "正在下载代码",
+                "logs": None,
+            }
+
+        async def start_download(
+            self,
+            _url: str,
+            _item_id: str | None = None,
+            *,
+            access_token: str | None = None,
+            branch: str | None = None,
+        ) -> dict[str, str | int | None]:
+            self.download_tokens.append(access_token)
+            return {
+                "status": "running",
+                "percent": 0,
+                "message": "正在连接仓库",
+                "logs": None,
+            }
+
+        async def cancel_download(
+            self, _url: str, _item_id: str | None = None
+        ) -> dict[str, str | int | None]:
+            return {
+                "status": "cancelled",
+                "percent": 12,
+                "message": "已取消下载",
+                "logs": None,
+            }
+
+        def deploy_status(
+            self, _url: str, _item_id: str | None = None
+        ) -> dict[str, str | int | None]:
+            return {
+                "status": "done",
+                "percent": 100,
+                "message": "安装完成",
+                "logs": None,
+                "url": "http://127.0.0.1:4010",
+                "kind": "node",
+            }
+
+        async def start_deploy(
+            self,
+            _url: str,
+            _item_id: str | None = None,
+            *,
+            access_token: str | None = None,
+            branch: str | None = None,
+        ) -> dict[str, str | int | None]:
+            self.install_tokens.append(access_token)
+            return {
+                "status": "running",
+                "percent": 2,
+                "message": "准备代码",
+                "logs": None,
+                "url": None,
+                "kind": None,
+            }
+
+        async def stop(self, _url: str, item_id: str | None = None) -> dict[str, str | None]:
+            self.stopped.append(item_id or "")
+            return {"status": "stopped", "url": None, "logs": None}
+
+        async def close(self) -> None:
+            return None
+
+    manager = ManagerStub()
+    server.project_service_manager = manager
+    item_path = f"/api/creations/items/{item['item_id']}"
+
+    downloaded = await client.get(f"{item_path}/download", headers=admin_auth)
+    assert downloaded.status_code == 200
+    assert downloaded.json()["percent"] == 42
+
+    assert (await client.post(f"{item_path}/download", headers=admin_auth)).json()[
+        "status"
+    ] == "running"
+    assert manager.download_tokens == [None]
+
+    connector = await client.post(
+        "/api/connector-instances",
+        headers=admin_auth,
+        json={
+            "kind": "github",
+            "display_name": "GitHub",
+            "credentials": {"token": "ghp_read_only"},
+        },
+    )
+    assert connector.status_code == 201
+    assert (await client.post(f"{item_path}/download", headers=admin_auth)).status_code == 200
+    assert manager.download_tokens == [None, "ghp_read_only"]
+
+    cancelled = await client.delete(f"{item_path}/download", headers=admin_auth)
+    assert cancelled.json()["status"] == "cancelled"
+
+    installed = await client.get(f"{item_path}/install", headers=admin_auth)
+    assert installed.json()["url"] == "http://127.0.0.1:4010"
+    assert installed.json()["kind"] == "node"
+    assert (await client.post(f"{item_path}/install", headers=admin_auth)).json()["status"] == (
+        "running"
+    )
+    assert manager.install_tokens == ["ghp_read_only"]
+    assert (await client.delete(f"{item_path}/install", headers=admin_auth)).status_code == 200
+    assert manager.stopped == [item["item_id"]]
+
+    platform_path = f"/api/creations/items/{platform['item_id']}"
+    assert (await client.get(f"{platform_path}/download", headers=admin_auth)).status_code == 404
+    assert (await client.post(f"{platform_path}/install", headers=admin_auth)).status_code == 404
+
+    user_auth = await create_user(client, admin_auth, username="repo-user")
+    assert (await client.post(f"{item_path}/download", headers=user_auth)).status_code == 403
+    assert (await client.post(f"{item_path}/install", headers=user_auth)).status_code == 403
+
+
+async def test_repository_lookup_normalizes_cnb_urls_without_network(env: Any) -> None:
+    client, _server, admin_auth = env
+    found = await client.post(
+        "/api/creations/repositories/lookup",
+        headers=admin_auth,
+        json={"url": "https://cnb.cool/group/subgroup/octop.git"},
+    )
+    assert found.status_code == 200
+    assert found.json() == {
+        "url": "https://cnb.cool/group/subgroup/octop",
+        "name": "octop",
+        "description": None,
+        "default_branch": None,
+        "language": None,
+        "stars": None,
+    }
+    invalid = await client.post(
+        "/api/creations/repositories/lookup",
+        headers=admin_auth,
+        json={"url": "https://gitlab.com/group/repo"},
+    )
+    assert invalid.status_code == 422

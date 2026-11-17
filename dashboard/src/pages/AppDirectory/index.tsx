@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Alert, Button, Card, Empty, Input, Space, Spin } from "antd";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -6,6 +6,18 @@ import { useNavigate } from "react-router-dom";
 import PageShell from "../../layouts/PageShell";
 import { creationsApi, type CreationItem } from "../../api/modules/creations";
 import { BUILT_IN_CREATIONS } from "../Creations/builtInCreations";
+
+// Card bodies vary in text length; the description takes the slack so every
+// action button lands on the same baseline inside a grid row.
+const cardDescriptionStyle = {
+  margin: "0 0 16px",
+  minHeight: 42,
+  flex: 1,
+  fontSize: 13,
+  lineHeight: 1.6,
+  color: "var(--fn-text-secondary)",
+} as const;
+const cardActionStyle = { alignSelf: "flex-start", marginTop: "auto" } as const;
 
 export default function AppDirectoryPage() {
   const { t } = useTranslation();
@@ -55,15 +67,18 @@ export default function AppDirectoryPage() {
       subtitle={t("appDirectoryPage.subtitle")}
     >
       <Space direction="vertical" size="middle" style={{ width: "100%" }}>
-        <Button onClick={() => navigate("/creations")}>
-          {t("appDirectoryPage.manage")}
-        </Button>
-        <Input.Search
-          value={keyword}
-          onChange={(event) => setKeyword(event.target.value)}
-          placeholder={t("appDirectoryPage.search")}
-          allowClear
-        />
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Input.Search
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+            placeholder={t("appDirectoryPage.search")}
+            allowClear
+            style={{ flex: "0 1 360px", minWidth: 0 }}
+          />
+          <Button onClick={() => navigate("/creations")}>
+            {t("appDirectoryPage.manage")}
+          </Button>
+        </div>
         {error && (
           <Alert
             type="error"
@@ -96,18 +111,40 @@ export default function AppDirectoryPage() {
         >
           {applications.map((app) =>
             app.type === "app" && app.route ? (
-              <Card key={app.id} title={t(app.titleKey)}>
-                <p>{t(app.descriptionKey)}</p>
-                <Button onClick={() => navigate(app.route!)}>
+              <Card
+                key={app.id}
+                title={t(app.titleKey)}
+                hoverable
+                style={{ display: "flex", flexDirection: "column" }}
+                styles={{
+                  body: { display: "flex", flexDirection: "column", flex: 1 },
+                }}
+              >
+                <p style={cardDescriptionStyle}>{t(app.descriptionKey)}</p>
+                <Button
+                  style={cardActionStyle}
+                  onClick={() => navigate(app.route!)}
+                >
                   {t("appDirectoryPage.open")}
                 </Button>
               </Card>
             ) : null,
           )}
           {userItems.map((item) => (
-            <Card key={item.item_id} title={item.name}>
-              <p>{item.description}</p>
-              <Button onClick={() => navigate("/creations")}>
+            <Card
+              key={item.item_id}
+              title={item.name}
+              hoverable
+              style={{ display: "flex", flexDirection: "column" }}
+              styles={{
+                body: { display: "flex", flexDirection: "column", flex: 1 },
+              }}
+            >
+              <p style={cardDescriptionStyle}>{item.description}</p>
+              <Button
+                style={cardActionStyle}
+                onClick={() => navigate("/creations")}
+              >
                 {t("appDirectoryPage.manage")}
               </Button>
             </Card>

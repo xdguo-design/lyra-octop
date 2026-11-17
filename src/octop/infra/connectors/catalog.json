@@ -721,6 +721,27 @@
         "zh": "创建具有仓库读取权限的 CNB Access Token。Octop 仅使用它执行 Git 克隆和拉取，并在启动或更新项目时验证令牌。"
       },
       "allowed_tools": []
+    },
+    {
+      "kind": "github",
+      "name": { "en": "GitHub Repositories", "zh": "GitHub 代码仓库" },
+      "description": {
+        "en": "Connect a GitHub account to clone private repositories and read repository metadata",
+        "zh": "连接 GitHub 账号，克隆私有仓库并读取仓库信息"
+      },
+      "auth_kind": "personal_token",
+      "doc_url": "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens",
+      "icon": "github",
+      "color": "#24292f",
+      "phase": "available",
+      "mcp_mode": "gateway",
+      "category": "self_hosted",
+      "manual_url": "https://github.com/settings/tokens",
+      "auth_hint": {
+        "en": "Create a fine-grained personal access token with read-only Contents access. Octop uses it only for Git clone, pull and repository lookup; public repositories work without a token.",
+        "zh": "创建仅授予「Contents 只读」权限的细粒度访问令牌。Octop 仅使用它执行 Git 克隆、拉取和仓库信息查询；公开仓库无需令牌。"
+      },
+      "allowed_tools": []
     }
   ]
 }

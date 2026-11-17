@@ -199,29 +199,44 @@
 }
 .cr-act {
   padding: 4px 8px;
-  border: 1px solid var(--fn-border-primary);
+  border: 1px solid transparent;
   border-radius: 7px;
-  background: var(--fn-bg-container);
-  color: var(--fn-text-secondary);
+  background: transparent;
+  color: var(--fn-text-tertiary);
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
+  transition:
+    background var(--fn-transition-fast),
+    color var(--fn-transition-fast);
 }
 .cr-act:hover {
-  border-color: var(--fn-color-brand-border);
+  border-color: transparent;
   background: var(--fn-bg-secondary-hover);
+  color: var(--fn-text-primary);
+}
+.cr-act:focus-visible {
+  outline: 2px solid var(--fn-color-brand);
+  outline-offset: 1px;
 }
 .cr-star {
   margin-left: auto;
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  border: 1px solid var(--fn-border-primary);
-  border-radius: 8px;
-  background: var(--fn-bg-container);
-  color: var(--fn-text-tertiary);
+  width: 26px;
+  height: 26px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fn-text-quaternary);
   cursor: pointer;
+  transition:
+    background var(--fn-transition-fast),
+    color var(--fn-transition-fast);
+}
+.cr-star:hover {
+  background: var(--fn-bg-secondary-hover);
+  color: var(--fn-text-secondary);
 }
 .cr-star.is-starred {
   color: var(--fn-color-warning);
@@ -339,13 +354,83 @@
   line-height: 1.5;
 }
 .cr-act-primary {
-  border-color: var(--fn-color-brand);
+  border-color: transparent;
   background: var(--fn-color-brand);
   color: var(--fn-color-on-brand);
+  font-weight: 500;
 }
 .cr-act-primary:hover {
-  border-color: var(--fn-color-brand-hover);
+  border-color: transparent;
   background: var(--fn-color-brand-hover);
+  color: var(--fn-color-on-brand);
+}
+
+.cr-job {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(420px, 100%);
+  padding: 18px 20px;
+  border: 1px solid var(--fn-border-primary);
+  border-radius: var(--fn-radius-xl);
+  background: var(--fn-bg-elevated);
+  box-shadow: 0 18px 60px var(--fn-color-brand-shadow);
+}
+.cr-job-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--fn-text-primary);
+  font-size: 14px;
+}
+.cr-job-head button {
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+  color: var(--fn-text-secondary);
+  cursor: pointer;
+}
+.cr-job-track {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--fn-bg-secondary);
+}
+.cr-job-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--fn-color-brand);
+  transition: width 0.3s ease;
+}
+.cr-job-message {
+  margin: 0;
+  color: var(--fn-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+.cr-job-logs {
+  max-height: 96px;
+  margin: 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border-radius: var(--fn-radius-md);
+  background: var(--fn-bg-secondary);
+  color: var(--fn-text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.cr-job-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .cr-card-soon {

@@ -4,6 +4,7 @@ import asyncio
 import sys
 from pathlib import Path
 
+import httpx
 import pytest
 
 from octop.infra.workbench.project_service import (
@@ -398,3 +399,43 @@ async def test_cnb_git_auth_uses_and_removes_temporary_credentials(
     credential_file = captured["credential_file"]
     assert isinstance(credential_file, Path)
     assert not credential_file.exists()
+
+
+@pytest.mark.asyncio
+async def test_auto_deploy_serves_a_static_checkout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_root = tmp_path / "projects"
+    checkout = project_root / "github" / "demo" / "site" / "0123456789abcdef"
+    checkout.mkdir(parents=True)
+    (checkout / "index.html").write_text("<html><body>hello-octop</body></html>", encoding="utf-8")
+    manager = ProjectServiceManager(None, {}, project_root)
+    monkeypatch.setattr(
+        manager, "_docker_names", lambda _url, _pid: (checkout, "container", "image")
+    )
+    repository = "https://github.com/demo/site"
+
+    try:
+        started = await manager.start_deploy(repository, "item-static")
+        assert started["status"] == "running"
+
+        status = manager.deploy_status(repository, "item-static")
+        for _ in range(100):
+            if status["status"] in {"done", "failed"}:
+                break
+            await asyncio.sleep(0.1)
+            status = manager.deploy_status(repository, "item-static")
+
+        assert status["status"] == "done", status.get("message")
+        assert status["percent"] == 100
+        assert isinstance(status["url"], str)
+        assert manager.status(repository, "item-static")["status"] == "running"
+
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(str(status["url"]))
+        assert "hello-octop" in response.text
+    finally:
+        await manager.stop_deploy(repository, "item-static")
+        await manager.close()
+
+    assert manager.deploy_status(repository, "item-static")["url"] is None

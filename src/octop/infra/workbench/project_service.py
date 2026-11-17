@@ -8,12 +8,15 @@ import os
 import re
 import secrets
 import shlex
+import shutil
 import signal
 import socket
 import subprocess
+import sys
 import tempfile
 from collections import deque
-from contextlib import suppress
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass, field
 from pathlib import Path, PureWindowsPath
 from typing import Any
@@ -22,6 +25,12 @@ from urllib.parse import quote, urlsplit
 import httpx
 
 from octop.infra.utils import posix_compat
+from octop.infra.workbench.deploy_plan import (
+    PORT_PLACEHOLDER,
+    DeployCommand,
+    detect_deploy_plan,
+    static_start,
+)
 
 _REPO_SEGMENT_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 _REPO_HOSTS = {"github.com", "cnb.cool"}
@@ -31,6 +40,18 @@ _MAX_LOG_BYTES = 8192
 _START_TIMEOUT = 30.0
 _DOCKER_BUILD_TIMEOUT = 900.0
 _DOCKER_START_TIMEOUT = 60.0
+_DEPLOY_INSTALL_TIMEOUT = 900.0
+_DEPLOY_HEALTH_TIMEOUT = 120.0
+_GIT_PROGRESS_RE = re.compile(
+    r"(Counting objects|Compressing objects|Receiving objects|Resolving deltas):\s+(\d+)%"
+)
+# Overall download percent attributed to each git phase.
+_GIT_PHASE_RANGES = {
+    "Counting objects": (0, 8),
+    "Compressing objects": (8, 20),
+    "Receiving objects": (20, 92),
+    "Resolving deltas": (92, 100),
+}
 _PREVIEW_DOMAIN_LABEL_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 _CHILD_ENV_KEYS = {
     "APPDATA",
@@ -99,6 +120,53 @@ class _DockerRuntime:
     upstream_url: str | None = None
     preview_token: str | None = None
     logs: deque[str] = field(default_factory=lambda: deque(maxlen=2))
+
+
+@dataclass
+class _JobState:
+    """Progress of a one-shot background job (code download)."""
+
+    status: str = "idle"  # idle | running | done | failed | cancelled
+    percent: int = 0
+    message: str = ""
+    logs: deque[str] = field(default_factory=lambda: deque(maxlen=12))
+    task: asyncio.Task[None] | None = None
+    process: asyncio.subprocess.Process | None = None
+    temp_dir: str | None = None
+
+    def snapshot(self) -> dict[str, str | int | None]:
+        return {
+            "status": self.status,
+            "percent": max(0, min(100, self.percent)),
+            "message": self.message or None,
+            "logs": "\n".join(self.logs)[-_MAX_LOG_BYTES:] or None,
+        }
+
+
+@dataclass
+class _DeployRuntime:
+    """Auto-deployed checkout: install/build commands plus the serving process."""
+
+    repository_url: str
+    project_id: str | None
+    job: _JobState = field(default_factory=_JobState)
+    status: str = "stopped"  # stopped | starting | running | failed
+    url: str | None = None
+    upstream_url: str | None = None
+    preview_token: str | None = None
+    kind: str | None = None
+    processes: list[_RunningProcess] = field(default_factory=list)
+    thumbnail_origins: tuple[str, ...] = ()
+
+
+def parse_git_progress(line: str) -> int | None:
+    """Map a ``git --progress`` stderr line onto an overall 0-100 percent."""
+    match = _GIT_PROGRESS_RE.search(line)
+    if match is None:
+        return None
+    low, high = _GIT_PHASE_RANGES[match.group(1)]
+    phase = min(100, int(match.group(2)))
+    return low + round((high - low) * phase / 100)
 
 
 def normalize_repository_url(value: str) -> str | None:
@@ -305,6 +373,29 @@ async def _terminate(running: _RunningProcess) -> None:
         await asyncio.gather(running.reader_task, return_exceptions=True)
 
 
+async def _kill_process(process: asyncio.subprocess.Process) -> None:
+    """Stop a helper process (git, installers) without raising."""
+    if process.returncode is not None:
+        return
+    if os.name == "nt":
+        with suppress(OSError):
+            killer = await asyncio.create_subprocess_exec(
+                "taskkill",
+                "/PID",
+                str(process.pid),
+                "/T",
+                "/F",
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await killer.wait()
+    else:
+        with suppress(ProcessLookupError):
+            posix_compat.killpg(process.pid, signal.SIGTERM)
+    with suppress(TimeoutError):
+        await asyncio.wait_for(process.wait(), timeout=5)
+
+
 class ProjectServiceManager:
     def __init__(
         self,
@@ -319,11 +410,29 @@ class ProjectServiceManager:
         self._project_root = Path(project_root) if project_root is not None else None
         self._preview_domain = _normalize_preview_domain(preview_domain)
         self._docker_runtimes: dict[tuple[str, str | None], _DockerRuntime] = {}
+        self._downloads: dict[tuple[str, str | None], _JobState] = {}
+        self._deploys: dict[tuple[str, str | None], _DeployRuntime] = {}
         self._lock = asyncio.Lock()
 
     def status(self, repository_url: str, project_id: str | None = None) -> dict[str, str | None]:
         key = normalize_repository_url(repository_url)
         if key is not None and key not in self._profiles:
+            deploy_runtime = self._deploys.get((key, project_id))
+            if deploy_runtime is not None and deploy_runtime.status in {
+                "starting",
+                "running",
+                "failed",
+            }:
+                if deploy_runtime.status == "running" and any(
+                    item.process.returncode is not None for item in deploy_runtime.processes
+                ):
+                    deploy_runtime.status = "failed"
+                    deploy_runtime.url = None
+                return {
+                    "status": deploy_runtime.status,
+                    "url": deploy_runtime.url,
+                    "logs": "\n".join(deploy_runtime.job.logs)[-_MAX_LOG_BYTES:] or None,
+                }
             docker_runtime = self._docker_runtimes.get((key, project_id))
             return {
                 "status": docker_runtime.status if docker_runtime else "stopped",
@@ -355,6 +464,13 @@ class ProjectServiceManager:
     ) -> tuple[str, ...]:
         key = normalize_repository_url(repository_url)
         if key is not None and key not in self._profiles:
+            deploy_runtime = self._deploys.get((key, project_id))
+            if (
+                deploy_runtime is not None
+                and deploy_runtime.status == "running"
+                and deploy_runtime.upstream_url
+            ):
+                return (deploy_runtime.upstream_url,)
             docker_runtime = self._docker_runtimes.get((key, project_id))
             return (
                 (docker_runtime.upstream_url,)
@@ -374,6 +490,13 @@ class ProjectServiceManager:
         token = self._preview_token_from_host(host)
         if token is None:
             return None
+        for deploy_runtime in self._deploys.values():
+            if (
+                deploy_runtime.preview_token == token
+                and deploy_runtime.status == "running"
+                and deploy_runtime.upstream_url
+            ):
+                return deploy_runtime.upstream_url
         for runtime in self._docker_runtimes.values():
             if (
                 runtime.preview_token == token
@@ -465,6 +588,392 @@ class ProjectServiceManager:
                 runtime.status = "failed"
                 raise RuntimeError(_redact_log("\n".join(runtime.logs).encode())) from exc
 
+    # ------------------------------------------------------------------
+    # Code download (with progress) and auto deploy
+    # ------------------------------------------------------------------
+
+    def _project_key(self, repository_url: str, project_id: str | None) -> tuple[str, str | None]:
+        key = normalize_repository_url(repository_url)
+        if key is None or self._project_root is None:
+            raise KeyError("project repository is not supported")
+        return key, project_id
+
+    def download_status(
+        self, repository_url: str, project_id: str | None = None
+    ) -> dict[str, str | int | None]:
+        key, item = self._project_key(repository_url, project_id)
+        job = self._downloads.get((key, item))
+        return job.snapshot() if job is not None else _JobState().snapshot()
+
+    async def start_download(
+        self,
+        repository_url: str,
+        project_id: str | None = None,
+        *,
+        access_token: str | None = None,
+        branch: str | None = None,
+    ) -> dict[str, str | int | None]:
+        key, item = self._project_key(repository_url, project_id)
+        job = self._downloads.get((key, item))
+        if job is not None and job.status == "running":
+            return job.snapshot()
+        checkout, _container, _image = self._docker_names(key, item)
+        job = _JobState(status="running", percent=0, message="正在连接仓库")
+        self._downloads[(key, item)] = job
+        job.task = asyncio.create_task(
+            self._run_download(
+                key,
+                item,
+                checkout,
+                job,
+                access_token,
+                normalize_repository_branch(branch),
+            )
+        )
+        return job.snapshot()
+
+    async def cancel_download(
+        self, repository_url: str, project_id: str | None = None
+    ) -> dict[str, str | int | None]:
+        key, item = self._project_key(repository_url, project_id)
+        job = self._downloads.get((key, item))
+        if job is None:
+            return _JobState().snapshot()
+        if job.status == "running":
+            if job.process is not None:
+                await _kill_process(job.process)
+            if job.task is not None:
+                job.task.cancel()
+                await asyncio.gather(job.task, return_exceptions=True)
+            job.status = "cancelled"
+            job.message = "已取消下载"
+        return job.snapshot()
+
+    async def _run_download(
+        self,
+        key: str,
+        project_id: str | None,
+        checkout: Path,
+        job: _JobState,
+        access_token: str | None,
+        branch: str | None,
+    ) -> None:
+        host = urlsplit(key).hostname or "cnb.cool"
+        temp_dir: str | None = None
+        try:
+            if checkout.is_dir() and not checkout.is_symlink():
+                job.status = "done"
+                job.percent = 100
+                job.message = "代码已在本地"
+                return
+            checkout.parent.mkdir(parents=True, exist_ok=True)
+            temp_dir = tempfile.mkdtemp(prefix="octop-clone-", dir=checkout.parent)
+            job.temp_dir = temp_dir
+            target = Path(temp_dir) / "source"
+            args = ["clone", "--depth", "1", "--progress"]
+            if branch:
+                args.extend(("--branch", branch))
+            args.extend((key, str(target)))
+            async with self._credential_args(access_token, host) as extra:
+                process = await asyncio.create_subprocess_exec(
+                    "git",
+                    *extra,
+                    *args,
+                    cwd=str(checkout.parent),
+                    env=_child_environment(),
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.PIPE,
+                    start_new_session=os.name == "posix",
+                    creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
+                )
+                job.process = process
+                job.message = "正在下载代码"
+                assert process.stderr is not None
+                buffer = ""
+                while True:
+                    chunk = await process.stderr.read(4096)
+                    if not chunk:
+                        break
+                    buffer += chunk.decode("utf-8", errors="replace")
+                    lines = re.split(r"[\r\n]", buffer)
+                    buffer = lines.pop()
+                    for line in lines:
+                        text = line.strip()
+                        if not text:
+                            continue
+                        percent = parse_git_progress(text)
+                        if percent is not None:
+                            job.percent = max(job.percent, percent)
+                        elif text.startswith(("Cloning into", "remote:", "warning:")):
+                            job.logs.append(text[:200])
+                code = await process.wait()
+            if code != 0:
+                raise RuntimeError("git clone 失败，请检查仓库权限或网络")
+            target.replace(checkout)
+            job.percent = 100
+            job.status = "done"
+            job.message = "下载完成"
+        except asyncio.CancelledError:
+            job.status = "cancelled"
+            job.message = "已取消下载"
+        except Exception as exc:
+            job.status = "failed"
+            job.message = _redact_log(str(exc).encode())[:400]
+        finally:
+            job.process = None
+            job.temp_dir = None
+            if temp_dir is not None:
+                with suppress(OSError):
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def deploy_status(
+        self, repository_url: str, project_id: str | None = None
+    ) -> dict[str, str | int | None]:
+        key, item = self._project_key(repository_url, project_id)
+        runtime = self._deploys.get((key, item))
+        if runtime is None:
+            snapshot = _JobState().snapshot()
+            snapshot.update({"url": None, "kind": None})
+            return snapshot
+        snapshot = runtime.job.snapshot()
+        snapshot["url"] = runtime.url if runtime.status == "running" else None
+        snapshot["kind"] = runtime.kind
+        return snapshot
+
+    async def start_deploy(
+        self,
+        repository_url: str,
+        project_id: str | None = None,
+        *,
+        access_token: str | None = None,
+        branch: str | None = None,
+    ) -> dict[str, str | int | None]:
+        key, item = self._project_key(repository_url, project_id)
+        runtime = self._deploys.setdefault((key, item), _DeployRuntime(key, item))
+        if runtime.job.status == "running":
+            return self.deploy_status(key, item)
+        await self._stop_deploy_runtime(runtime)
+        runtime.status = "starting"
+        runtime.url = None
+        runtime.upstream_url = None
+        runtime.job = _JobState(status="running", percent=2, message="准备代码")
+        runtime.job.task = asyncio.create_task(
+            self._run_deploy(
+                key,
+                item,
+                runtime,
+                access_token,
+                normalize_repository_branch(branch),
+            )
+        )
+        return self.deploy_status(key, item)
+
+    async def stop_deploy(
+        self, repository_url: str, project_id: str | None = None
+    ) -> dict[str, str | int | None]:
+        key, item = self._project_key(repository_url, project_id)
+        runtime = self._deploys.get((key, item))
+        if runtime is not None:
+            if runtime.job.task is not None and runtime.job.status == "running":
+                runtime.job.task.cancel()
+                await asyncio.gather(runtime.job.task, return_exceptions=True)
+            await self._stop_deploy_runtime(runtime)
+            runtime.status = "stopped"
+            if runtime.job.status != "cancelled":
+                runtime.job.status = "idle"
+                runtime.job.percent = 0
+            runtime.job.message = "已停止"
+        return self.deploy_status(key, item)
+
+    async def _run_deploy(
+        self,
+        key: str,
+        project_id: str | None,
+        runtime: _DeployRuntime,
+        access_token: str | None,
+        branch: str | None,
+    ) -> None:
+        job = runtime.job
+        try:
+            checkout, _container, _image = self._docker_names(key, project_id)
+            if not checkout.is_dir():
+                job.message = "下载代码"
+                await self._clone_project(key, checkout, access_token, branch)
+            job.percent = 12
+            job.message = "识别项目类型"
+            plan = detect_deploy_plan(checkout)
+            runtime.kind = plan.kind
+            if plan.kind == "docker":
+                job.message = "构建并启动 Docker 镜像"
+                job.percent = 20
+                status = await self._start_docker_project(key, project_id, access_token)
+                runtime.status = str(status["status"])
+                job.status = "done" if runtime.status == "running" else "failed"
+                job.percent = 100 if job.status == "done" else job.percent
+                job.message = "安装完成" if job.status == "done" else "Docker 启动失败"
+                return
+            if plan.install:
+                job.message = "安装依赖"
+                await self._run_plan_commands(runtime, checkout, plan.install, job, 12, 55)
+            if plan.build:
+                job.message = "构建项目"
+                await self._run_plan_commands(runtime, checkout, plan.build, job, 55, 80)
+            start = plan.start
+            for directory in plan.static_dirs:
+                if (checkout / directory / "index.html").is_file():
+                    start = static_start(directory)
+                    break
+            if start is None:
+                raise RuntimeError("构建完成但没有可启动的产物")
+            job.message = "启动服务"
+            job.percent = 88
+            port = _free_port()
+            await self._spawn_plan_process(runtime, checkout, start, port)
+            upstream = f"http://127.0.0.1:{port}"
+            runtime.upstream_url = upstream
+            runtime.thumbnail_origins = (upstream,)
+            job.message = "等待服务就绪"
+            await self._wait_deploy_health(upstream + plan.health_path, runtime)
+            if self._preview_domain:
+                runtime.preview_token = runtime.preview_token or secrets.token_hex(24)
+                runtime.url = f"https://{runtime.preview_token}.{self._preview_domain}"
+            else:
+                runtime.url = upstream
+            runtime.status = "running"
+            job.status = "done"
+            job.percent = 100
+            job.message = "安装完成"
+        except asyncio.CancelledError:
+            await self._stop_deploy_runtime(runtime)
+            runtime.status = "stopped"
+            job.status = "cancelled"
+            job.message = "已取消安装"
+        except Exception as exc:
+            await self._stop_deploy_runtime(runtime)
+            runtime.status = "failed"
+            job.status = "failed"
+            job.message = _redact_log(str(exc).encode())[:400]
+            job.logs.append(job.message)
+
+    async def _run_plan_commands(
+        self,
+        runtime: _DeployRuntime,
+        checkout: Path,
+        commands: tuple[DeployCommand, ...],
+        job: _JobState,
+        start_pct: int,
+        end_pct: int,
+    ) -> None:
+        step = (end_pct - start_pct) / max(1, len(commands))
+        for index, command in enumerate(commands):
+            cwd = (checkout / command.cwd).resolve()
+            if not cwd.is_dir() or not cwd.is_relative_to(checkout.resolve()):
+                raise RuntimeError("安装命令的工作目录不在项目内")
+            job.logs.append(f"$ {command.command} {' '.join(command.args)}".strip()[:200])
+            process = await asyncio.create_subprocess_exec(
+                self._resolve_program(command.command, checkout),
+                *command.args,
+                cwd=cwd,
+                env=_child_environment(),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                start_new_session=os.name == "posix",
+                creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
+            )
+            output = await self._collect_output(process, job, _DEPLOY_INSTALL_TIMEOUT)
+            if process.returncode:
+                raise RuntimeError(output[-400:] or f"{command.command} 执行失败")
+            job.percent = int(start_pct + step * (index + 1))
+
+    @staticmethod
+    async def _collect_output(
+        process: asyncio.subprocess.Process, job: _JobState, timeout: float
+    ) -> str:
+        assert process.stdout is not None
+        output = bytearray()
+
+        async def read_output() -> None:
+            assert process.stdout is not None
+            while chunk := await process.stdout.read(4096):
+                output.extend(chunk)
+                if len(output) > _MAX_LOG_BYTES:
+                    del output[:-_MAX_LOG_BYTES]
+
+        try:
+            await asyncio.wait_for(asyncio.gather(read_output(), process.wait()), timeout)
+        except TimeoutError:
+            await _kill_process(process)
+            raise RuntimeError("安装超时，请检查网络或依赖配置") from None
+        text = _redact_log(bytes(output))
+        for line in text.splitlines()[-4:]:
+            if line.strip():
+                job.logs.append(line.strip()[:200])
+        return text
+
+    @staticmethod
+    def _resolve_program(command: str, checkout: Path) -> str:
+        if "/" in command or "\\" in command:
+            candidate = (checkout / command).resolve()
+            if not candidate.is_relative_to(checkout.resolve()) or not candidate.is_file():
+                raise RuntimeError(f"找不到命令 {command}")
+            return str(candidate)
+        if command == "python":
+            return sys.executable
+        found = shutil.which(command)
+        if found is None:
+            raise RuntimeError(f"本机没有安装 {command}")
+        return found
+
+    async def _spawn_plan_process(
+        self,
+        runtime: _DeployRuntime,
+        checkout: Path,
+        command: DeployCommand,
+        port: int,
+    ) -> None:
+        cwd = (checkout / command.cwd).resolve()
+        if not cwd.is_dir() or not cwd.is_relative_to(checkout.resolve()):
+            raise RuntimeError("启动命令的工作目录不在项目内")
+        env = _child_environment()
+        env["PORT"] = str(port)
+        env["HOST"] = "127.0.0.1"
+        args = [arg.replace(PORT_PLACEHOLDER, str(port)) for arg in command.args]
+        process = await asyncio.create_subprocess_exec(
+            self._resolve_program(command.command, checkout),
+            *args,
+            cwd=cwd,
+            env=env,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            start_new_session=os.name == "posix",
+            creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
+        )
+        running = _RunningProcess(process)
+        runtime.processes.append(running)
+        running.reader_task = asyncio.create_task(_read_output(running))
+
+    async def _wait_deploy_health(self, url: str, runtime: _DeployRuntime) -> None:
+        async with httpx.AsyncClient(timeout=1.0) as client:
+            async with asyncio.timeout(_DEPLOY_HEALTH_TIMEOUT):
+                while True:
+                    if any(item.process.returncode is not None for item in runtime.processes):
+                        raise RuntimeError("服务启动后立即退出，请查看日志")
+                    try:
+                        response = await client.get(url)
+                        if response.status_code < 500:
+                            return
+                    except httpx.HTTPError:
+                        pass
+                    await asyncio.sleep(0.3)
+
+    async def _stop_deploy_runtime(self, runtime: _DeployRuntime) -> None:
+        for process in reversed(runtime.processes):
+            await _terminate(process)
+        runtime.processes.clear()
+        runtime.url = None
+        runtime.upstream_url = None
+        runtime.thumbnail_origins = ()
+
     def _docker_names(self, repository_url: str, project_id: str | None) -> tuple[Path, str, str]:
         if self._project_root is None:
             raise RuntimeError("Docker project previews are not configured")
@@ -529,24 +1038,33 @@ class ProjectServiceManager:
             return ""
         return text.strip()
 
+    @asynccontextmanager
+    async def _credential_args(
+        self, access_token: str | None, host: str
+    ) -> AsyncIterator[list[str]]:
+        """Yield ``git -c`` arguments that supply a stored token for ``host``."""
+        if access_token is None:
+            yield []
+            return
+        username = "x-access-token" if host == "github.com" else "cnb"
+        with tempfile.TemporaryDirectory(prefix="octop-git-auth-") as temp:
+            credentials = Path(temp) / "credentials"
+            credentials.write_text(
+                f"https://{username}:{quote(access_token, safe='')}@{host}\n", encoding="utf-8"
+            )
+            helper = f"store --file={shlex.quote(str(credentials))}"
+            yield ["-c", f"credential.helper={helper}"]
+
     async def _git_command(
         self,
         access_token: str | None,
         *args: str,
+        host: str = "cnb.cool",
         cwd: Path | None = None,
         timeout: float = 30.0,
     ) -> str:
-        if access_token is None:
-            return await self._docker_command("git", *args, cwd=cwd, timeout=timeout)
-        with tempfile.TemporaryDirectory(prefix="octop-git-auth-") as temp:
-            credentials = Path(temp) / "credentials"
-            credentials.write_text(
-                f"https://cnb:{quote(access_token, safe='')}@cnb.cool\n", encoding="utf-8"
-            )
-            helper = f"store --file={shlex.quote(str(credentials))}"
-            return await self._docker_command(
-                "git", "-c", f"credential.helper={helper}", *args, cwd=cwd, timeout=timeout
-            )
+        async with self._credential_args(access_token, host) as extra:
+            return await self._docker_command("git", *extra, *args, cwd=cwd, timeout=timeout)
 
     async def _clone_project(
         self,
@@ -566,7 +1084,12 @@ class ProjectServiceManager:
             if branch:
                 args.extend(("--branch", branch))
             args.extend((repository_url, str(target)))
-            await self._git_command(access_token, *args, timeout=180)
+            await self._git_command(
+                access_token,
+                *args,
+                host=urlsplit(repository_url).hostname or "cnb.cool",
+                timeout=180,
+            )
             target.replace(checkout)
 
     async def update(
@@ -581,6 +1104,7 @@ class ProjectServiceManager:
         key = normalize_repository_url(repository_url)
         if key is None:
             raise KeyError("project repository is not updateable")
+        host = urlsplit(key).hostname or "cnb.cool"
         branch = normalize_repository_branch(repository_branch)
         if repository_branch is not None and branch is None:
             raise RuntimeError("project repository branch is invalid")
@@ -613,6 +1137,7 @@ class ProjectServiceManager:
                         "--symref",
                         "origin",
                         "HEAD",
+                        host=host,
                         cwd=checkout,
                     )
                     match = re.search(r"^ref: refs/heads/(\S+)\s+HEAD$", refs, re.MULTILINE)
@@ -630,6 +1155,7 @@ class ProjectServiceManager:
                         "1",
                         "origin",
                         f"+refs/heads/{branch}:refs/remotes/origin/{branch}",
+                        host=host,
                         cwd=checkout,
                     )
                     local_branch = await self._docker_command(
@@ -653,12 +1179,13 @@ class ProjectServiceManager:
                     "--ff-only",
                     "origin",
                     branch,
+                    host=host,
                     timeout=180,
                     cwd=checkout,
                 )
             else:
                 await self._git_command(
-                    access_token, "pull", "--ff-only", timeout=180, cwd=checkout
+                    access_token, "pull", "--ff-only", host=host, timeout=180, cwd=checkout
                 )
             if source_only:
                 return
@@ -863,6 +1390,15 @@ class ProjectServiceManager:
         if key not in self._profiles:
             if self._project_root is None:
                 raise KeyError("project launch profile not found")
+            deploy_runtime = self._deploys.get((key, project_id))
+            if deploy_runtime is not None:
+                if deploy_runtime.job.task is not None and deploy_runtime.job.status == "running":
+                    deploy_runtime.job.task.cancel()
+                    await asyncio.gather(deploy_runtime.job.task, return_exceptions=True)
+                await self._stop_deploy_runtime(deploy_runtime)
+                deploy_runtime.status = "stopped"
+                if deploy_runtime.job.status != "cancelled":
+                    deploy_runtime.job.status = "idle"
             _, container, _ = self._docker_names(key, project_id)
             async with self._lock:
                 try:
@@ -895,6 +1431,15 @@ class ProjectServiceManager:
                 await self._stop_runtime(process_runtime)
                 process_runtime.status = "stopped"
                 process_runtime.logs.clear()
+            for deploy_runtime in self._deploys.values():
+                if deploy_runtime.job.task is not None and deploy_runtime.job.status == "running":
+                    deploy_runtime.job.task.cancel()
+                    await asyncio.gather(deploy_runtime.job.task, return_exceptions=True)
+                await self._stop_deploy_runtime(deploy_runtime)
+                deploy_runtime.status = "stopped"
+            for job in self._downloads.values():
+                if job.process is not None:
+                    await _kill_process(job.process)
         for docker_runtime in self._docker_runtimes.values():
             if docker_runtime.status == "running" or docker_runtime.status == "starting":
                 try:

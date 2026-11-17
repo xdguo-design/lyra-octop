@@ -196,6 +196,23 @@ describe("CreationsPage", () => {
     expect(screen.queryByTitle("智能入院登记 · 作品")).toBeNull();
   });
 
+  it("opens the patient appointment mini program from the built-in card", async () => {
+    renderPage();
+    const card = await screen
+      .findByText("患者预约小程序")
+      .then((node) => node.closest(".cr-card") as HTMLElement);
+
+    fireEvent.click(
+      within(card).getByRole("button", { name: "打开 患者预约小程序" }),
+    );
+
+    expect(
+      (screen.getByTitle("患者预约小程序 · 作品") as HTMLIFrameElement).getAttribute(
+        "src",
+      ),
+    ).toBe("/patient-appointment/index.html");
+  });
+
   it("copies the admission-registration app as an absolute URL", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal("isSecureContext", true);
@@ -217,13 +234,13 @@ describe("CreationsPage", () => {
     );
   });
 
-  it("embeds a registered GitHub project preview and returns to Creations", async () => {
+  it("installs a registered GitHub project and opens it in place", async () => {
     const itemId = "project-1";
     const previewUrl = "http://127.0.0.1:8090/";
     const openSpy = vi.spyOn(window, "open").mockReturnValue(null);
+    let installReads = 0;
     mocks.request.mockImplementation((path: string, options?: RequestInit) => {
       if (path === "/auth/me") return Promise.resolve({ role: "admin" });
-      if (path === "/agents") return Promise.resolve([]);
       if (path === "/creations") {
         return Promise.resolve({
           folders: [],
@@ -244,51 +261,80 @@ describe("CreationsPage", () => {
           card_meta: {},
         });
       }
-      if (
-        path.endsWith(`/creations/items/${itemId}/launch`) &&
-        options?.method === "POST"
-      ) {
+      if (path.endsWith(`/creations/items/${itemId}/download`)) {
         return Promise.resolve({
-          status: "running",
-          url: previewUrl,
+          status: "done",
+          percent: 100,
+          message: "下载完成",
           logs: null,
-          thumbnail_url: null,
         });
       }
-      if (
-        path.endsWith(`/creations/items/${itemId}/launch`) &&
-        options?.method === "DELETE"
-      ) {
-        return Promise.resolve({
-          status: "stopped",
-          url: null,
-          logs: null,
-          thumbnail_url: null,
-        });
+      if (path.endsWith(`/creations/items/${itemId}/install`)) {
+        if (options?.method === "POST") {
+          return Promise.resolve({
+            status: "running",
+            percent: 2,
+            message: "准备代码",
+            logs: null,
+            url: null,
+            kind: null,
+          });
+        }
+        if (options?.method === "DELETE") {
+          return Promise.resolve({
+            status: "idle",
+            percent: 0,
+            message: "已停止",
+            logs: null,
+            url: null,
+            kind: null,
+          });
+        }
+        installReads += 1;
+        return Promise.resolve(
+          installReads === 1
+            ? {
+                status: "idle",
+                percent: 0,
+                message: null,
+                logs: null,
+                url: null,
+                kind: null,
+              }
+            : {
+                status: "done",
+                percent: 100,
+                message: "安装完成",
+                logs: null,
+                url: previewUrl,
+                kind: "static",
+              },
+        );
       }
-      if (path.endsWith(`/creations/items/${itemId}/launch`)) {
-        return Promise.resolve({
-          status: "stopped",
-          url: null,
-          logs: null,
-          thumbnail_url: null,
-        });
-      }
-      return Promise.resolve({
-        folders: [],
-        items: [],
-        card_folders: {},
-        card_meta: {},
-      });
+      return Promise.resolve({});
     });
+
     renderPage();
     const card = await screen
       .findByText("数据转换平台")
       .then((node) => node.closest(".cr-card") as HTMLElement);
-    fireEvent.click(within(card).getByRole("button", { name: "启动预览" }));
-    fireEvent.click(
-      await within(card).findByRole("button", { name: "打开预览" }),
+
+    fireEvent.click(within(card).getByRole("button", { name: "安装" }));
+    await waitFor(() =>
+      expect(mocks.request).toHaveBeenCalledWith(
+        `/creations/items/${itemId}/install`,
+        { method: "POST" },
+      ),
     );
+
+    const dialog = await screen.findByRole("dialog");
+    const openButton = await within(dialog).findByRole(
+      "button",
+      { name: "打开" },
+      { timeout: 4000 },
+    );
+    fireEvent.click(openButton);
+
     const frame = screen.getByTitle("数据转换平台 · 作品") as HTMLIFrameElement;
     expect(frame.src).toBe(previewUrl);
     expect(openSpy).not.toHaveBeenCalled();
@@ -309,14 +355,111 @@ describe("CreationsPage", () => {
     fireEvent.click(card.querySelector(".cr-thumb") as HTMLButtonElement);
     expect(screen.getByTitle("数据转换平台 · 作品")).toBeTruthy();
 
-    fireEvent.click(within(card).getByRole("button", { name: "停止预览" }));
+    fireEvent.click(screen.getByRole("button", { name: "创作" }));
+    fireEvent.click(within(card).getByRole("button", { name: "停止" }));
     await waitFor(() =>
       expect(mocks.request).toHaveBeenCalledWith(
-        `/creations/items/${itemId}/launch`,
+        `/creations/items/${itemId}/install`,
         { method: "DELETE" },
       ),
     );
     openSpy.mockRestore();
+  });
+
+  it("shows repository download progress and cancels it", async () => {
+    const itemId = "project-2";
+    let started = false;
+    mocks.request.mockImplementation((path: string, options?: RequestInit) => {
+      if (path === "/auth/me") return Promise.resolve({ role: "admin" });
+      if (path === "/creations") {
+        return Promise.resolve({
+          folders: [],
+          items: [
+            {
+              item_id: itemId,
+              kind: "service",
+              name: "个人博客",
+              description: "",
+              url: "https://github.com/example/blog",
+              folder_id: null,
+              created_at: 1,
+              updated_at: 1,
+              thumbnail_url: null,
+            },
+          ],
+          card_folders: {},
+          card_meta: {},
+        });
+      }
+      if (path.endsWith(`/creations/items/${itemId}/download`)) {
+        if (options?.method === "POST") {
+          started = true;
+          return Promise.resolve({
+            status: "running",
+            percent: 3,
+            message: "正在连接仓库",
+            logs: null,
+          });
+        }
+        if (options?.method === "DELETE") {
+          started = false;
+          return Promise.resolve({
+            status: "cancelled",
+            percent: 12,
+            message: "已取消下载",
+            logs: null,
+          });
+        }
+        return Promise.resolve(
+          started
+            ? {
+                status: "running",
+                percent: 42,
+                message: "正在下载代码",
+                logs: null,
+              }
+            : {
+                status: "idle",
+                percent: 0,
+                message: null,
+                logs: null,
+              },
+        );
+      }
+      if (path.endsWith(`/creations/items/${itemId}/install`)) {
+        return Promise.resolve({
+          status: "idle",
+          percent: 0,
+          message: null,
+          logs: null,
+          url: null,
+          kind: null,
+        });
+      }
+      return Promise.resolve({});
+    });
+
+    renderPage();
+    const card = await screen
+      .findByText("个人博客")
+      .then((node) => node.closest(".cr-card") as HTMLElement);
+
+    fireEvent.click(within(card).getByRole("button", { name: "下载" }));
+    await waitFor(() =>
+      expect(mocks.request).toHaveBeenCalledWith(
+        `/creations/items/${itemId}/download`,
+        { method: "POST" },
+      ),
+    );
+    expect(await screen.findByText(/正在下载 个人博客/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    await waitFor(() =>
+      expect(mocks.request).toHaveBeenCalledWith(
+        `/creations/items/${itemId}/download`,
+        { method: "DELETE" },
+      ),
+    );
   });
 
   it("offers manual code updates for CNB repositories", async () => {
@@ -445,7 +588,7 @@ describe("CreationsPage", () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: "打开 星球乐园" }));
     const frame = screen.getByTitle("星球乐园 · 作品") as HTMLIFrameElement;
-    expect(frame.src).toContain(":8130/");
+    expect(frame.src).toContain("/planet/");
     fireEvent.click(screen.getByRole("button", { name: "创作" }));
     expect(screen.queryByTitle("星球乐园 · 作品")).toBeNull();
   });
