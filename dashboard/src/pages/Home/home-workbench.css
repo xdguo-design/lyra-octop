@@ -448,13 +448,13 @@ html[data-theme="dark"] {
   --wbk-30: #243f28;
   --wbk-31: #272315;
   --wbk-32: #474744;
-  --wbk-33: #373020;
+  --wbk-33: #2e2e2e;
   --wbk-34: #5d5e5d;
   --wbk-35: #d0d6d5;
   --wbk-36: #8e9593;
   --wbk-37: #70675b;
   --wbk-38: #3e3423;
-  --wbk-39: #3a3a30;
+  --wbk-39: #3a3a3a;
   --wbk-40: #6c716f;
   --wbk-41: #cba267;
   --wbk-42: #ccdcdc;
@@ -638,7 +638,7 @@ html[data-theme="dark"] {
   --wbk-220: #1e2838;
   --wbk-221: #3d79ca;
   --wbk-222: rgba(132, 157, 169, 0.42);
-  --wbk-223: rgba(39, 35, 21, 0.93);
+  --wbk-223: rgba(25, 25, 25, 0.93);
   --wbk-224: rgba(219, 214, 205, 0.055);
   --wbk-225: rgba(110, 135, 129, 0.12);
   --wbk-226: rgba(203, 227, 217, 0.09);
@@ -3055,8 +3055,10 @@ html[data-theme="dark"] {
     bottom: 0;
     background: inherit;
   }
+  /* The glass sidebar is 64% translucent under skins; keep the account row
+     itself opaque so threads scrolling underneath do not bleed through. */
   html[data-skin] .wb-sidebar-footer-row {
-    backdrop-filter: blur(12px);
+    background: var(--fn-bg-sidebar);
   }
 }
 .wb-sidebar-footer {
@@ -4574,4 +4576,446 @@ html[data-skin] .wb-theme-popup .ant-select-item {
 .wb-project-folder-row + .wb-task-row,
 .wb-project-folder-content .wb-task-row {
   padding-left: 34px;
+}
+
+/* ===================================================================
+   静纸 · Quiet Paper  (2026-11 design pass)
+   ------------------------------------------------------------------
+   One accent, three surfaces, hairline rules.
+
+   Before this pass the shell spoke three dialects at once: a warm paper
+   canvas (#f1f0eb), a cool slate topbar (rgba(251,250,247,.93)) and a flat
+   saturated "新建任务" block (#357cf4) — while the pages inside rendered on
+   the neutral --fn-* surface layer. That mismatch is what made the product
+   read as "assembled".
+
+   The block below re-declares the shell on a single semantic token set
+   (--qp-*), so every surface derives from one palette and dark mode is one
+   override away instead of 253 numbered slots. It only touches chrome:
+   sidebar, topbar, empty-state hero, composer frame. Page bodies keep
+   their own layout; their primitives are refined in styles/manus-theme.css.
+   =================================================================== */
+
+.wb-root {
+  /* canvas / surfaces */
+  --qp-canvas: #f4f6f8;
+  --qp-surface: #ffffff;
+  --qp-sunken: #f1f4f7;
+  --qp-hover: #f4f6f9;
+  /* ink */
+  --qp-ink: #16191d;
+  --qp-ink-2: #4d555f;
+  --qp-ink-3: #7b838d;
+  --qp-ink-4: #a4acb6;
+  /* one accent */
+  --qp-brand: #377cf4;
+  --qp-brand-ink: #2a63d4;
+  --qp-brand-soft: #edf3fe;
+  --qp-brand-line: rgba(55, 124, 244, 0.22);
+  /* elevation */
+  --qp-shadow-1: 0 1px 2px rgba(16, 24, 40, 0.04),
+    0 1px 3px rgba(16, 24, 40, 0.03);
+  --qp-shadow-2: 0 2px 6px rgba(16, 24, 40, 0.04),
+    0 12px 28px -12px rgba(16, 24, 40, 0.16);
+  --qp-shadow-brand: 0 6px 16px -6px rgba(55, 124, 244, 0.45);
+
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Microsoft YaHei",
+    sans-serif;
+  color: var(--qp-ink);
+  background: var(--qp-canvas);
+  grid-template-columns: 248px minmax(0, 1fr);
+}
+
+html[data-theme="dark"] .wb-root {
+  --qp-canvas: #0f1216;
+  --qp-surface: #171b21;
+  --qp-sunken: #1e242c;
+  --qp-hover: #212832;
+  --qp-ink: #e9edf2;
+  --qp-ink-2: #b4bdc8;
+  --qp-ink-3: #8b95a1;
+  --qp-ink-4: #6d7885;
+  --qp-brand: #6f9bff;
+  --qp-brand-ink: #9cbcff;
+  --qp-brand-soft: rgba(111, 155, 255, 0.14);
+  --qp-brand-line: rgba(111, 155, 255, 0.3);
+  --qp-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --qp-shadow-2: 0 12px 28px -12px rgba(0, 0, 0, 0.6);
+  --qp-shadow-brand: 0 6px 18px -8px rgba(111, 155, 255, 0.4);
+}
+
+/* ---------- sidebar ---------- */
+.wb-root .wb-side {
+  padding: 20px 12px 0;
+  background: var(--qp-surface);
+  border-right: 1px solid color-mix(in srgb, var(--qp-ink) 9%, transparent);
+}
+
+.wb-root .wb-brand {
+  gap: 10px;
+  padding: 0 8px 18px;
+}
+.wb-root .wb-brand-mark {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--qp-brand-soft);
+  transform: none;
+  box-shadow: none;
+}
+.wb-root .wb-brand-mark img {
+  width: 28px;
+  height: 28px;
+}
+.wb-root .wb-brand-copy {
+  gap: 4px;
+}
+.wb-root .wb-brand-copy strong {
+  font:
+    750 17px/1 system-ui,
+    -apple-system,
+    "PingFang SC",
+    sans-serif;
+  letter-spacing: -0.01em;
+  color: var(--qp-ink);
+}
+.wb-root .wb-brand-copy small {
+  font:
+    600 9.5px/1 system-ui,
+    sans-serif;
+  letter-spacing: 0.14em;
+  color: var(--qp-ink-4);
+}
+
+/* primary action: the only solid brand fill in the chrome */
+.wb-root .wb-newtask {
+  gap: 9px;
+  min-height: 40px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--qp-brand);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 600 !important;
+  letter-spacing: 0.005em;
+  box-shadow: var(--qp-shadow-brand);
+  transition:
+    background 0.16s ease,
+    box-shadow 0.16s ease;
+}
+.wb-root .wb-newtask:hover {
+  background: var(--qp-brand-ink);
+  transform: none;
+  box-shadow: 0 8px 20px -8px var(--qp-shadow-brand);
+}
+.wb-root .wb-newtask:active {
+  background: var(--qp-brand-ink);
+  transform: translateY(1px);
+}
+.wb-root .wb-newtask-shortcut {
+  font-size: 15px;
+  opacity: 0.6;
+}
+/* dark: the bright accent needs dark ink, not white on pale blue */
+html[data-theme="dark"] .wb-root .wb-newtask,
+html[data-theme="dark"] .wb-root .wb-newtask:hover,
+html[data-theme="dark"] .wb-root .wb-newtask:active {
+  color: #0f1216 !important;
+}
+
+/* navigation rows */
+.wb-root .wb-nav {
+  gap: 2px;
+  margin-top: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--qp-ink) 7%, transparent);
+}
+.wb-root .wb-nav-item {
+  gap: 10px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  color: var(--qp-ink-2) !important;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0.002em;
+}
+.wb-root .wb-nav-item:hover {
+  background: var(--qp-hover);
+  color: var(--qp-ink) !important;
+}
+.wb-root .wb-nav-item.is-active {
+  background: var(--qp-brand-soft);
+  color: var(--qp-brand-ink) !important;
+  font-weight: 600;
+}
+.wb-root .wb-nav-item.is-active svg {
+  color: var(--qp-brand);
+}
+.wb-root .wb-cue {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--qp-brand-soft);
+  color: var(--qp-brand-ink);
+  font:
+    600 10px/1.35 system-ui,
+    sans-serif;
+  letter-spacing: 0.02em;
+}
+.wb-root .wb-active-dot {
+  background: var(--qp-brand);
+}
+
+/* section labels: 项目 / 回收站 / 最近 */
+.wb-root .wb-projects-toggle strong,
+.wb-root .wb-task-filter strong,
+.wb-root .wb-sidebar-section strong {
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  color: var(--qp-ink-4);
+}
+.wb-root .wb-projects-head,
+.wb-root .wb-task-section,
+.wb-root .wb-recycle-section {
+  padding-inline: 10px;
+}
+
+/* tree + task rows */
+.wb-root .wb-task-item {
+  min-height: 34px;
+  border-radius: 8px;
+  color: var(--qp-ink-3) !important;
+  font-size: 12.5px;
+}
+.wb-root .wb-task-item:hover {
+  background: var(--qp-hover);
+  color: var(--qp-ink-2) !important;
+}
+.wb-root .wb-task-item.is-current {
+  background: var(--qp-sunken);
+  color: var(--qp-ink) !important;
+}
+.wb-root .wb-task-item time {
+  color: var(--qp-ink-4);
+  font-size: 11px;
+}
+.wb-root .wb-recycle-empty,
+.wb-root .wb-task-empty {
+  color: var(--qp-ink-4);
+}
+
+/* sidebar footer */
+.wb-root .wb-sidebar-footer-row {
+  background: var(--qp-surface);
+  border-top: 1px solid color-mix(in srgb, var(--qp-ink) 7%, transparent);
+}
+.wb-root .wb-sidebar-footer:hover {
+  background: var(--qp-hover);
+}
+
+/* ---------- topbar ---------- */
+.wb-root .wb-topbar {
+  height: 56px;
+  padding: 0 26px;
+  background: var(--qp-surface);
+  border-bottom: 1px solid color-mix(in srgb, var(--qp-ink) 8%, transparent);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.wb-root .wb-breadcrumb {
+  gap: 7px;
+  font:
+    650 10.5px/1 system-ui,
+    sans-serif;
+  letter-spacing: 0.13em;
+  color: var(--qp-ink-4);
+  text-transform: uppercase;
+}
+.wb-root .wb-breadcrumb svg {
+  color: var(--qp-ink-4);
+  opacity: 0.7;
+}
+.wb-root .wb-breadcrumb strong {
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0;
+  color: var(--qp-ink);
+  text-transform: none;
+}
+
+/* mode switch inside the breadcrumb */
+.wb-root .wb-mode-tabs {
+  gap: 2px;
+  margin-left: 16px;
+  padding: 3px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--qp-sunken);
+}
+.wb-root .wb-mode-tabs button {
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 8px;
+  color: var(--qp-ink-3);
+  font:
+    500 12px/1.2 system-ui,
+    "PingFang SC",
+    sans-serif;
+}
+.wb-root .wb-mode-tabs button:hover {
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--qp-ink);
+}
+.wb-root .wb-mode-tabs button.is-selected {
+  background: var(--qp-surface);
+  color: var(--qp-ink);
+  font-weight: 600;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--qp-ink) 7%, transparent),
+    var(--qp-shadow-1);
+}
+html[data-theme="dark"] .wb-root .wb-mode-tabs button:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.wb-root .wb-topbar-right {
+  gap: 10px;
+  font-size: 12px;
+  color: var(--qp-ink-3);
+}
+.wb-root .wb-status,
+.wb-root .wb-private-label {
+  color: var(--qp-ink-3);
+}
+.wb-root .wb-status-dot {
+  width: 6px;
+  height: 6px;
+  background: #2fa06a;
+  box-shadow: 0 0 0 3px rgba(47, 160, 106, 0.14);
+}
+.wb-root .wb-status-dot.is-off {
+  background: #c9cdd3;
+  box-shadow: 0 0 0 3px rgba(120, 130, 140, 0.12);
+}
+.wb-root .wb-topbar-divider {
+  background: color-mix(in srgb, var(--qp-ink) 10%, transparent);
+}
+
+/* ---------- canvas ---------- */
+.wb-root .wb-workspace-body {
+  background: var(--qp-canvas);
+}
+.wb-root .wb-feature-content {
+  background: var(--qp-canvas);
+}
+
+/* composer frame */
+.wb-root .wb-composer {
+  padding: 14px 14px 10px;
+  border: 1px solid color-mix(in srgb, var(--qp-ink) 9%, transparent);
+  border-radius: 14px;
+  background: var(--qp-surface);
+  box-shadow: var(--qp-shadow-2);
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+.wb-root .wb-composer:focus-within {
+  border-color: var(--qp-brand-line);
+  box-shadow:
+    0 0 0 3px var(--qp-brand-soft),
+    var(--qp-shadow-2);
+}
+.wb-root .wb-composer textarea {
+  color: var(--qp-ink);
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+.wb-root .wb-composer textarea::placeholder {
+  color: var(--qp-ink-4);
+}
+
+/* ---------- empty-state hero (was a blank canvas) ---------- */
+.wb-root .wb-empty-hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 0;
+  padding: 20px 24px 8px;
+  text-align: center;
+}
+.wb-root .wb-empty-eyebrow {
+  margin-bottom: 2px;
+  font:
+    650 10.5px/1 system-ui,
+    sans-serif;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--qp-brand-ink);
+}
+.wb-root .wb-empty-hero h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 680;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
+  color: var(--qp-ink);
+}
+.wb-root .wb-empty-hero h1 em {
+  font-style: normal;
+  color: var(--qp-brand-ink);
+}
+.wb-root .wb-empty-hero p {
+  max-width: 430px;
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--qp-ink-3);
+}
+.wb-root .wb-empty-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.wb-root .wb-empty-chip {
+  height: 32px;
+  padding: 0 13px;
+  border: 1px solid color-mix(in srgb, var(--qp-ink) 9%, transparent);
+  border-radius: 999px;
+  background: var(--qp-surface);
+  color: var(--qp-ink-2);
+  font:
+    500 12.5px/1 system-ui,
+    "PingFang SC",
+    sans-serif;
+  box-shadow: var(--qp-shadow-1);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
+}
+.wb-root .wb-empty-chip:hover {
+  border-color: var(--qp-brand-line);
+  background: var(--qp-brand-soft);
+  color: var(--qp-brand-ink);
+  transform: translateY(-1px);
+}
+.wb-root .wb-empty-chip:active {
+  transform: translateY(0);
 }

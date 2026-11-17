@@ -46,17 +46,13 @@ afterEach(() => {
 describe("SearchHome", () => {
   it("links to the PRD summary beside the HIS login and code entries", () => {
     mocks.search.mockResolvedValue({ query: "", total: 0, results: [] });
-    render(
-      <MemoryRouter>
-        <SearchHome />
-      </MemoryRouter>,
-    );
+    render(<SearchHome />);
 
     const nav = within(screen.getByRole("navigation", { name: "更多入口" }));
     expect(nav.getAllByRole("link")).toHaveLength(3);
     expect(nav.getByRole("link", { name: "PRD 汇总" })).toHaveAttribute(
       "href",
-      "/ehr/prd",
+      "https://119.3.216.103/pd/prd-center.html",
     );
     expect(nav.getByRole("link", { name: "启动 / 登录 HIS" })).toHaveAttribute(
       "href",

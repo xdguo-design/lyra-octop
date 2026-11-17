@@ -78,11 +78,13 @@ function PathTabsSegmented({
  * Universal page wrapper for every non-fullscreen, non-Chat page.
  *
  * Visual contract (master spec §5 / sub-project ② spec §6.2):
- *  - Title row: 20px / 600 weight, fixed (does not scroll with content)
- *  - Subtitle: 13px / secondary colour, 4px below title
+ *  - Title row: 21px / 650 weight, fixed (does not scroll with content)
+ *  - Subtitle: 12.5px / secondary colour, 5px below title
  *  - Optional agent bar (`agentScoped`): below title, outside content card
- *  - Gap between title row and content: 24px (12px + agent bar when scoped)
- *  - Content: colorBgContainer background, 24px padding, 8px radius
+ *  - Gap between title row and content: 20px (12px + agent bar when scoped)
+ *  - Content: colorBgContainer background, hairline border, 26px padding,
+ *    14px radius, hairline shadow — the card must stay readable on the
+ *    layout canvas without a heavy border
  *  - Only the content area scrolls internally
  *  - `actions` slot: right-aligned in the title row
  *  - `pathTabs`: desktop in title row; mobile full-width bar in content
@@ -103,8 +105,8 @@ function PageShell({
   const isMobile = useIsMobile();
   const { activeAgent } = useAgent();
   const outerPad = isMobile ? 12 : 32;
-  const outerPadTop = isMobile ? 12 : 24;
-  const contentPad = isMobile ? 12 : 24;
+  const outerPadTop = isMobile ? 12 : 22;
+  const contentPad = isMobile ? 14 : 26;
   /** Fill layout, or mobile path-tabs that must stay pinned above the body. */
   const pinBody = Boolean(fill || (isMobile && pathTabs));
   /**
@@ -149,7 +151,7 @@ function PageShell({
           justifyContent: "space-between",
           gap: 12,
           flexShrink: 0,
-          marginBottom: agentScoped ? 12 : 24,
+          marginBottom: agentScoped ? 12 : 20,
           paddingRight: titleRowEndPadding(outerPad),
         }}
       >
@@ -158,9 +160,10 @@ function PageShell({
             level={4}
             style={{
               margin: 0,
-              lineHeight: "28px",
-              fontSize: 20,
-              fontWeight: 600,
+              lineHeight: "30px",
+              fontSize: 21,
+              fontWeight: 650,
+              letterSpacing: "-0.012em",
             }}
           >
             {title}
@@ -168,7 +171,7 @@ function PageShell({
           {subtitle && (
             <Text
               type="secondary"
-              style={{ fontSize: 13, marginTop: 4, display: "block" }}
+              style={{ fontSize: 12.5, marginTop: 5, display: "block" }}
             >
               {subtitle}
             </Text>
@@ -192,8 +195,10 @@ function PageShell({
         className={DESKTOP_NO_DRAG_CLASS}
         style={{
           flex: 1,
-          background: "var(--fn-bg-container, var(--fn-bg-elevated))",
-          borderRadius: 8,
+          // Flat content surface: pages bring their own cards, so a page-level
+          // panel would only stack a second hairline inside them.
+          background: "transparent",
+          borderRadius: 14,
           padding: contentPad,
           paddingBottom: pinBody
             ? contentPad

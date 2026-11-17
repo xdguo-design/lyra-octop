@@ -75,9 +75,12 @@ html[data-theme="light"] {
 
   /* theme hooks used by app surfaces */
   --manus-radius-card: 14px;
-  --manus-radius-control: 10px;
+  --manus-radius-control: 9px;
   --manus-radius-pill: 999px;
-  --manus-shadow-hairline: 0 1px 2px rgba(0, 0, 0, 0.04);
+  /* Cool-neutral hairline shadow: the pure-black version reads dirty on the
+     white surfaces next to the brand blue. */
+  --manus-shadow-hairline: 0 1px 2px rgba(16, 24, 40, 0.04),
+    0 1px 3px rgba(16, 24, 40, 0.03);
   --manus-shadow-raise: 0 4px 14px rgba(0, 0, 0, 0.07);
   --manus-shadow-float: 0 8px 28px rgba(0, 0, 0, 0.1);
 }
@@ -211,15 +214,15 @@ html[data-theme="dark"] {
 .octop-input-affix-wrapper-focused,
 .octop-select-focused .octop-select-selector,
 .octop-picker-focused {
-  border-color: var(--fn-text-primary) !important;
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06) !important;
+  border-color: var(--fn-color-brand, var(--fn-text-primary)) !important;
+  box-shadow: 0 0 0 3px var(--fn-color-brand-bg, rgba(0, 0, 0, 0.06)) !important;
 }
 html[data-theme="dark"] .octop-input:focus,
 html[data-theme="dark"] .octop-input-focused,
 html[data-theme="dark"] .octop-input-affix-wrapper-focused,
 html[data-theme="dark"] .octop-select-focused .octop-select-selector,
 html[data-theme="dark"] .octop-picker-focused {
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 0 0 3px var(--fn-color-brand-bg, rgba(255, 255, 255, 0.08)) !important;
 }
 /* Chrome paints autofilled fields blue only on the inner input's box;
    repaint in theme surface + freeze its background transition so the
@@ -233,7 +236,10 @@ html[data-theme="dark"] .octop-picker-focused {
   transition: background-color 99999s ease-in-out 0s;
 }
 
-/* buttons — quiet by default, solid black primary like Manus */
+/* buttons — quiet by default, brand-solid primary.
+   One accent language: the palette brand colour (--fn-color-brand) is the only
+   solid fill in the UI, so the shell's "新建任务" and every primary action in
+   the pages finally agree. */
 .octop-btn {
   border-radius: var(--manus-radius-control) !important;
   box-shadow: none !important;
@@ -253,12 +259,19 @@ html[data-theme="dark"] .octop-picker-focused {
   color: var(--fn-text-primary) !important;
 }
 .octop-btn-primary:not(.octop-btn-dangerous) {
-  background: var(--fn-text-primary) !important;
-  border-color: var(--fn-text-primary) !important;
-  color: var(--fn-bg-primary) !important;
+  background: var(--fn-color-brand, var(--fn-text-primary)) !important;
+  border-color: var(--fn-color-brand, var(--fn-text-primary)) !important;
+  color: #fff !important;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.12) !important;
 }
 .octop-btn-primary:not(.octop-btn-dangerous):not(:disabled):hover {
-  opacity: 0.88;
+  background: var(--fn-color-brand-hover, var(--fn-text-primary)) !important;
+  border-color: var(--fn-color-brand-hover, var(--fn-text-primary)) !important;
+  color: #fff !important;
+  box-shadow: 0 3px 10px -2px var(--fn-color-brand-shadow, rgba(16, 24, 40, 0.3)) !important;
+}
+.octop-btn-primary:not(.octop-btn-dangerous):not(:disabled):active {
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.14) !important;
 }
 .octop-btn-round {
   border-radius: var(--manus-radius-pill) !important;
@@ -272,20 +285,23 @@ html[data-theme="dark"] .octop-picker-focused {
   background: var(--fn-bg-secondary) !important;
   border-radius: var(--manus-radius-control) !important;
   padding: 2px !important;
+  box-shadow: inset 0 0 0 1px var(--fn-border-secondary) !important;
 }
 .octop-segmented-item,
 .octop-segmented-thumb {
-  border-radius: 8px !important;
+  border-radius: 7px !important;
 }
 .octop-segmented-item-selected {
   background: var(--fn-bg-primary) !important;
-  box-shadow: var(--manus-shadow-hairline) !important;
+  box-shadow:
+    0 0 0 1px var(--fn-border-primary),
+    0 1px 2px rgba(16, 24, 40, 0.06) !important;
 }
 .octop-tabs-tab {
   border-radius: 8px !important;
 }
 .octop-tabs-tab-active .octop-tabs-tab-btn {
-  font-weight: 500;
+  font-weight: 600;
 }
 
 /* tables — clean hairlines */
@@ -295,9 +311,13 @@ html[data-theme="dark"] .octop-picker-focused {
   overflow: hidden;
 }
 .octop-table-thead > tr > th {
-  background: var(--fn-bg-secondary) !important;
+  background: transparent !important;
   border-bottom: 1px solid var(--fn-border-primary) !important;
-  font-weight: 500 !important;
+  color: var(--fn-text-tertiary) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em;
+  padding-block: 10px !important;
 }
 .octop-table-tbody > tr > td {
   border-bottom: 1px solid var(--fn-border-secondary) !important;
@@ -325,20 +345,20 @@ html[data-theme="dark"] .octop-picker-focused {
   border-block-end: 1px solid var(--fn-border-secondary) !important;
 }
 
-/* focus ring — quiet, no dashes */
+/* focus ring — quiet, brand-tinted, no dashes */
 :where(button, a, input, textarea, select, [tabindex]):focus-visible {
-  outline: 2px solid var(--fn-text-primary) !important;
+  outline: 2px solid var(--fn-color-brand, var(--fn-text-primary)) !important;
   outline-offset: 2px;
   border-radius: 8px;
 }
 html[data-theme="dark"]
   :where(button, a, input, textarea, select, [tabindex]):focus-visible {
-  outline-color: #ffffff !important;
+  outline-color: var(--fn-color-brand, #ffffff) !important;
 }
 
 /* selection */
 ::selection {
-  background: rgba(0, 0, 0, 0.1);
+  background: var(--fn-color-brand-bg, rgba(0, 0, 0, 0.1));
 }
 
 /* thin neutral scrollbars */

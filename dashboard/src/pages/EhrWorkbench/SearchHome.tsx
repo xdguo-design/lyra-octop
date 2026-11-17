@@ -12,7 +12,6 @@ import {
   Typography,
 } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
-import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ehrApi, publicEhrApi, type SearchResult } from "@/api/modules/ehr";
 import { TYPE_COLORS, TYPE_LABELS } from "./types";
@@ -20,6 +19,9 @@ import { ehrPlatformLoginUrl } from "./ehrPlatformLoginUrl";
 import styles from "./index.module.less";
 
 type SearchScope = "medical" | "documents" | "code" | "all";
+
+// PRD 汇总入口指向 PD 站「PRD 中心」，静态部署在 119 服务器 nginx 的 /pd/ 子路径。
+const PD_PRD_CENTER_URL = "https://119.3.216.103/pd/prd-center.html";
 
 const MEDICAL_TYPES = [
   "drug",
@@ -143,7 +145,9 @@ export default function SearchHome({
               className={styles.ehrSecondaryLinks}
               aria-label={t("ehrWorkbenchPage.moreEntries")}
             >
-              <Link to="/ehr/prd">{t("ehrWorkbenchPage.docsEntry")}</Link>
+              <a href={PD_PRD_CENTER_URL} target="_blank" rel="noreferrer">
+                {t("ehrWorkbenchPage.docsEntry")}
+              </a>
               <Button
                 type="primary"
                 href={loginUrl || undefined}

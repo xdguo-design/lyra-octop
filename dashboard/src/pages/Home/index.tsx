@@ -3611,6 +3611,40 @@ export default function HomePage() {
                 </section>
               )}
 
+              {/* 空态主视觉：对话尚未开始时，画布给一个可读的落点，
+                  而不是一片空白 + 底部输入框。点击提示填入草稿，不直接发送。 */}
+              {!hasChat && (
+                <div className="wb-empty-hero">
+                  <span className="wb-empty-eyebrow">LYRA SPACE</span>
+                  <h1>
+                    让 <em>{primary?.name || "主 Agent"}</em> 帮你推进一件事
+                  </h1>
+                  <p>
+                    描述目标、贴代码或丢链接都行。复杂任务会被拆成步骤，工具调用与结果都留在这个工作台里。
+                  </p>
+                  <div className="wb-empty-chips">
+                    {[
+                      "梳理这个项目还剩哪些待办",
+                      "把资料整理成一份报告",
+                      "读一段代码并解释它在做什么",
+                      "总结今天的进展与风险",
+                    ].map((hint) => (
+                      <button
+                        key={hint}
+                        type="button"
+                        className="wb-empty-chip"
+                        onClick={() => {
+                          setInput(hint);
+                          inputRef.current?.focus();
+                        }}
+                      >
+                        {hint}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div
                 className={
                   "wb-composer-wrap" +
