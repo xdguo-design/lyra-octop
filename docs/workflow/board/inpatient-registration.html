@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="pageflow-slug" content="inpatient-registration" />
+<meta name="pageflow-branch" content="feature/page-inpatient-registration" />
+<title>住院登记页面 · 开发进度</title>
+<style>
+  :root {
+    --paper: #f7f5f0;
+    --ink: #16181d;
+    --muted: #6b6f7a;
+    --line: #dcd7cc;
+    --done: #1f7a4d;
+    --wip: #a4761b;
+    --todo: #6b6f7a;
+    --blocked: #a63d3d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 15px/1.6 "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 48px 24px 80px; }
+  .hero { border-bottom: 1px solid var(--line); padding-bottom: 24px; }
+  .kicker {
+    margin: 0 0 8px;
+    font-size: 12px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h1 { margin: 0 0 12px; font-size: 34px; line-height: 1.2; letter-spacing: -.01em; }
+  .meta { margin: 0; color: var(--muted); font-size: 13px; }
+  .bar {
+    margin-top: 20px;
+    height: 6px;
+    border-radius: 99px;
+    background: #e6e1d6;
+    overflow: hidden;
+  }
+  .bar > span { display: block; height: 100%; background: var(--done); }
+  .count { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
+  h2 {
+    margin: 44px 0 16px;
+    font-size: 13px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+  .card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .card header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .mid { font: 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); }
+  .pill {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 99px;
+    border: 1px solid currentColor;
+  }
+  .pill.done { color: var(--done); }
+  .pill.wip { color: var(--wip); }
+  .pill.todo { color: var(--todo); }
+  .pill.blocked { color: var(--blocked); }
+  .card h3 { margin: 10px 0 8px; font-size: 16px; font-weight: 600; }
+  .files { margin: 0; padding-left: 18px; font-size: 12px; color: var(--muted); }
+  .files code, .verify code { font-size: 12px; }
+  .verify { margin: 10px 0 0; font-size: 12px; color: var(--muted); }
+  .log { list-style: none; margin: 0; padding: 0; border-left: 2px solid var(--line); }
+  .log > li { position: relative; padding: 0 0 22px 20px; }
+  .log > li::before {
+    content: "";
+    position: absolute;
+    left: -5px;
+    top: 6px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--done);
+  }
+  .log .stamp {
+    margin: 0;
+    font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--muted);
+  }
+  .log h3 { margin: 4px 0 4px; font-size: 15px; }
+  .log p { margin: 0; }
+  .log .files { margin-top: 4px; padding-left: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  th { font-weight: 600; color: var(--muted); font-size: 12px; text-transform: uppercase; }
+  footer {
+    margin-top: 56px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <p class="kicker">pageflow · feature/page-inpatient-registration</p>
+    <h1>住院登记页面</h1>
+    <p class="meta">基线 develop · 目标 docs/workflow/board/inpatient-registration.html · 文档创建于 2026-11-14T10:39:25+08:00</p>
+    <div class="bar"><span style="width:100%"></span></div>
+    <p class="count">8 / 8 模块完成</p>
+  </header>
+  <main>
+    <h2>模块</h2>
+    <div class="grid">
+      <article class="card" id="module-m1" data-status="done">
+        <header><span class="mid">M1</span><span class="pill done">已完成</span></header>
+        <h3>需求与数据基线</h3>
+        <ul class="files"><li><code>docs/pages/inpatient-registration/SPEC.md</code></li></ul>
+        <p class="verify">校验：<code>4 张申请单 + 5 条登记记录与原型 spec 逐条对齐</code></p>
+      </article>
+      <article class="card" id="module-m2" data-status="done">
+        <header><span class="mid">M2</span><span class="pill done">已完成</span></header>
+        <h3>页面主体与交互</h3>
+        <ul class="files"><li><code>docs/pages/inpatient-registration/index.html</code></li></ul>
+        <p class="verify">校验：<code>pytest tests/unit/workflow/test_pf_inpatient_registration_page.py</code></p>
+      </article>
+      <article class="card" id="module-m3" data-status="done">
+        <header><span class="mid">M3</span><span class="pill done">已完成</span></header>
+        <h3>看板页渲染</h3>
+        <ul class="files"><li><code>docs/workflow/board/inpatient-registration.html</code></li></ul>
+        <p class="verify">校验：<code>python scripts/pageflow.py render --slug inpatient-registration --check</code></p>
+      </article>
+      <article class="card" id="module-m4" data-status="done">
+        <header><span class="mid">M4</span><span class="pill done">已完成</span></header>
+        <h3>合同测试</h3>
+        <ul class="files"><li><code>tests/unit/workflow/test_pf_inpatient_registration_contract.py</code></li></ul>
+        <p class="verify">校验：<code>pytest tests/unit/workflow/test_pf_inpatient_registration_contract.py -x -q</code></p>
+      </article>
+      <article class="card" id="module-m5" data-status="done">
+        <header><span class="mid">M5</span><span class="pill done">已完成</span></header>
+        <h3>对抗性测试</h3>
+        <ul class="files"><li><code>tests/unit/workflow/test_pf_inpatient_registration_adversarial.py</code></li></ul>
+        <p class="verify">校验：<code>pytest tests/unit/workflow/test_pf_inpatient_registration_adversarial.py -x -q</code></p>
+      </article>
+      <article class="card" id="module-m6" data-status="done">
+        <header><span class="mid">M6</span><span class="pill done">已完成</span></header>
+        <h3>唯一性测试</h3>
+        <ul class="files"><li><code>tests/unit/workflow/test_pf_inpatient_registration_uniqueness.py</code></li></ul>
+        <p class="verify">校验：<code>pytest tests/unit/workflow/test_pf_inpatient_registration_uniqueness.py -x -q</code></p>
+      </article>
+      <article class="card" id="module-m7" data-status="done">
+        <header><span class="mid">M7</span><span class="pill done">已完成</span></header>
+        <h3>页面行为测试</h3>
+        <ul class="files"><li><code>tests/unit/workflow/test_pf_inpatient_registration_page.py</code></li></ul>
+        <p class="verify">校验：<code>pytest tests/unit/workflow/test_pf_inpatient_registration_page.py -x -q</code></p>
+      </article>
+      <article class="card" id="module-m8" data-status="done">
+        <header><span class="mid">M8</span><span class="pill done">已完成</span></header>
+        <h3>校验报告与验收准备</h3>
+        <ul class="files"><li><code>docs/pages/inpatient-registration/VERIFY.md</code></li></ul>
+        <p class="verify">校验：<code>python scripts/pageflow.py verify --slug inpatient-registration</code></p>
+      </article>
+    </div>
+    <h2>变更日志</h2>
+    <ol class="log">
+      <li id="log-1">
+        <p class="stamp">2026-11-14T10:44:00+08:00 · M1</p>
+        <h3>需求与数据基线</h3>
+        <p>把原型 spec、方向 B 决策、v2 结构与用户追加的三条要求固化成页面规格：4 张门诊申请单（含 1 张待患者确认的异常样本）、5 条登记记录、科室/病区/工作组/床位/入院类型字典、confirmed→registered 状态机与三类锁定态。</p>
+        <p class="files">`docs/pages/inpatient-registration/SPEC.md` (73 行)</p>
+      </li>
+      <li id="log-2">
+        <p class="stamp">2026-11-14T10:49:00+08:00 · M2</p>
+        <h3>页面主体与交互</h3>
+        <p>单文件实现临床密集工作台：顶栏班次与窗口、页头待办理/待患者确认计数、主 tab（门诊住院申请 | 登记队列）、左栏三过滤 + 申请卡、右栏三步表单、底条核对勾选与主按钮；提交走二次确认弹窗生成住院号 ZY20261112003 并切到登记队列高亮新行。</p>
+        <p class="files">`docs/pages/inpatient-registration/index.html` (1420 行)</p>
+      </li>
+      <li id="log-3">
+        <p class="stamp">2026-11-14T10:52:00+08:00 · M3</p>
+        <h3>看板页渲染</h3>
+        <p>按 pageflow 渲染契约手写看板页（脚本执行器在本会话不可用）：8 个模块卡带 module-&lt;id&gt; 锚点、8 条日志时间线 log-&lt;n&gt;、进度条 100%、测试计划表与本文档逐行一致，样式沿用 pageflow 模板。</p>
+        <p class="files">`docs/workflow/board/inpatient-registration.html` (245 行)</p>
+      </li>
+      <li id="log-4">
+        <p class="stamp">2026-11-14T10:55:00+08:00 · M4</p>
+        <h3>合同测试</h3>
+        <p>合同测试锁本文档与页面、测试文件三者一致：模块清单逐行比对、状态全 done、page_problems 为空、渲染页含每个模块锚点、每条日志摘要与校验非空、生成文件可被 ast 解析。</p>
+        <p class="files">`tests/unit/workflow/test_pf_inpatient_registration_contract.py` (88 行)</p>
+      </li>
+      <li id="log-5">
+        <p class="stamp">2026-11-14T10:58:00+08:00 · M5</p>
+        <h3>对抗性测试</h3>
+        <p>9 组恶意载荷（XSS、属性逃逸、javascript:、SSTI/JNDI、RTL 覆写、零宽字符、命令注入、表格伪装）打解析与渲染，另加 5 组结构攻击（重复模块 ID、未知状态归一、空模块表、CRLF+BOM、两万字符标题）与 sanitize_id 契约。</p>
+        <p class="files">`tests/unit/workflow/test_pf_inpatient_registration_adversarial.py` (139 行)</p>
+      </li>
+      <li id="log-6">
+        <p class="stamp">2026-11-14T11:01:00+08:00 · M6</p>
+        <h3>唯一性测试</h3>
+        <p>跨 docs/pages/*/PROGRESS.md 断言 slug 唯一且等于目录名、模块 ID 唯一并按数字升序、同一产出文件不属两个模块、日志 (stamp, mid) 不重复、页面锚点唯一且为安全 token、生成测试文件名不重名。</p>
+        <p class="files">`tests/unit/workflow/test_pf_inpatient_registration_uniqueness.py` (94 行)</p>
+      </li>
+      <li id="log-7">
+        <p class="stamp">2026-11-14T11:04:00+08:00 · M7</p>
+        <h3>页面行为测试</h3>
+        <p>对业务页做静态契约断言：无外链与构建依赖、无 emoji、无紫色渐变、无「圆角卡 + 左侧彩色竖条」、正文不小于 14px、申请队列 4 行与登记队列 5 行齐全、三类锁定态文案与主按钮 disabled、提交后住院号生成规则、二次确认弹窗含联系人回改入口、空态不用插画。</p>
+        <p class="files">`tests/unit/workflow/test_pf_inpatient_registration_page.py` (197 行)</p>
+      </li>
+      <li id="log-8">
+        <p class="stamp">2026-11-14T11:07:00+08:00 · M8</p>
+        <h3>校验报告与验收准备</h3>
+        <p>写校验报告：记录本会话执行器不可用（EXECUTOR_UNAVAILABLE: Niubash preparation failed）导致 pytest / render / verify 无法执行，列出手工核对过的结构项与宿主侧待跑命令，状态如实标注为待执行，不预填 PASS。</p>
+        <p class="files">`docs/pages/inpatient-registration/VERIFY.md` (63 行)</p>
+      </li>
+    </ol>
+    <h2>测试计划</h2>
+    <table>
+      <thead><tr><th>TID</th><th>类型</th><th>描述</th><th>断言</th></tr></thead>
+      <tbody>
+        <tr><td>T1</td><td>contract</td><td>文档结构可解析</td><td>模块表 8 行、状态全 done、日志 8 条</td></tr>
+        <tr><td>T2</td><td>contract</td><td>页面反映文档</td><td>8 个模块锚点唯一、模块标题渲染、日志条目数与文档一致</td></tr>
+        <tr><td>T3</td><td>contract</td><td>生成文件可读</td><td>三个测试文件存在且能被 ast 解析</td></tr>
+        <tr><td>T4</td><td>adversarial</td><td>注入载荷被转义</td><td>渲染结果不含 &lt;script、&lt;img、&lt;svg、onerror 等原始标签</td></tr>
+        <tr><td>T5</td><td>adversarial</td><td>畸形文档不崩</td><td>重复 ID 报错、未知状态归一 todo、空模块表报错、CRLF+BOM 可解析、两万字符标题不截断</td></tr>
+        <tr><td>T6</td><td>uniqueness</td><td>标识全局唯一</td><td>slug、模块 ID、产出归属、日志条目、页面锚点均不重复且为安全 token</td></tr>
+        <tr><td>T7</td><td>page</td><td>页面自包含</td><td>无外链/无构建依赖/无 emoji/无紫色渐变/正文 ≥14px</td></tr>
+        <tr><td>T8</td><td>page</td><td>队列数据齐全</td><td>4 张申请单与 5 条登记记录逐行出现，异常样本带待确认标记</td></tr>
+        <tr><td>T9</td><td>page</td><td>提交链路正确</td><td>勾选核对前主按钮 disabled、三类锁定态文案正确、二次确认弹窗可回改联系人、提交生成 ZY20261112003</td></tr>
+      </tbody>
+    </table>
+  </main>
+  <footer>本文档由 docs/pages/inpatient-registration/PROGRESS.md 渲染；改动请改文档后重新 render。</footer>
+</div>
+</body>
+</html>

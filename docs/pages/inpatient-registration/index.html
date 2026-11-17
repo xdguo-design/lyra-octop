@@ -1,0 +1,1420 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>住院登记 · 住院处 3 号窗口</title>
+<style>
+  :root {
+    --k900: #161616;
+    --k700: #393939;
+    --k600: #525252;
+    --k500: #8d8d8d;
+    --k400: #c6c6c6;
+    --k300: #e0e0e0;
+    --k200: #f0f0f0;
+    --k100: #f4f4f4;
+    --blue: #0f62fe;
+    --blue-h: #0043ce;
+    --blue-bg: #edf5ff;
+    --green: #198038;
+    --green-bg: #defbe6;
+    --amber: #8a5a00;
+    --amber-bg: #fcf4d6;
+    --red: #a2191f;
+    --red-bg: #fff1f1;
+    --radius: 2px;
+    --mono: ui-monospace, "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: var(--k100);
+    color: var(--k900);
+    font: 14px/1.5 "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  .mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* ── 骨架 ─────────────────────────────────────────────── */
+  .app { display: grid; grid-template-rows: 40px auto 40px minmax(0, 1fr); height: 100vh; }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 0 20px; background: var(--k900); color: #fff; font-size: 12px;
+  }
+  .tb-left, .tb-right { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .brand { font: 600 13px/1 var(--mono); letter-spacing: .12em; color: #fff; }
+  .crumb { color: #c6c6c6; }
+  .crumb.is-current { color: #fff; }
+  .sep { color: #525252; }
+  .tb-item { color: #c6c6c6; }
+  .tb-item b { color: #fff; font-weight: 500; }
+  .tb-clock { font-family: var(--mono); color: #c6c6c6; padding-left: 12px; border-left: 1px solid #393939; }
+
+  .pagehead {
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    padding: 14px 20px; background: #fff; border-bottom: 1px solid var(--k300);
+  }
+  .pagehead h1 { margin: 0; font-size: 22px; line-height: 1.2; letter-spacing: -.01em; }
+  .pagehead .sub { margin: 4px 0 0; font-size: 13px; color: var(--k600); }
+  .ph-right { display: flex; align-items: center; gap: 20px; }
+  .ph-count { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--k600); }
+  .ph-count b { font-family: var(--mono); font-size: 14px; color: var(--k900); }
+  .ph-count .divider { width: 1px; height: 14px; background: var(--k300); margin: 0 6px; }
+
+  .maintabs {
+    display: flex; align-items: stretch; gap: 4px; padding: 0 20px;
+    background: #fff; border-bottom: 1px solid var(--k300);
+  }
+  .maintab {
+    display: inline-flex; align-items: center; gap: 8px; padding: 0 16px;
+    background: none; border: 0; border-bottom: 2px solid transparent;
+    color: var(--k600); font-size: 13px; cursor: pointer;
+  }
+  .maintab:hover { color: var(--k900); background: var(--k100); }
+  .maintab.is-active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 600; }
+  .tab-count {
+    font: 11px/1 var(--mono); padding: 2px 6px; border: 1px solid var(--k300);
+    color: var(--k600); border-radius: 99px;
+  }
+  .maintab.is-active .tab-count { border-color: var(--blue); color: var(--blue); background: var(--blue-bg); }
+  .sync { margin-left: auto; align-self: center; font-size: 12px; color: var(--k600); }
+  .sync b { font-family: var(--mono); color: var(--k700); font-weight: 500; }
+
+  .stage { min-height: 0; position: relative; }
+  .pane { height: 100%; min-height: 0; }
+  .pane[hidden] { display: none; }
+
+  /* ── 申请 tab：左队列 + 右表单 ─────────────────────────── */
+  #pane-apps { display: grid; grid-template-columns: 360px minmax(0, 1fr); }
+  @media (max-width: 1360px) { #pane-apps { grid-template-columns: 320px minmax(0, 1fr); } }
+  @media (max-width: 1100px) { #pane-apps { grid-template-columns: 280px minmax(0, 1fr); } }
+
+  .queue-col {
+    display: grid; grid-template-rows: auto auto minmax(0, 1fr);
+    background: #fff; border-right: 1px solid var(--k300); min-height: 0;
+  }
+  .queue-filters { padding: 12px 14px 0; display: grid; gap: 8px; }
+  .fld { display: grid; gap: 4px; min-width: 0; }
+  .lbl { font-size: 11px; color: var(--k600); letter-spacing: .02em; display: flex; align-items: center; gap: 4px; }
+  .lbl i { font-style: normal; font-size: 10px; color: var(--red); }
+  .lbl i.opt { color: var(--k500); }
+  .fld input, .fld select, .fld textarea {
+    width: 100%; height: 32px; padding: 0 8px; font-size: 14px;
+    border: 1px solid var(--k400); border-radius: var(--radius); background: #fff; color: var(--k900);
+  }
+  .fld textarea { height: auto; padding: 8px; resize: vertical; }
+  .fld input[readonly], .fld input:disabled, .fld select:disabled, .fld textarea[readonly] {
+    background: var(--k100); color: var(--k600); border-color: var(--k300); cursor: default;
+  }
+  .fld input:focus-visible, .fld select:focus-visible, .fld textarea:focus-visible,
+  .fld input:focus, .fld select:focus, .fld textarea:focus { outline: 2px solid var(--blue); outline-offset: -1px; }
+  .fld input::placeholder { color: var(--k500); }
+
+  .queue-meta {
+    margin: 10px 14px 6px; display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; color: var(--k600);
+  }
+  .queue-meta a { color: var(--blue); text-decoration: none; }
+  .queue-meta a:hover { text-decoration: underline; }
+
+  .queue-scroll { overflow: auto; padding: 4px 14px 20px; min-height: 0; }
+  .col-title {
+    margin: 8px 0 10px; font-size: 12px; font-weight: 600; color: var(--k600);
+    letter-spacing: .04em; text-transform: uppercase;
+  }
+  .cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .card {
+    width: 100%; text-align: left; display: grid; gap: 6px;
+    padding: 10px 12px; background: #fff; border: 1px solid var(--k300);
+    border-radius: var(--radius); cursor: pointer;
+  }
+  .card:hover { border-color: var(--k500); }
+  .card:focus-visible { outline: 2px solid var(--blue); outline-offset: -1px; }
+  .card-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .card-name { font-size: 15px; font-weight: 600; letter-spacing: .01em; }
+  .card-name small { font-size: 12px; font-weight: 400; color: var(--k600); margin-left: 6px; }
+  .card-meta { font-size: 12px; color: var(--k600); }
+  .card-meta .pid { font-family: var(--mono); color: var(--k700); }
+  .card-reason { font-size: 12px; color: var(--k700); }
+  .card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }
+  .card.is-selected { border-color: var(--blue); box-shadow: inset 0 0 0 1px var(--blue); background: var(--blue-bg); }
+  .card.is-locked { cursor: not-allowed; background: var(--k100); }
+  .card.is-locked .card-name { color: var(--k600); }
+
+  /* 状态：圆点 + 文字 */
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--k700); white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--k500); flex: none; }
+  .s-confirmed .dot, .dot-green { background: var(--green); }
+  .s-awaiting .dot, .dot-amber { background: var(--amber); }
+  .s-registered .dot { background: var(--blue); }
+  .s-cancelled .dot, .dot-red { background: var(--red); }
+  .s-pending .dot { background: var(--blue); }
+  .s-in .dot { background: var(--green); }
+  .s-transfer .dot { background: var(--amber); }
+  .s-leaving .dot { background: var(--amber); }
+  .s-settling .dot { background: var(--k500); }
+  .dot-blue { background: var(--blue); }
+
+  .empty { border: 1px dashed var(--k400); padding: 16px 14px; color: var(--k600); font-size: 12px; line-height: 1.7; background: var(--k100); }
+  .empty b { display: block; color: var(--k900); font-size: 13px; margin-bottom: 2px; }
+
+  /* 右栏表单 */
+  .form-col { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; background: #fff; min-height: 0; }
+  .form-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 12px 20px; border-bottom: 1px solid var(--k300);
+  }
+  .form-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+  .form-head h2 .num { font-size: 12px; color: var(--k500); margin-left: 6px; }
+  .fh-meta { margin: 4px 0 0; font-size: 12px; color: var(--k600); }
+  .fh-meta b { color: var(--k900); font-weight: 600; }
+  .fh-meta .pid { font-family: var(--mono); }
+  .fh-side { display: flex; align-items: center; gap: 12px; }
+
+  .subtabs { display: flex; align-items: center; gap: 4px; padding: 0 20px; border-bottom: 1px solid var(--k300); }
+  .subtab {
+    display: inline-flex; align-items: center; gap: 6px; padding: 9px 12px; background: none; border: 0;
+    border-bottom: 2px solid transparent; color: var(--k600); font-size: 13px; cursor: pointer;
+  }
+  .subtab .idx { font: 11px/1 var(--mono); color: var(--k500); }
+  .subtab:hover { color: var(--k900); }
+  .subtab.is-active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 600; }
+  .subtab.is-active .idx { color: var(--blue); }
+  .progress { margin-left: auto; font-size: 12px; color: var(--k600); }
+  .progress b { font-family: var(--mono); font-size: 13px; color: var(--k900); }
+  .progress.is-full b { color: var(--green); }
+
+  .form-body { overflow: auto; padding: 16px 20px 24px; min-height: 0; }
+  .block + .block { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--k200); }
+  .block-title {
+    margin: 0 0 10px; font-size: 12px; font-weight: 600; color: var(--k600);
+    letter-spacing: .04em; text-transform: uppercase; display: flex; align-items: center; gap: 8px;
+  }
+  .tag { font-size: 11px; font-weight: 400; color: var(--k600); background: var(--k100); border: 1px solid var(--k300); padding: 1px 6px; border-radius: 99px; letter-spacing: 0; text-transform: none; }
+  .tag.is-warn { color: var(--amber); border-color: var(--amber); background: var(--amber-bg); }
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 20px; }
+  .span2 { grid-column: span 2; }
+  .note { margin: 10px 0 0; font-size: 12px; color: var(--k600); line-height: 1.6; }
+
+  .past { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .past li { display: flex; gap: 12px; font-size: 12px; color: var(--k700); padding: 6px 10px; background: var(--k100); border: 1px solid var(--k200); }
+  .past .range { font-family: var(--mono); color: var(--k600); }
+
+  .summary {
+    margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    border: 1px solid var(--k300); background: #fff;
+  }
+  .summary > div { padding: 8px 10px; border-right: 1px solid var(--k200); border-bottom: 1px solid var(--k200); min-width: 0; }
+  .summary > div:nth-child(4n) { border-right: 0; }
+  .summary > div:nth-last-child(-n+4) { border-bottom: 0; }
+  .summary dt { font-size: 11px; color: var(--k600); margin: 0 0 2px; }
+  .summary dd { margin: 0; font-size: 13px; color: var(--k900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .summary dd .mono { font-size: 12px; }
+
+  .timeline { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 1px solid var(--k300); display: grid; gap: 12px; }
+  .timeline li { position: relative; font-size: 12px; color: var(--k700); }
+  .timeline li::before {
+    content: ""; position: absolute; left: -19px; top: 5px; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--k500); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--k400);
+  }
+  .timeline li.is-done::before { background: var(--green); box-shadow: 0 0 0 1px var(--green); }
+  .timeline li.is-todo::before { background: #fff; box-shadow: 0 0 0 1px var(--k400); }
+  .timeline .t-when { font-family: var(--mono); color: var(--k600); margin-right: 8px; }
+  .timeline .t-what { color: var(--k900); }
+
+  /* 底条 */
+  .submitbar {
+    display: flex; align-items: center; gap: 16px; padding: 10px 20px;
+    border-top: 1px solid var(--k300); background: #fff;
+  }
+  .check { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--k700); cursor: pointer; white-space: nowrap; }
+  .check input { width: 16px; height: 16px; accent-color: var(--blue); cursor: pointer; margin: 0; }
+  .check input:disabled { cursor: not-allowed; }
+  .gate { margin: 0; font-size: 12px; color: var(--k600); min-width: 0; flex: 1; display: flex; align-items: center; gap: 6px; }
+  .gate.is-ok { color: var(--green); }
+  .gate.is-error { color: var(--red); }
+  .gate.is-warn { color: var(--amber); }
+  .gate .ico { flex: none; }
+  .sb-actions { display: flex; align-items: center; gap: 12px; flex: none; }
+  .primary-wrap { display: grid; gap: 2px; justify-items: stretch; }
+  .primary-wrap .sub { font-size: 11px; color: var(--k600); text-align: center; }
+
+  .btn {
+    height: 34px; padding: 0 14px; border-radius: var(--radius); border: 1px solid transparent;
+    font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  }
+  .btn:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .btn-primary { background: var(--blue); color: #fff; border-color: var(--blue); font-weight: 600; }
+  .btn-primary:hover:not(:disabled) { background: var(--blue-h); border-color: var(--blue-h); }
+  .btn-primary:disabled { background: var(--k300); border-color: var(--k300); color: var(--k600); cursor: not-allowed; }
+  .btn-secondary { background: #fff; color: var(--k900); border-color: var(--k400); }
+  .btn-secondary:hover { background: var(--k100); border-color: var(--k600); }
+  .btn-quiet { background: #fff; color: var(--red); border-color: var(--k400); height: 30px; font-size: 12px; }
+  .btn-quiet:hover { border-color: var(--red); background: var(--red-bg); }
+  .btn-danger { background: var(--red); border-color: var(--red); color: #fff; font-weight: 600; }
+  .btn-danger:hover { background: #8c1419; border-color: #8c1419; }
+  .btn-ghost { background: none; border: 0; color: var(--blue); padding: 0 4px; height: 30px; }
+  .btn-ghost:hover { text-decoration: underline; }
+
+  /* ── 登记队列 tab ─────────────────────────────────────── */
+  #pane-regs { overflow: auto; padding: 16px 20px 24px; }
+  .reg-filters {
+    display: grid; grid-template-columns: minmax(200px, 1.4fr) repeat(2, minmax(130px, .8fr)) repeat(2, minmax(140px, .9fr)) auto auto;
+    gap: 12px; align-items: end; background: #fff; border: 1px solid var(--k300); padding: 12px 14px;
+  }
+  .reg-meta { margin: 12px 0 8px; font-size: 12px; color: var(--k600); }
+  .reg-meta b { font-family: var(--mono); color: var(--k900); }
+  .table-wrap { border: 1px solid var(--k300); background: #fff; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    text-align: left; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--k600); background: var(--k100); padding: 8px 12px; border-bottom: 1px solid var(--k300); white-space: nowrap;
+  }
+  tbody td { padding: 10px 12px; border-bottom: 1px solid var(--k200); white-space: nowrap; color: var(--k900); }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr.is-new { background: var(--blue-bg); }
+  tbody tr.is-new td:first-child { box-shadow: inset 2px 0 0 var(--blue); }
+  .table-empty td { white-space: normal; color: var(--k600); font-size: 12px; line-height: 1.7; padding: 18px 12px; }
+  .table-empty b { color: var(--k900); }
+  .table-foot {
+    display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+    padding: 8px 4px; font-size: 12px; color: var(--k600);
+  }
+  .table-foot b { font-family: var(--mono); color: var(--k900); }
+  .pager { display: inline-flex; align-items: center; gap: 4px; }
+  .pager button {
+    height: 26px; min-width: 26px; padding: 0 8px; background: #fff; border: 1px solid var(--k300);
+    color: var(--k700); border-radius: var(--radius); font-size: 12px; cursor: default;
+  }
+  .pager button[aria-current="page"] { border-color: var(--blue); color: var(--blue); background: var(--blue-bg); }
+
+  /* ── 弹窗 ─────────────────────────────────────────────── */
+  .modal-root { position: fixed; inset: 0; background: rgba(22, 22, 22, .5); display: grid; place-items: center; z-index: 50; }
+  .modal-root[hidden] { display: none; }
+  .panel { width: 520px; max-width: calc(100vw - 40px); background: #fff; border-radius: var(--radius); border-top: 3px solid var(--blue); max-height: calc(100vh - 80px); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+  .panel-head { padding: 16px 20px 12px; border-bottom: 1px solid var(--k200); }
+  .panel-head h2 { margin: 0; font-size: 16px; }
+  .panel-head p { margin: 4px 0 0; font-size: 12px; color: var(--k600); }
+  .panel-body { padding: 16px 20px; overflow: auto; display: grid; gap: 12px; }
+  .panel-foot { padding: 12px 20px 16px; border-top: 1px solid var(--k200); display: flex; justify-content: flex-end; gap: 12px; }
+  .err { margin: 0; font-size: 12px; color: var(--red); }
+  .err[hidden] { display: none; }
+
+  /* 提示条 / toast */
+  .banner {
+    display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; font-size: 12px; line-height: 1.6;
+    border: 1px solid var(--red); background: var(--red-bg); color: var(--red); margin-bottom: 12px;
+  }
+  .banner[hidden] { display: none; }
+  .banner b { color: var(--red); }
+  .banner.is-muted { border-color: var(--k300); background: var(--k100); color: var(--k700); }
+  .banner.is-muted b { color: var(--k900); }
+  .banner .ico { flex: none; margin-top: 2px; }
+
+  .toast-root {
+    position: fixed; right: 24px; bottom: 24px; z-index: 60; max-width: 420px;
+    background: var(--k900); color: #fff; padding: 10px 14px; border-radius: var(--radius);
+    font-size: 13px; display: flex; align-items: center; gap: 8px; border-left: 3px solid var(--green);
+  }
+  .toast-root[hidden] { display: none; }
+  .toast-root .mono { color: #a8d8b9; }
+
+  .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--k400); border: 2px solid #fff; border-radius: 99px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="tb-left">
+      <span class="brand">HIS</span>
+      <span class="crumb">住院管理</span>
+      <span class="sep">/</span>
+      <span class="crumb is-current">住院处 · 3 号窗口</span>
+    </div>
+    <div class="tb-right">
+      <span class="tb-item">班次 <b>白班 08:00–16:00</b></span>
+      <span class="tb-item">今日已办理 <b id="todayCount">2</b></span>
+      <span class="tb-item">操作人 <b>王霞 · 住院处</b></span>
+      <span class="tb-clock" id="clock">11-12 10:39</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <div>
+      <h1>住院登记</h1>
+      <p class="sub">办理新的住院记录；登记、分床和实际入科分别留痕。</p>
+    </div>
+    <div class="ph-right">
+      <p class="ph-count">
+        <span class="dot dot-green"></span>待办理 <b id="cntReady">3</b>
+        <span class="divider"></span>
+        <span class="dot dot-amber"></span>待患者确认 <b id="cntAwait">1</b>
+      </p>
+      <button class="btn btn-secondary" id="btnRefresh" type="button">
+        <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M13.5 8a5.5 5.5 0 1 1-1.9-4.2" /><path d="M13.6 1.8v3.4h-3.4" />
+        </svg>
+        刷新队列
+      </button>
+    </div>
+  </div>
+
+  <nav class="maintabs" role="tablist" aria-label="住院登记主视图">
+    <button class="maintab is-active" id="tabApps" role="tab" aria-selected="true" data-pane="apps" type="button">
+      门诊住院申请 <span class="tab-count" id="tabAppsCount">4</span>
+    </button>
+    <button class="maintab" id="tabRegs" role="tab" aria-selected="false" data-pane="regs" type="button">
+      登记队列 · 02 <span class="tab-count" id="tabRegsCount">5</span>
+    </button>
+    <span class="sync">同步 <b>11-12 10:39</b> · 60 秒自动同步</span>
+  </nav>
+
+  <main class="stage">
+    <!-- 申请 tab -->
+    <section class="pane" id="pane-apps" role="tabpanel" aria-labelledby="tabApps">
+      <div class="queue-col">
+        <div class="queue-filters">
+          <label class="fld">
+            <span class="lbl">检索</span>
+            <input id="appQ" type="search" placeholder="姓名 / 申请号 / 患者标识" autocomplete="off" />
+          </label>
+          <label class="fld">
+            <span class="lbl">科室 <i class="opt">全部</i></span>
+            <select id="appDept"><option value="">全部科室</option></select>
+          </label>
+          <label class="fld">
+            <span class="lbl">状态 <i class="opt">全部</i></span>
+            <select id="appStatus">
+              <option value="">全部状态</option>
+              <option value="confirmed">患者已确认</option>
+              <option value="awaiting">待患者确认</option>
+              <option value="registered">已办理</option>
+              <option value="cancelled">已取消</option>
+            </select>
+          </label>
+        </div>
+        <p class="queue-meta">
+          <span id="appMeta">4 张申请单 · 3 张可按流程办理</span>
+          <a href="#" id="appReset">重置筛选</a>
+        </p>
+        <div class="queue-scroll">
+          <h2 class="col-title">患者已确认的住院申请</h2>
+          <ul class="cards" id="appList"></ul>
+          <div class="empty" id="appEmpty" hidden>
+            <b>没有符合条件的申请单</b>
+            清空关键词 / 科室 / 状态，或点右上角「刷新队列」重新取门诊新开单。
+          </div>
+        </div>
+      </div>
+
+      <div class="form-col">
+        <div class="form-head">
+          <div>
+            <h2>新建住院登记 <span class="num">01</span></h2>
+            <p class="fh-meta" id="fhMeta">未选择申请单 · 从左侧队列点「办理登记」开始</p>
+          </div>
+          <div class="fh-side">
+            <span class="chip s-confirmed" id="fhStatus" hidden><span class="dot"></span><span id="fhStatusText"></span></span>
+            <button class="btn btn-quiet" id="btnCancelApp" type="button" hidden>取消申请</button>
+          </div>
+        </div>
+
+        <div class="subtabs" role="tablist" aria-label="登记步骤">
+          <button class="subtab is-active" role="tab" aria-selected="true" data-step="0" type="button"><span class="idx">01</span>申请与科室</button>
+          <button class="subtab" role="tab" aria-selected="false" data-step="1" type="button"><span class="idx">02</span>患者与联系人</button>
+          <button class="subtab" role="tab" aria-selected="false" data-step="2" type="button"><span class="idx">03</span>办理登记</button>
+          <span class="progress" id="progress">核对进度 <b id="pgNum">0</b>/3</span>
+        </div>
+
+        <div class="form-body" id="formBody">
+          <div class="banner is-muted" id="formBanner" hidden></div>
+
+          <!-- 步骤 1 -->
+          <div class="step" data-step="0">
+            <section class="block">
+              <h3 class="block-title">门诊住院申请单 <span class="tag">只读 · 由门诊开具，不可在此修改</span></h3>
+              <div class="grid2">
+                <label class="fld"><span class="lbl">患者姓名 <i>必填</i></span><input id="fName" readonly /></label>
+                <label class="fld"><span class="lbl">患者院内标识 <i>必填</i></span><input id="fPid" class="mono" readonly /></label>
+                <label class="fld"><span class="lbl">申请号</span><input id="fAppNo" class="mono" readonly /></label>
+                <label class="fld"><span class="lbl">申请时间</span><input id="fAppTime" class="mono" readonly /></label>
+                <label class="fld"><span class="lbl">申请科室</span><input id="fAppDept" readonly /></label>
+                <label class="fld"><span class="lbl">门诊诊断</span><input id="fReason" readonly /></label>
+              </div>
+            </section>
+
+            <section class="block">
+              <h3 class="block-title">本次收治确认</h3>
+              <div class="grid2">
+                <label class="fld"><span class="lbl">入院类型</span><select id="fType"></select></label>
+                <label class="fld"><span class="lbl">住院医生工作组 <i>必填</i></span><select id="fGroup"></select></label>
+                <label class="fld"><span class="lbl">拟收治科室 <i>必填</i></span><select id="fDept"></select></label>
+                <label class="fld"><span class="lbl">拟收治病区</span><select id="fWard"></select></label>
+                <label class="fld"><span class="lbl">床位</span><select id="fBed"></select></label>
+                <label class="fld"><span class="lbl">入院时间</span><input id="fAdmitAt" type="datetime-local" class="mono" /></label>
+              </div>
+              <p class="note">床位可留「暂不分床」，入科前由护士站在床位管理补录；入院类型与科室默认沿用门诊申请，可在此确认。</p>
+            </section>
+          </div>
+
+          <!-- 步骤 2 -->
+          <div class="step" data-step="1" hidden>
+            <section class="block">
+              <h3 class="block-title">患者基本信息 <span class="tag">只读 · 来自患者主索引</span></h3>
+              <div class="grid3">
+                <label class="fld"><span class="lbl">姓名</span><input id="pName" readonly /></label>
+                <label class="fld"><span class="lbl">性别</span><input id="pSex" readonly /></label>
+                <label class="fld"><span class="lbl">年龄</span><input id="pAge" readonly /></label>
+                <label class="fld"><span class="lbl">出生日期</span><input id="pBirth" class="mono" readonly /></label>
+                <label class="fld"><span class="lbl">身份证号</span><input id="pIdCard" class="mono" readonly /></label>
+                <label class="fld"><span class="lbl">医保类型</span><input id="pIns" readonly /></label>
+                <label class="fld"><span class="lbl">联系电话</span><input id="pPhone" class="mono" readonly /></label>
+                <label class="fld"><span class="lbl">民族</span><input id="pNation" readonly /></label>
+                <label class="fld"><span class="lbl">职业</span><input id="pJob" readonly /></label>
+              </div>
+            </section>
+
+            <section class="block">
+              <h3 class="block-title">联系人 <span class="tag is-warn">可修改 · 改动随登记留痕</span></h3>
+              <div class="grid2">
+                <label class="fld"><span class="lbl">联系人姓名</span><input id="cName" /></label>
+                <label class="fld"><span class="lbl">与患者关系</span><input id="cRelation" /></label>
+                <label class="fld"><span class="lbl">联系电话</span><input id="cPhone" class="mono" inputmode="tel" /></label>
+                <label class="fld"><span class="lbl">备用电话 <i class="opt">选填</i></span><input id="cBackup" class="mono" inputmode="tel" /></label>
+              </div>
+            </section>
+
+            <section class="block">
+              <h3 class="block-title">籍贯与住址 <span class="tag is-warn">可修改</span></h3>
+              <div class="grid2">
+                <label class="fld"><span class="lbl">籍贯</span><input id="aNative" /></label>
+                <label class="fld"><span class="lbl">省 / 市 / 区</span><input id="aRegion" /></label>
+                <label class="fld span2"><span class="lbl">详细住址</span><input id="aDetail" /></label>
+                <label class="fld"><span class="lbl">邮政编码</span><input id="aZip" class="mono" inputmode="numeric" /></label>
+              </div>
+            </section>
+
+            <section class="block">
+              <h3 class="block-title">既往住院</h3>
+              <ul class="past" id="pPast"></ul>
+            </section>
+          </div>
+
+          <!-- 步骤 3 -->
+          <div class="step" data-step="2" hidden>
+            <section class="block">
+              <h3 class="block-title">提交前核对 <span class="tag">提交即写入留痕</span></h3>
+              <dl class="summary" id="fSummary"></dl>
+              <div class="grid2" style="margin-top:12px">
+                <label class="fld"><span class="lbl">预交金（元）</span><input id="fDeposit" class="mono" type="number" min="0" step="500" value="5000" /></label>
+                <label class="fld"><span class="lbl">登记窗口</span><input value="住院处 · 3 号窗口（王霞）" readonly /></label>
+              </div>
+            </section>
+
+            <section class="block">
+              <h3 class="block-title">留痕</h3>
+              <ol class="timeline" id="fTimeline"></ol>
+            </section>
+          </div>
+        </div>
+
+        <div class="submitbar">
+          <label class="check">
+            <input type="checkbox" id="chkVerify" />
+            <span>已核对患者身份与门诊申请单一致</span>
+          </label>
+          <p class="gate" id="gateHint">请先从左侧选择一张住院申请单。</p>
+          <div class="sb-actions">
+            <button class="btn btn-secondary" id="btnClear" type="button" hidden>取消申请选择</button>
+            <div class="primary-wrap">
+              <button class="btn btn-primary" id="btnSubmit" type="button" disabled>确认办理住院登记</button>
+              <span class="sub">保存 HIS 住院登记（线下登记）</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 登记队列 tab -->
+    <section class="pane" id="pane-regs" role="tabpanel" aria-labelledby="tabRegs" hidden>
+      <div class="reg-filters">
+        <label class="fld">
+          <span class="lbl">检索</span>
+          <input id="regQ" type="search" placeholder="姓名 / 住院号 / 床号" autocomplete="off" />
+        </label>
+        <label class="fld"><span class="lbl">科室</span><select id="regDept"><option value="">全部科室</option></select></label>
+        <label class="fld">
+          <span class="lbl">状态</span>
+          <select id="regStatus">
+            <option value="">全部状态</option>
+            <option>待入科</option>
+            <option>在院</option>
+            <option>转科待接收</option>
+            <option>待出院审核</option>
+            <option>出院待结算</option>
+          </select>
+        </label>
+        <label class="fld"><span class="lbl">登记日期从</span><input id="regFrom" type="date" class="mono" /></label>
+        <label class="fld"><span class="lbl">到</span><input id="regTo" type="date" class="mono" /></label>
+        <button class="btn btn-primary" id="regQuery" type="button">查询</button>
+        <button class="btn btn-secondary" id="regReset" type="button">重置</button>
+      </div>
+
+      <p class="reg-meta">筛选结果 <b id="regMeta">5 / 5</b> 条 · 登记队列按登记时间倒序</p>
+
+      <div class="table-wrap">
+        <table>
+          <caption class="sr-only">住院登记队列</caption>
+          <thead>
+            <tr>
+              <th scope="col">住院号</th>
+              <th scope="col">患者</th>
+              <th scope="col">患者标识</th>
+              <th scope="col">科室</th>
+              <th scope="col">住院护士工作组 · 床位</th>
+              <th scope="col">状态</th>
+              <th scope="col">登记时间</th>
+            </tr>
+          </thead>
+          <tbody id="regRows"></tbody>
+        </table>
+      </div>
+      <div class="table-foot">
+        <span>共 <b id="regTotal">5</b> 条 · 每页 20 条</span>
+        <span class="pager">
+          <button type="button" disabled>上一页</button>
+          <button type="button" aria-current="page">1</button>
+          <button type="button" disabled>下一页</button>
+        </span>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- 取消申请 -->
+<div class="modal-root" id="modalCancel" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="ccTitle">
+    <header class="panel-head">
+      <h2 id="ccTitle">取消住院申请</h2>
+      <p id="ccSub">取消后本单锁定，取消原因、时间与操作人记入申请单留痕。</p>
+    </header>
+    <div class="panel-body">
+      <label class="fld">
+        <span class="lbl">取消原因 <i>必填</i></span>
+        <select id="ccReason">
+          <option value="">请选择取消原因</option>
+          <option>患者放弃住院</option>
+          <option>改为门诊治疗</option>
+          <option>重复开单</option>
+          <option>其他科室已收治</option>
+          <option>其他</option>
+        </select>
+      </label>
+      <label class="fld">
+        <span class="lbl">补充说明 <i class="opt">选填，120 字以内</i></span>
+        <textarea id="ccNote" rows="3" maxlength="120" placeholder="例如：患者家属决定先门诊复查，下周再评估。"></textarea>
+      </label>
+      <p class="err" id="ccErr" hidden>请选择取消原因后再提交。</p>
+    </div>
+    <footer class="panel-foot">
+      <button class="btn btn-secondary" id="ccBack" type="button">返回</button>
+      <button class="btn btn-danger" id="ccOk" type="button">确认取消申请</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 办理确认 -->
+<div class="modal-root" id="modalConfirm" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="cfTitle">
+    <header class="panel-head">
+      <h2 id="cfTitle">办理确认</h2>
+      <p>这才是真正的提交：生成住院号、申请单转「已办理」、写入留痕。</p>
+    </header>
+    <div class="panel-body">
+      <dl class="summary" id="cfSummary"></dl>
+      <p class="note">联系人 / 个人信息需要更正？返回「患者与联系人」修改，再回到这里核对。</p>
+    </div>
+    <footer class="panel-foot">
+      <button class="btn btn-secondary" id="cfBack" type="button">返回修改联系人 / 个人信息</button>
+      <button class="btn btn-primary" id="cfOk" type="button">确认办理</button>
+    </footer>
+  </div>
+</div>
+
+<div class="toast-root" id="toast" hidden role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var TODAY = "2026-11-12";
+  var OPERATOR = "王霞 · 住院处 3 号窗口";
+
+  var TYPES = ["急诊入院", "择期入院", "转科入院"];
+  var DEPTS = ["心血管内科", "普外科", "骨科", "神经内科", "呼吸内科"];
+  var WARDS = {
+    "心血管内科": ["心内一区", "心内二区"],
+    "普外科": ["普外三区", "普外一区"],
+    "骨科": ["骨二区", "骨一区"],
+    "神经内科": ["神内二区", "神内一区"],
+    "呼吸内科": ["呼内一区"]
+  };
+  var GROUPS = {
+    "心血管内科": ["心内一区医疗组"],
+    "普外科": ["普外三区医疗组"],
+    "骨科": ["骨二区医疗组"],
+    "神经内科": ["神内二区医疗组"],
+    "呼吸内科": []
+  };
+  var BEDS = ["暂不分床", "1 床", "2 床", "3 床", "5 床", "7 床", "12 床", "21 床"];
+  var REG_STATUS_CLASS = {
+    "待入科": "s-pending",
+    "在院": "s-in",
+    "转科待接收": "s-transfer",
+    "待出院审核": "s-leaving",
+    "出院待结算": "s-settling"
+  };
+  var APP_STATUS = {
+    confirmed: { label: "患者已确认", cls: "s-confirmed" },
+    awaiting: { label: "待患者确认", cls: "s-awaiting" },
+    registered: { label: "已办理", cls: "s-registered" },
+    cancelled: { label: "已取消", cls: "s-cancelled" }
+  };
+
+  var APPLICATIONS = [
+    {
+      id: "A1", no: "SQ20261112007", patientId: "P2024051827", name: "陈静怡", sex: "女", age: 52,
+      birth: "1974-03-18", idCard: "3201**********1527", insurance: "城镇职工医保", phone: "13905162318",
+      nation: "汉族", job: "教师", dept: "心血管内科", type: "急诊入院", reason: "急性胸痛待查",
+      status: "confirmed", appliedAt: "2026-11-12T08:20",
+      contact: { name: "陈立国", relation: "儿子", phone: "13905162319", backup: "025-86631208" },
+      address: { native: "江苏苏州", region: "江苏省 / 南京市 / 鼓楼区", detail: "中山北路 128 号 3 幢 502 室", zip: "210009" },
+      past: [{ range: "2023-04-11 ~ 2023-04-18", dept: "心血管内科 · 心内一区" }],
+      cancel: null
+    },
+    {
+      id: "A2", no: "SQ20261112005", patientId: "P2024040913", name: "王振华", sex: "男", age: 61,
+      birth: "1965-07-02", idCard: "3201**********3311", insurance: "城乡居民医保", phone: "13905167742",
+      nation: "汉族", job: "退休", dept: "普外科", type: "择期入院", reason: "腹腔镜胆囊切除术",
+      status: "confirmed", appliedAt: "2026-11-12T08:05",
+      contact: { name: "王倩", relation: "女儿", phone: "13905167743", backup: "025-83387126" },
+      address: { native: "江苏无锡", region: "江苏省 / 南京市 / 秦淮区", detail: "太平南路 66 号 12 幢 201 室", zip: "210002" },
+      past: [{ range: "2021-09-06 ~ 2021-09-13", dept: "普外科 · 普外三区" }],
+      cancel: null
+    },
+    {
+      id: "A3", no: "SQ20261111014", patientId: "P2024022644", name: "林小雨", sex: "女", age: 29,
+      birth: "1997-05-21", idCard: "3201**********0628", insurance: "城镇职工医保", phone: "13905158820",
+      nation: "汉族", job: "设计师", dept: "骨科", type: "择期入院", reason: "右膝半月板修复术",
+      status: "confirmed", appliedAt: "2026-11-11T16:52",
+      contact: { name: "林建国", relation: "父亲", phone: "13905158821", backup: "" },
+      address: { native: "江苏南京", region: "江苏省 / 南京市 / 建邺区", detail: "江东中路 289 号 5 幢 1102 室", zip: "210019" },
+      past: [],
+      cancel: null
+    },
+    {
+      id: "A4", no: "SQ20261110009", patientId: "P2023110378", name: "赵卫国", sex: "男", age: 68,
+      birth: "1958-01-09", idCard: "3201**********5714", insurance: "城镇职工医保", phone: "13905172266",
+      nation: "汉族", job: "退休", dept: "神经内科", type: "转科入院", reason: "脑梗死恢复期",
+      status: "awaiting", appliedAt: "2026-11-10T13:48",
+      contact: { name: "赵磊", relation: "儿子", phone: "13905172267", backup: "025-84210933" },
+      address: { native: "江苏镇江", region: "江苏省 / 南京市 / 玄武区", detail: "珠江路 518 号 2 幢 703 室", zip: "210018" },
+      past: [{ range: "2024-02-19 ~ 2024-03-05", dept: "神经内科 · 神内二区" }],
+      cancel: null
+    }
+  ];
+
+  var REGISTRATIONS = [
+    { no: "ZY20261112001", name: "陈静怡", patientId: "P2024051827", dept: "心血管内科", group: "心内一区", bed: "3 床", status: "待入科", time: "2026-11-12T09:42" },
+    { no: "ZY20261112002", name: "王振华", patientId: "P2024040913", dept: "普外科", group: "普外三区", bed: "12 床", status: "在院", time: "2026-11-12T09:15" },
+    { no: "ZY20261111008", name: "林小雨", patientId: "P2024022644", dept: "骨科", group: "骨二区", bed: "7 床", status: "转科待接收", time: "2026-11-11T16:20" },
+    { no: "ZY20261110015", name: "赵卫国", patientId: "P2023110378", dept: "神经内科", group: "神内二区", bed: "21 床", status: "待出院审核", time: "2026-11-10T14:05" },
+    { no: "ZY20261109003", name: "周慧敏", patientId: "P2023120945", dept: "呼吸内科", group: "呼内一区", bed: "5 床", status: "出院待结算", time: "2026-11-09T11:30" }
+  ];
+
+  var state = {
+    tab: "apps",
+    step: 0,
+    selectedId: null,
+    verified: false,
+    app: { q: "", dept: "", status: "" },
+    reg: { q: "", dept: "", status: "", from: "", to: "" },
+    draft: null,
+    newNo: ""
+  };
+
+  var el = {};
+  function $(id) { return document.getElementById(id); }
+
+  function esc(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, function (ch) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
+    });
+  }
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function fmtDateTime(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) { return iso || "—"; }
+    return pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+  function fmtDateOnly(iso) {
+    var d = new Date(iso);
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+  function money(n) {
+    var v = Number(n || 0);
+    return "¥ " + v.toLocaleString("zh-CN");
+  }
+  function canRegister(app) { return app.status === "confirmed"; }
+  function findApp(id) {
+    for (var i = 0; i < APPLICATIONS.length; i++) { if (APPLICATIONS[i].id === id) { return APPLICATIONS[i]; } }
+    return null;
+  }
+  function selectedApp() { return state.selectedId ? findApp(state.selectedId) : null; }
+
+  function fillSelect(node, items, current, placeholder) {
+    var html = "";
+    if (placeholder) { html += '<option value="">' + esc(placeholder) + "</option>"; }
+    for (var i = 0; i < items.length; i++) {
+      var value = items[i];
+      html += '<option value="' + esc(value) + '"' + (value === current ? " selected" : "") + ">" + esc(value) + "</option>";
+    }
+    node.innerHTML = html;
+  }
+
+  /* ── 队列渲染 ─────────────────────────────────────── */
+  function filteredApps() {
+    var q = state.app.q.trim().toLowerCase();
+    return APPLICATIONS.filter(function (app) {
+      if (state.app.dept && app.dept !== state.app.dept) { return false; }
+      if (state.app.status && app.status !== state.app.status) { return false; }
+      if (!q) { return true; }
+      return [app.name, app.no, app.patientId, app.reason].join(" ").toLowerCase().indexOf(q) >= 0;
+    });
+  }
+
+  function renderApps() {
+    var list = filteredApps();
+    el.appList.innerHTML = list.map(function (app) {
+      var st = APP_STATUS[app.status];
+      var selected = app.id === state.selectedId;
+      var locked = !canRegister(app);
+      return (
+        '<li><button class="card' + (selected ? " is-selected" : "") + (locked ? " is-locked" : "") + '"' +
+        ' type="button" data-app="' + esc(app.id) + '"' + (locked ? " aria-disabled=\"true\"" : "") + ">" +
+        '<span class="card-top"><span class="card-name">' + esc(app.name) +
+        "<small>" + esc(app.sex) + " · " + esc(app.age) + " 岁</small></span>" +
+        '<span class="chip ' + st.cls + '"><span class="dot"></span>' + esc(st.label) + "</span></span>" +
+        '<span class="card-meta"><span class="pid">' + esc(app.patientId) + "</span> · " + esc(app.dept) + " · " + esc(app.type) + "</span>" +
+        '<span class="card-reason">' + esc(app.reason) + "</span>" +
+        '<span class="card-foot"><span class="card-meta mono">申请 ' + esc(fmtDateTime(app.appliedAt)) + "</span>" +
+        '<span class="btn ' + (locked ? "btn-secondary" : "btn-secondary") + '" style="height:26px;font-size:12px;pointer-events:none">' +
+        (app.status === "registered" ? "已办理" : app.status === "cancelled" ? "已取消" : "办理登记") + "</span></span>" +
+        "</button></li>"
+      );
+    }).join("");
+
+    el.appEmpty.hidden = list.length !== 0;
+    var ready = APPLICATIONS.filter(function (app) { return app.status === "confirmed"; }).length;
+    el.appMeta.textContent = list.length + " 张申请单 · " + ready + " 张可按流程办理";
+    el.tabAppsCount.textContent = String(APPLICATIONS.length);
+    el.cntReady.textContent = String(ready);
+    el.cntAwait.textContent = String(APPLICATIONS.filter(function (app) { return app.status === "awaiting"; }).length);
+  }
+
+  /* ── 表单渲染 ─────────────────────────────────────── */
+  function newDraft(app) {
+    var ward = (WARDS[app.dept] || [""])[0];
+    return {
+      type: app.type,
+      dept: app.dept,
+      ward: ward,
+      group: (GROUPS[app.dept] || [""])[0],
+      bed: "暂不分床",
+      admitAt: TODAY + "T10:39",
+      deposit: "5000",
+      contact: { name: app.contact.name, relation: app.contact.relation, phone: app.contact.phone, backup: app.contact.backup },
+      address: { native: app.address.native, region: app.address.region, detail: app.address.detail, zip: app.address.zip }
+    };
+  }
+
+  function syncDraftFromForm() {
+    if (!state.draft) { return; }
+    var d = state.draft;
+    d.type = el.fType.value || d.type;
+    d.dept = el.fDept.value || d.dept;
+    d.ward = el.fWard.value || d.ward;
+    d.group = el.fGroup.value;
+    d.bed = el.fBed.value;
+    d.admitAt = el.fAdmitAt.value;
+    d.deposit = el.fDeposit.value;
+    d.contact = {
+      name: el.cName.value,
+      relation: el.cRelation.value,
+      phone: el.cPhone.value,
+      backup: el.cBackup.value
+    };
+    d.address = {
+      native: el.aNative.value,
+      region: el.aRegion.value,
+      detail: el.aDetail.value,
+      zip: el.aZip.value
+    };
+  }
+
+  function renderForm() {
+    var app = selectedApp();
+
+    if (!app) {
+      el.fhMeta.textContent = "未选择申请单 · 从左侧队列点「办理登记」开始";
+      el.fhStatus.hidden = true;
+      el.btnCancelApp.hidden = true;
+      el.btnClear.hidden = true;
+      el.chkVerify.checked = false;
+      el.chkVerify.disabled = true;
+      state.verified = false;
+      ["fName", "fPid", "fAppNo", "fAppTime", "fAppDept", "fReason",
+        "pName", "pSex", "pAge", "pBirth", "pIdCard", "pIns", "pPhone", "pNation", "pJob"].forEach(function (id) {
+          el[id].value = "";
+        });
+      ["cName", "cRelation", "cPhone", "cBackup", "aNative", "aRegion", "aDetail", "aZip"].forEach(function (id) {
+        el[id].value = "";
+        el[id].disabled = true;
+      });
+      el.fSummary.innerHTML = "";
+      el.cfSummary.innerHTML = "";
+      el.fTimeline.innerHTML = "";
+      el.pPast.innerHTML = "";
+      el.formBanner.hidden = true;
+      el.progress.classList.remove("is-full");
+      el.pgNum.textContent = "0";
+      updateGate();
+      return;
+    }
+
+    if (!state.draft || state.draft.appId !== app.id) {
+      state.draft = newDraft(app);
+      state.draft.appId = app.id;
+      state.step = 0;
+      state.verified = false;
+      el.chkVerify.checked = false;
+    }
+    var d = state.draft;
+    var st = APP_STATUS[app.status];
+
+    el.fName.value = app.name;
+    el.fPid.value = app.patientId;
+    el.fAppNo.value = app.no;
+    el.fAppTime.value = fmtDateTime(app.appliedAt);
+    el.fAppDept.value = app.dept;
+    el.fReason.value = app.reason;
+
+    fillSelect(el.fType, TYPES, d.type, "");
+    fillSelect(el.fDept, DEPTS, d.dept, "");
+    fillSelect(el.fWard, WARDS[d.dept] || [], d.ward, "");
+    fillSelect(el.fGroup, GROUPS[d.dept] || [], d.group, "请选择住院医生工作组");
+    fillSelect(el.fBed, BEDS, d.bed, "");
+    el.fAdmitAt.value = d.admitAt;
+    el.fDeposit.value = d.deposit;
+
+    var locked = !canRegister(app);
+    [el.fType, el.fDept, el.fWard, el.fGroup, el.fBed, el.fAdmitAt].forEach(function (node) {
+      node.disabled = locked;
+    });
+    el.fDeposit.disabled = locked;
+
+    el.pName.value = app.name;
+    el.pSex.value = app.sex;
+    el.pAge.value = app.age + " 岁";
+    el.pBirth.value = app.birth;
+    el.pIdCard.value = app.idCard;
+    el.pIns.value = app.insurance;
+    el.pPhone.value = app.phone;
+    el.pNation.value = app.nation;
+    el.pJob.value = app.job;
+
+    [["cName", "name"], ["cRelation", "relation"], ["cPhone", "phone"], ["cBackup", "backup"]].forEach(function (pair) {
+      el[pair[0]].value = d.contact[pair[1]] || "";
+      el[pair[0]].disabled = locked;
+    });
+    [["aNative", "native"], ["aRegion", "region"], ["aDetail", "detail"], ["aZip", "zip"]].forEach(function (pair) {
+      el[pair[0]].value = d.address[pair[1]] || "";
+      el[pair[0]].disabled = locked;
+    });
+
+    el.pPast.innerHTML = app.past.length
+      ? app.past.map(function (item) {
+        return '<li><span class="range">' + esc(item.range) + "</span><span>" + esc(item.dept) + "</span></li>";
+      }).join("")
+      : '<li><span>无既往住院记录</span></li>';
+
+    el.fhMeta.innerHTML = "<b>" + esc(app.name) + "</b> · " + esc(app.sex) + " · " + esc(app.age) + " 岁" +
+      ' · <span class="pid">' + esc(app.patientId) + "</span> · 申请 " + esc(app.no);
+    el.fhStatus.hidden = false;
+    el.fhStatus.className = "chip " + st.cls;
+    el.fhStatusText.textContent = st.label;
+    el.btnCancelApp.hidden = !(app.status === "confirmed" || app.status === "awaiting");
+    el.btnClear.hidden = false;
+
+    el.chkVerify.disabled = locked;
+    el.chkVerify.checked = !locked && state.verified;
+
+    if (app.status === "awaiting") {
+      el.formBanner.hidden = false;
+      el.formBanner.className = "banner";
+      el.formBanner.innerHTML = '<svg class="ico" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M8 5v4"/><path d="M8 11.4v.1"/></svg>' +
+        "<span><b>患者尚未确认办理住院</b> · 该申请单仍在等患者本人或家属到门诊确认，住院处不能代为确认，也无法提交登记。</span>";
+    } else if (app.status === "cancelled") {
+      el.formBanner.hidden = false;
+      el.formBanner.className = "banner";
+      el.formBanner.innerHTML = '<svg class="ico" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M8 5v4"/><path d="M8 11.4v.1"/></svg>' +
+        "<span><b>申请单已取消</b> · " + esc(app.cancel ? fmtDateTime(app.cancel.time) + " " + app.cancel.operator + "：" + app.cancel.reason + (app.cancel.note ? "（" + app.cancel.note + "）" : "") : "") + "</span>";
+    } else if (app.status === "registered") {
+      el.formBanner.hidden = false;
+      el.formBanner.className = "banner is-muted";
+      el.formBanner.innerHTML = "<span><b>该申请单已办理</b> · 住院号 " + esc(app.regNo || "—") + "；如需更正走退号流程，不在此重复登记。</span>";
+    } else {
+      el.formBanner.hidden = true;
+      el.formBanner.innerHTML = "";
+    }
+
+    renderSummary();
+    renderTimeline();
+    renderSteps();
+    updateGate();
+  }
+
+  function summaryData() {
+    var app = selectedApp();
+    var d = state.draft;
+    if (!app || !d) { return []; }
+    return [
+      ["患者", app.name + " · " + app.sex + " · " + app.age + " 岁"],
+      ["申请单", app.no + " · " + fmtDateTime(app.appliedAt)],
+      ["科室病区", d.dept + " · " + (d.ward || "未选")],
+      ["入院类型", d.type],
+      ["住院医生工作组", d.group || "未选"],
+      ["床位", d.bed],
+      ["入院时间", d.admitAt ? fmtDateTime(d.admitAt) : "未填"],
+      ["预交金", money(d.deposit)]
+    ];
+  }
+
+  function renderSummary() {
+    var items = summaryData();
+    el.fSummary.innerHTML = items.map(function (pair) {
+      return "<div><dt>" + esc(pair[0]) + "</dt><dd>" + esc(pair[1]) + "</dd></div>";
+    }).join("");
+    el.cfSummary.innerHTML = items.map(function (pair) {
+      return "<div><dt>" + esc(pair[0]) + "</dt><dd>" + esc(pair[1]) + "</dd></div>";
+    }).join("");
+  }
+
+  function renderTimeline() {
+    var app = selectedApp();
+    if (!app) { el.fTimeline.innerHTML = ""; return; }
+    var rows = [
+      { when: fmtDateTime(app.appliedAt), what: "门诊开具住院申请单 · " + app.dept + " · " + app.type, state: "is-done" }
+    ];
+    if (app.status === "awaiting") {
+      rows.push({ when: "—", what: "等患者本人 / 家属到门诊确认", state: "is-todo" });
+    } else if (app.status === "cancelled") {
+      rows.push({ when: fmtDateTime(app.cancel.time), what: "患者确认（已取消前完成）", state: "is-done" });
+      rows.push({
+        when: fmtDateTime(app.cancel.time),
+        what: "住院处取消申请 · " + app.cancel.operator + " · " + app.cancel.reason +
+          (app.cancel.note ? "（" + app.cancel.note + "）" : ""),
+        state: "is-done"
+      });
+    } else if (app.status === "registered") {
+      rows.push({ when: "—", what: "患者确认办理住院", state: "is-done" });
+      rows.push({ when: "—", what: "住院处登记完成 · 住院号 " + (app.regNo || "—"), state: "is-done" });
+    } else {
+      rows.push({ when: "—", what: "患者确认办理住院", state: "is-done" });
+      rows.push({ when: fmtDateTime(app.appliedAt), what: "住院处核对身份 · 待提交", state: "is-todo" });
+    }
+    el.fTimeline.innerHTML = rows.map(function (row) {
+      return '<li class="' + row.state + '"><span class="t-when">' + esc(row.when) + '</span><span class="t-what">' + esc(row.what) + "</span></li>";
+    }).join("");
+  }
+
+  function renderSteps() {
+    var nodes = document.querySelectorAll(".step");
+    for (var i = 0; i < nodes.length; i++) {
+      nodes[i].hidden = Number(nodes[i].getAttribute("data-step")) !== state.step;
+    }
+    var tabs = document.querySelectorAll(".subtab");
+    for (var j = 0; j < tabs.length; j++) {
+      var on = Number(tabs[j].getAttribute("data-step")) === state.step;
+      tabs[j].classList.toggle("is-active", on);
+      tabs[j].setAttribute("aria-selected", on ? "true" : "false");
+    }
+  }
+
+  function gateState() {
+    var app = selectedApp();
+    if (!app) { return { ok: false, tone: "", text: "请先从左侧选择一张住院申请单。" }; }
+    if (app.status === "awaiting") { return { ok: false, tone: "is-error", text: "患者尚未确认办理住院，住院处不能代为确认。" }; }
+    if (app.status === "cancelled") { return { ok: false, tone: "is-error", text: "申请单已取消，不能办理登记。" }; }
+    if (app.status === "registered") { return { ok: false, tone: "is-error", text: "该申请单已办理（" + (app.regNo || "—") + "），不能重复登记。" }; }
+    var d = state.draft || {};
+    var missing = [];
+    if (!d.dept) { missing.push("拟收治科室"); }
+    if (!d.group) { missing.push("住院医生工作组"); }
+    if (missing.length) { return { ok: false, tone: "is-warn", text: "还差：" + missing.join(" / ") + "。" }; }
+    if (!state.verified) { return { ok: false, tone: "", text: "勾选「已核对患者身份与门诊申请单一致」后才能提交。" }; }
+    return { ok: true, tone: "is-ok", text: "材料齐全，提交后生成住院号并进入待入科队列。" };
+  }
+
+  function updateGate() {
+    var gate = gateState();
+    el.gateHint.className = "gate" + (gate.tone ? " " + gate.tone : "");
+    var icon = "";
+    if (gate.tone === "is-ok") {
+      icon = '<svg class="ico" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 8.6l3.2 3.2L13 5"/></svg>';
+    } else if (gate.tone === "is-error") {
+      icon = '<svg class="ico" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M8 5v4"/><path d="M8 11.4v.1"/></svg>';
+    }
+    el.gateHint.innerHTML = icon + "<span>" + esc(gate.text) + "</span>";
+    el.btnSubmit.disabled = !gate.ok;
+
+    var d = state.draft || {};
+    var done = 0;
+    if (state.verified) { done++; }
+    if (d.dept && d.ward) { done++; }
+    if (d.group) { done++; }
+    el.pgNum.textContent = String(done);
+    el.progress.classList.toggle("is-full", done === 3);
+    el.chkVerify.checked = state.verified && !!selectedApp() && canRegister(selectedApp());
+  }
+
+  /* ── 登记队列 ─────────────────────────────────────── */
+  function filteredRegs() {
+    var q = state.reg.q.trim().toLowerCase();
+    return REGISTRATIONS.filter(function (row) {
+      if (state.reg.dept && row.dept !== state.reg.dept) { return false; }
+      if (state.reg.status && row.status !== state.reg.status) { return false; }
+      var day = fmtDateOnly(row.time);
+      if (state.reg.from && day < state.reg.from) { return false; }
+      if (state.reg.to && day > state.reg.to) { return false; }
+      if (!q) { return true; }
+      return [row.name, row.no, row.patientId, row.bed, row.group].join(" ").toLowerCase().indexOf(q) >= 0;
+    }).sort(function (a, b) { return a.time < b.time ? 1 : a.time > b.time ? -1 : 0; });
+  }
+
+  function renderRegs() {
+    var rows = filteredRegs();
+    if (!rows.length) {
+      el.regRows.innerHTML = '<tr class="table-empty"><td colspan="7"><b>当前筛选条件下没有登记记录</b><br />放宽登记日期区间、清空关键词或换一个科室后重新查询。</td></tr>';
+    } else {
+      el.regRows.innerHTML = rows.map(function (row) {
+        return "<tr" + (row.no === state.newNo ? ' class="is-new"' : "") + ">" +
+          '<td class="mono">' + esc(row.no) + "</td>" +
+          "<td>" + esc(row.name) + "</td>" +
+          '<td class="mono">' + esc(row.patientId) + "</td>" +
+          "<td>" + esc(row.dept) + "</td>" +
+          "<td>" + esc(row.group) + " · " + esc(row.bed) + "</td>" +
+          '<td><span class="chip ' + (REG_STATUS_CLASS[row.status] || "") + '"><span class="dot"></span>' + esc(row.status) + "</span></td>" +
+          '<td class="mono">' + esc(fmtDateTime(row.time)) + "</td>" +
+          "</tr>";
+      }).join("");
+    }
+    el.regMeta.textContent = rows.length + " / " + REGISTRATIONS.length;
+    el.regTotal.textContent = String(REGISTRATIONS.length);
+    el.tabRegsCount.textContent = String(REGISTRATIONS.length);
+    el.todayCount.textContent = String(REGISTRATIONS.filter(function (row) { return fmtDateOnly(row.time) === TODAY; }).length);
+  }
+
+  function nextRegNo() {
+    var prefix = "ZY" + TODAY.replace(/-/g, "");
+    var max = 0;
+    REGISTRATIONS.forEach(function (row) {
+      if (row.no.indexOf(prefix) === 0) {
+        var tail = Number(row.no.slice(prefix.length));
+        if (tail > max) { max = tail; }
+      }
+    });
+    return prefix + pad(max + 1).replace(/^(\d)$/, "00$1").replace(/^(\d\d)$/, "0$1");
+  }
+
+  /* ── 交互 ─────────────────────────────────────────── */
+  function selectApp(id) {
+    var app = findApp(id);
+    if (!app) { return; }
+    state.selectedId = id;
+    state.verified = false;
+    state.draft = null;
+    el.chkVerify.checked = false;
+    renderApps();
+    renderForm();
+    selectStep(0);
+  }
+
+  function clearSelection() {
+    state.selectedId = null;
+    state.verified = false;
+    state.draft = null;
+    el.chkVerify.checked = false;
+    renderApps();
+    renderForm();
+  }
+
+  function selectStep(index) {
+    state.step = index;
+    renderSteps();
+  }
+
+  function switchTab(name) {
+    state.tab = name;
+    $("pane-apps").hidden = name !== "apps";
+    $("pane-regs").hidden = name !== "regs";
+    var tabs = document.querySelectorAll(".maintab");
+    for (var i = 0; i < tabs.length; i++) {
+      var on = tabs[i].getAttribute("data-pane") === name;
+      tabs[i].classList.toggle("is-active", on);
+      tabs[i].setAttribute("aria-selected", on ? "true" : "false");
+    }
+  }
+
+  var toastTimer = null;
+  function toast(html) {
+    el.toast.innerHTML = html;
+    el.toast.hidden = false;
+    if (toastTimer) { clearTimeout(toastTimer); }
+    toastTimer = setTimeout(function () { el.toast.hidden = true; }, 6000);
+  }
+
+  function openModal(node) { node.hidden = false; }
+  function closeModal(node) { node.hidden = true; }
+
+  function submit() {
+    var app = selectedApp();
+    var gate = gateState();
+    if (!app || !gate.ok) { return; }
+    syncDraftFromForm();
+    state.confirmBuffer = { appId: app.id, no: nextRegNo(), draft: JSON.parse(JSON.stringify(state.draft)) };
+    renderSummary();
+    openModal($("modalConfirm"));
+  }
+
+  function commitRegistration() {
+    var app = selectedApp();
+    var buffer = state.confirmBuffer;
+    if (!app || !buffer) { closeModal($("modalConfirm")); return; }
+    var d = buffer.draft;
+
+    REGISTRATIONS.unshift({
+      no: buffer.no,
+      name: app.name,
+      patientId: app.patientId,
+      dept: d.dept,
+      group: d.ward || d.dept,
+      bed: d.bed,
+      status: "待入科",
+      time: TODAY + "T10:39"
+    });
+    app.status = "registered";
+    app.regNo = buffer.no;
+    state.newNo = buffer.no;
+    closeModal($("modalConfirm"));
+    state.selectedId = null;
+    state.draft = null;
+    state.verified = false;
+    el.chkVerify.checked = false;
+
+    renderApps();
+    renderForm();
+    resetRegFilters(false);
+    renderRegs();
+    switchTab("regs");
+    toast('登记已写入 · 住院号 <span class="mono">' + esc(buffer.no) + "</span> · 状态「待入科」");
+  }
+
+  function openCancel() {
+    var app = selectedApp();
+    if (!app) { return; }
+    $("ccSub").textContent = "将取消 " + app.name + "（" + app.patientId + "）的住院申请；取消后本单锁定，原因与操作人记入留痕。";
+    $("ccReason").value = "";
+    $("ccNote").value = "";
+    $("ccErr").hidden = true;
+    openModal($("modalCancel"));
+  }
+
+  function commitCancel() {
+    var app = selectedApp();
+    if (!app) { closeModal($("modalCancel")); return; }
+    var reason = $("ccReason").value;
+    if (!reason) { $("ccErr").hidden = false; return; }
+    app.status = "cancelled";
+    app.cancel = {
+      time: TODAY + "T10:39",
+      operator: OPERATOR,
+      reason: reason,
+      note: $("ccNote").value.trim()
+    };
+    state.verified = false;
+    el.chkVerify.checked = false;
+    closeModal($("modalCancel"));
+    renderApps();
+    renderForm();
+    toast("申请单已取消 · 已记入留痕");
+  }
+
+  function resetRegFilters(apply) {
+    el.regQ.value = "";
+    el.regDept.value = "";
+    el.regStatus.value = "";
+    el.regFrom.value = "";
+    el.regTo.value = "";
+    state.reg = { q: "", dept: "", status: "", from: "", to: "" };
+    if (apply) { renderRegs(); }
+  }
+
+  function bind() {
+    el = {
+      appList: $("appList"), appEmpty: $("appEmpty"), appQ: $("appQ"), appDept: $("appDept"),
+      appStatus: $("appStatus"), appMeta: $("appMeta"), appReset: $("appReset"),
+      fName: $("fName"), fPid: $("fPid"), fAppNo: $("fAppNo"), fAppTime: $("fAppTime"),
+      fAppDept: $("fAppDept"), fReason: $("fReason"), fType: $("fType"), fDept: $("fDept"),
+      fWard: $("fWard"), fGroup: $("fGroup"), fBed: $("fBed"), fAdmitAt: $("fAdmitAt"),
+      pName: $("pName"), pSex: $("pSex"), pAge: $("pAge"), pBirth: $("pBirth"), pIdCard: $("pIdCard"),
+      pIns: $("pIns"), pPhone: $("pPhone"), pNation: $("pNation"), pJob: $("pJob"),
+      cName: $("cName"), cRelation: $("cRelation"), cPhone: $("cPhone"), cBackup: $("cBackup"),
+      aNative: $("aNative"), aRegion: $("aRegion"), aDetail: $("aDetail"), aZip: $("aZip"),
+      pPast: $("pPast"), fSummary: $("fSummary"), cfSummary: $("cfSummary"), fTimeline: $("fTimeline"),
+      fDeposit: $("fDeposit"), formBanner: $("formBanner"), fhMeta: $("fhMeta"), fhStatus: $("fhStatus"),
+      fhStatusText: $("fhStatusText"), btnCancelApp: $("btnCancelApp"), btnClear: $("btnClear"),
+      btnSubmit: $("btnSubmit"), chkVerify: $("chkVerify"), gateHint: $("gateHint"),
+      progress: $("progress"), pgNum: $("pgNum"), regRows: $("regRows"), regMeta: $("regMeta"),
+      regTotal: $("regTotal"), regQ: $("regQ"), regDept: $("regDept"), regStatus: $("regStatus"),
+      regFrom: $("regFrom"), regTo: $("regTo"), todayCount: $("todayCount"), tabAppsCount: $("tabAppsCount"),
+      tabRegsCount: $("tabRegsCount"), cntReady: $("cntReady"), cntAwait: $("cntAwait"), toast: $("toast")
+    };
+
+    DEPTS.forEach(function (dept) {
+      var opt = document.createElement("option");
+      opt.value = dept;
+      opt.textContent = dept;
+      el.appDept.appendChild(opt);
+      var opt2 = document.createElement("option");
+      opt2.value = dept;
+      opt2.textContent = dept;
+      $("regDept").appendChild(opt2);
+    });
+
+    el.appList.addEventListener("click", function (event) {
+      var card = event.target.closest("[data-app]");
+      if (!card) { return; }
+      var app = findApp(card.getAttribute("data-app"));
+      if (!app) { return; }
+      if (!canRegister(app) && app.status !== "cancelled" && app.status !== "registered") {
+        selectApp(app.id);
+        return;
+      }
+      selectApp(app.id);
+    });
+
+    el.appQ.addEventListener("input", function () { state.app.q = el.appQ.value; renderApps(); });
+    el.appDept.addEventListener("change", function () { state.app.dept = el.appDept.value; renderApps(); });
+    el.appStatus.addEventListener("change", function () { state.app.status = el.appStatus.value; renderApps(); });
+    el.appReset.addEventListener("click", function (event) {
+      event.preventDefault();
+      el.appQ.value = "";
+      el.appDept.value = "";
+      el.appStatus.value = "";
+      state.app = { q: "", dept: "", status: "" };
+      renderApps();
+    });
+
+    document.querySelectorAll(".subtab").forEach(function (tab) {
+      tab.addEventListener("click", function () { selectStep(Number(tab.getAttribute("data-step"))); });
+    });
+
+    document.querySelectorAll(".maintab").forEach(function (tab) {
+      tab.addEventListener("click", function () { switchTab(tab.getAttribute("data-pane")); });
+    });
+
+    el.fDept.addEventListener("change", function () {
+      state.draft.dept = el.fDept.value;
+      state.draft.ward = (WARDS[state.draft.dept] || [""])[0];
+      state.draft.group = (GROUPS[state.draft.dept] || [""])[0];
+      fillSelect(el.fWard, WARDS[state.draft.dept] || [], state.draft.ward, "");
+      fillSelect(el.fGroup, GROUPS[state.draft.dept] || [], state.draft.group, "请选择住院医生工作组");
+      renderSummary();
+      updateGate();
+    });
+    ["fType", "fWard", "fGroup", "fBed", "fAdmitAt", "fDeposit",
+      "cName", "cRelation", "cPhone", "cBackup", "aNative", "aRegion", "aDetail", "aZip"].forEach(function (id) {
+      el[id].addEventListener("change", function () { syncDraftFromForm(); renderSummary(); updateGate(); });
+      el[id].addEventListener("input", function () { syncDraftFromForm(); renderSummary(); updateGate(); });
+    });
+
+    el.chkVerify.addEventListener("change", function () {
+      state.verified = el.chkVerify.checked;
+      updateGate();
+    });
+
+    el.btnClear.addEventListener("click", function () {
+      clearSelection();
+      toast("已取消申请选择，队列与表单回到未选状态");
+    });
+
+    el.btnCancelApp.addEventListener("click", openCancel);
+    el.btnSubmit.addEventListener("click", submit);
+
+    $("btnRefresh").addEventListener("click", function () {
+      renderApps();
+      renderRegs();
+      toast("队列已刷新 · 门诊新增 0 张申请单");
+    });
+
+    $("ccBack").addEventListener("click", function () { closeModal($("modalCancel")); });
+    $("ccOk").addEventListener("click", commitCancel);
+    $("cfBack").addEventListener("click", function () {
+      closeModal($("modalConfirm"));
+      selectStep(1);
+      el.cName.focus();
+    });
+    $("cfOk").addEventListener("click", commitRegistration);
+
+    [["regQ", "q"], ["regDept", "dept"], ["regStatus", "status"], ["regFrom", "from"], ["regTo", "to"]].forEach(function (pair) {
+      var node = $(pair[0]);
+      node.addEventListener("change", function () { state.reg[pair[1]] = node.value; });
+    });
+    $("regQuery").addEventListener("click", function () { renderRegs(); });
+    $("regReset").addEventListener("click", function () { resetRegFilters(true); });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key !== "Escape") { return; }
+      if (!$("modalCancel").hidden) { closeModal($("modalCancel")); }
+      else if (!$("modalConfirm").hidden) { closeModal($("modalConfirm")); }
+    });
+  }
+
+  function boot() {
+    bind();
+    renderApps();
+    renderForm();
+    renderRegs();
+    switchTab("apps");
+    selectStep(0);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+</body>
+</html>

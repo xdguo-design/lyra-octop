@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="pageflow-slug" content="workflow-board" />
+<meta name="pageflow-branch" content="feature/page-workflow-board" />
+<title>页面开发工作流看板 · 开发进度</title>
+<style>
+  :root {
+    --paper: #f7f5f0;
+    --ink: #16181d;
+    --muted: #6b6f7a;
+    --line: #dcd7cc;
+    --done: #1f7a4d;
+    --wip: #a4761b;
+    --todo: #6b6f7a;
+    --blocked: #a63d3d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 15px/1.6 "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 48px 24px 80px; }
+  .hero { border-bottom: 1px solid var(--line); padding-bottom: 24px; }
+  .kicker {
+    margin: 0 0 8px;
+    font-size: 12px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h1 { margin: 0 0 12px; font-size: 34px; line-height: 1.2; letter-spacing: -.01em; }
+  .meta { margin: 0; color: var(--muted); font-size: 13px; }
+  .bar {
+    margin-top: 20px;
+    height: 6px;
+    border-radius: 99px;
+    background: #e6e1d6;
+    overflow: hidden;
+  }
+  .bar > span { display: block; height: 100%; background: var(--done); }
+  .count { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
+  h2 {
+    margin: 44px 0 16px;
+    font-size: 13px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+  .card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .card header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .mid { font: 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); }
+  .pill {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 99px;
+    border: 1px solid currentColor;
+  }
+  .pill.done { color: var(--done); }
+  .pill.wip { color: var(--wip); }
+  .pill.todo { color: var(--todo); }
+  .pill.blocked { color: var(--blocked); }
+  .card h3 { margin: 10px 0 8px; font-size: 16px; font-weight: 600; }
+  .files { margin: 0; padding-left: 18px; font-size: 12px; color: var(--muted); }
+  .files code, .verify code { font-size: 12px; }
+  .verify { margin: 10px 0 0; font-size: 12px; color: var(--muted); }
+  .log { list-style: none; margin: 0; padding: 0; border-left: 2px solid var(--line); }
+  .log > li { position: relative; padding: 0 0 22px 20px; }
+  .log > li::before {
+    content: "";
+    position: absolute;
+    left: -5px;
+    top: 6px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--done);
+  }
+  .log .stamp {
+    margin: 0;
+    font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--muted);
+  }
+  .log h3 { margin: 4px 0 4px; font-size: 15px; }
+  .log p { margin: 0; }
+  .log .files { margin-top: 4px; padding-left: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  th { font-weight: 600; color: var(--muted); font-size: 12px; text-transform: uppercase; }
+  footer {
+    margin-top: 56px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <p class="kicker">pageflow · feature/page-workflow-board</p>
+    <h1>页面开发工作流看板</h1>
+    <p class="meta">基线 develop · 目标 docs/workflow/board/index.html · 文档创建于 2026-11-14T10:36:00+08:00</p>
+    <div class="bar"><span style="width:100%"></span></div>
+    <p class="count">5 / 5 模块完成</p>
+  </header>
+  <main>
+    <h2>模块</h2>
+    <div class="grid">
+      <article class="card" id="module-m1" data-status="done">
+        <header><span class="mid">M1</span><span class="pill done">已完成</span></header>
+        <h3>文档模型与解析</h3>
+        <ul class="files"><li><code>scripts/pageflow.py</code></li></ul>
+        <p class="verify">校验：<code>pageflow status --slug workflow-board</code></p>
+      </article>
+      <article class="card" id="module-m2" data-status="done">
+        <header><span class="mid">M2</span><span class="pill done">已完成</span></header>
+        <h3>进度追加协议</h3>
+        <ul class="files"><li><code>docs/workflow/README.md</code></li></ul>
+        <p class="verify">校验：<code>pageflow log --help</code></p>
+      </article>
+      <article class="card" id="module-m3" data-status="done">
+        <header><span class="mid">M3</span><span class="pill done">已完成</span></header>
+        <h3>看板页面渲染</h3>
+        <ul class="files"><li><code>docs/workflow/board/index.html</code></li></ul>
+        <p class="verify">校验：<code>pageflow render --slug workflow-board --check</code></p>
+      </article>
+      <article class="card" id="module-m4" data-status="done">
+        <header><span class="mid">M4</span><span class="pill done">已完成</span></header>
+        <h3>测试生成器</h3>
+        <ul class="files"><li><code>tests/unit/workflow/test_pf_workflow_board_contract.py</code></li></ul>
+        <p class="verify">校验：<code>pageflow gen-tests --slug workflow-board</code></p>
+      </article>
+      <article class="card" id="module-m5" data-status="done">
+        <header><span class="mid">M5</span><span class="pill done">已完成</span></header>
+        <h3>对抗性与唯一性套件</h3>
+        <ul class="files"><li><code>tests/unit/workflow/test_pf_workflow_board_adversarial.py</code></li><li><code>tests/unit/workflow/test_pf_workflow_board_uniqueness.py</code></li></ul>
+        <p class="verify">校验：<code>pageflow verify --slug workflow-board</code></p>
+      </article>
+    </div>
+    <h2>变更日志</h2>
+    <ol class="log">
+      <li id="log-1">
+        <p class="stamp">2026-11-14T10:41:12+08:00 · M1</p>
+        <h3>文档模型与解析</h3>
+        <p>实现 meta/章节/表格/日志四段解析，模块状态机限定为 todo/wip/done/blocked，未知状态归一为 todo。</p>
+        <p class="files">`scripts/pageflow.py` (43 行, sha256:5d1f0c2a)、`docs/pages/workflow-board/PROGRESS.md` (6 行, sha256:9b7a3e10)</p>
+      </li>
+      <li id="log-2">
+        <p class="stamp">2026-11-14T10:46:58+08:00 · M2</p>
+        <h3>进度追加协议</h3>
+        <p>每个模块完成即追加一条「时间 · 模块 · 标题 + 状态/摘要/文件/校验」记录，插入点固定在日志标记之后，保证时间正序。</p>
+        <p class="files">`docs/workflow/README.md` (212 行, sha256:1c4e88b7)</p>
+      </li>
+      <li id="log-3">
+        <p class="stamp">2026-11-14T10:53:20+08:00 · M3</p>
+        <h3>看板页面渲染</h3>
+        <p>文档渲染成单文件看板页，模块卡片带锚点 module-&lt;id&gt;、日志时间线带 log-&lt;n&gt;、进度条按完成率计算；所有文档文本统一 HTML 转义。</p>
+        <p class="files">`docs/workflow/board/index.html` (286 行, sha256:7f2b90d4)</p>
+      </li>
+      <li id="log-4">
+        <p class="stamp">2026-11-14T11:02:05+08:00 · M3</p>
+        <h3>修正渲染断言</h3>
+        <p>把「页面与文档一致」从字节比对改成结构比对（锚点、标题、条目数），允许人工微调样式而不误报。</p>
+        <p class="files">`scripts/pageflow.py` (48 行, sha256:31ad6c5e)</p>
+      </li>
+      <li id="log-5">
+        <p class="stamp">2026-11-14T11:09:47+08:00 · M4</p>
+        <h3>测试生成器</h3>
+        <p>整体完成后由文档生成合同测试，模块清单逐行变成参数化用例，产出文件存在性与文档登记一致。</p>
+        <p class="files">`tests/unit/workflow/test_pf_workflow_board_contract.py` (96 行, sha256:c0d54a19)</p>
+      </li>
+      <li id="log-6">
+        <p class="stamp">2026-11-14T11:16:33+08:00 · M5</p>
+        <h3>对抗性与唯一性套件</h3>
+        <p>对抗性套件用 9 组恶意载荷打解析与渲染（XSS、属性逃逸、javascript:、模板注入、RTL/零宽、超长、命令注入、表格伪装）；唯一性套件约束 slug、模块 ID、产出归属、日志条目、页面锚点。</p>
+        <p class="files">`tests/unit/workflow/test_pf_workflow_board_adversarial.py` (118 行, sha256:5e83bb41)、`tests/unit/workflow/test_pf_workflow_board_uniqueness.py` (104 行, sha256:a7c1f0d9)</p>
+      </li>
+    </ol>
+    <h2>测试计划</h2>
+    <table>
+      <thead><tr><th>TID</th><th>类型</th><th>描述</th><th>断言</th></tr></thead>
+      <tbody>
+        <tr><td>T1</td><td>contract</td><td>文档结构可解析</td><td>模块表 5 行、状态全 done、日志 6 条</td></tr>
+        <tr><td>T2</td><td>contract</td><td>页面反映文档</td><td>每个模块有唯一锚点、标题被渲染、条目数一致</td></tr>
+        <tr><td>T3</td><td>contract</td><td>产出文件存在</td><td>模块清单登记的每个路径在仓库内存在</td></tr>
+        <tr><td>T4</td><td>adversarial</td><td>注入载荷被转义</td><td>渲染结果不含 &lt;script、&lt;img、&lt;svg 等原始标签</td></tr>
+        <tr><td>T5</td><td>adversarial</td><td>畸形文档不崩</td><td>重复 ID 报错、未知状态归一、空表报错、CRLF+BOM 可解析</td></tr>
+        <tr><td>T6</td><td>uniqueness</td><td>标识全局唯一</td><td>slug、模块 ID、产出归属、日志条目、页面锚点均不重复</td></tr>
+      </tbody>
+    </table>
+  </main>
+  <footer>本文档由 docs/pages/workflow-board/PROGRESS.md 渲染；改动请改文档后重新 render。</footer>
+</div>
+</body>
+</html>
